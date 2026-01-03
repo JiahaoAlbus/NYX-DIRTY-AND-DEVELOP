@@ -17,7 +17,7 @@ support override
 '
 
 # Keep scope small for now to avoid false positives/noise.
-TARGET_DIRS="tooling 规则 .github"
+TARGET_DIRS=".github tooling packages"
 
 for d in $TARGET_DIRS; do
   if [ -d "$d" ]; then
