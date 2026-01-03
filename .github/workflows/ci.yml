@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: Conformance (Frozen Rules Gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Week 12 deliverables exist
+        run: |
+          test -f "规则/Engineering_Guidelines.md"
+          test -f "规则/Q2_Implementation_Plan.md"
+
+      - name: Frozen rules conformance gate
+        run: |
+          chmod +x tooling/scripts/conformance.sh
+          tooling/scripts/conformance.sh
