@@ -24,4 +24,4 @@ jobs:
       - name: Frozen rules conformance gate
         shell: bash
         run: |
-          bash tooling/scripts/conformance.sh
+          bash "tooling/scripts/conformance.sh"
