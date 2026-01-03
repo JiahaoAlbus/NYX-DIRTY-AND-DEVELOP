@@ -21,6 +21,7 @@ jobs:
           test -f "规则/Q2_Implementation_Plan.md"
 
       - name: Frozen rules conformance gate
+        shell: bash
         run: |
-          chmod +x tooling/scripts/conformance.sh
-          tooling/scripts/conformance.sh
+          bash tooling/scripts/conformance.sh
+
