@@ -1,6 +1,8 @@
 # NYX Q1 Frozen List (Week 11)
 
 **Document ID:** NYX_Q1_Frozen_List.md  
+**Authoritative Location:** frozen/q1/ (only)
+**Note:** Any copies outside frozen/q1 are non-authoritative and must not be used.
 **Status:** FROZEN — Q1 2026  
 **Freeze Window:** 2026-03-15 → 2026-03-21  
 **Authority Level:** Constitutional (v1)
@@ -308,4 +310,3 @@ By signing, the signatory acknowledges:
 
 **Freeze Effective Time:** 2026-03-21T23:59:59Z  
 **Status:** FROZEN — EFFECTIVE
-
