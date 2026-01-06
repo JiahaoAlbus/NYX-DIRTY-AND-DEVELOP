@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  frozen-q1-lock:
+    name: Frozen Q1 Lock
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Block PR changes to frozen/q1
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+
+          if echo "$changed" | grep -q '^frozen/q1/'; then
+            echo "frozen/q1 changes are not allowed in PRs"
+            echo "$changed" | grep '^frozen/q1/' || true
+            exit 1
+          fi
+
   conformance:
     name: Conformance (Frozen Rules Gate)
     runs-on: ubuntu-latest
