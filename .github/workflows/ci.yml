@@ -8,13 +8,19 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frozen-q1-lock:
     name: Frozen Q1 Lock
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
@@ -35,9 +41,20 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Cache build artifacts (placeholder)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/nyx
+          key: nyx-${{ runner.os }}-${{ hashFiles('ci/cache-key.txt') }}
+          restore-keys: |
+            nyx-${{ runner.os }}-
+
+      # Placeholder: replace with real build commands once build tooling is defined.
       - name: Build placeholder
         shell: bash
         run: |
@@ -51,9 +68,12 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      # Placeholder: replace with real test commands once test tooling is defined.
       - name: Test placeholder
         shell: bash
         run: |
@@ -67,9 +87,12 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      # Placeholder: replace with real lint commands once lint tooling is defined.
       - name: Lint placeholder
         shell: bash
         run: |
@@ -83,10 +106,14 @@ jobs:
   sast:
     name: SAST
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: SAST placeholder
+      # Placeholder: replace with real SAST scanner before any implementation code lands.
+      - name: Generate placeholder SARIF
         shell: bash
         run: |
           set -euo pipefail
@@ -94,15 +121,47 @@ jobs:
             echo "forced sast failure"
             exit 1
           fi
-          echo "sast placeholder"
+          mkdir -p .artifacts
+          cat > .artifacts/sast.sarif <<'SARIF'
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "NYX Placeholder SAST",
+                    "informationUri": "https://github.com/JiahaoAlbus/nyx",
+                    "rules": []
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          SARIF
+
+      - name: Upload SARIF (SAST)
+        uses: github/codeql-action/upload-sarif@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.31.9
+        with:
+          sarif_file: .artifacts/sast.sarif
 
   dependency-scan:
     name: Dependency Scan
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Dependency scan placeholder
+      - name: Dependency review (baseline)
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+
+      # Placeholder: replace with full dependency scanning when package manifests exist.
+      - name: Generate placeholder SARIF
         shell: bash
         run: |
           set -euo pipefail
@@ -110,13 +169,38 @@ jobs:
             echo "forced dependency scan failure"
             exit 1
           fi
-          echo "dependency scan placeholder"
+          mkdir -p .artifacts
+          cat > .artifacts/deps.sarif <<'SARIF'
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "NYX Placeholder Dependency Scan",
+                    "informationUri": "https://github.com/JiahaoAlbus/nyx",
+                    "rules": []
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          SARIF
+
+      - name: Upload SARIF (Dependency Scan)
+        uses: github/codeql-action/upload-sarif@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.31.9
+        with:
+          sarif_file: .artifacts/deps.sarif
 
   conformance:
     name: Conformance (Frozen Rules Gate)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Verify Week 12 deliverables exist
         shell: bash
