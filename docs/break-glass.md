@@ -10,7 +10,7 @@ It is a last-resort process and must be auditable.
 
 ## Required change set
 - Update frozen/q1 artifacts.
-- Regenerate frozen/q1/manifest.sha256.
+- Regenerate conformance/frozen-manifest.sha256.
 - Update conformance mapping if the frozen list changes.
 - Add a clear audit note in the PR description.
 

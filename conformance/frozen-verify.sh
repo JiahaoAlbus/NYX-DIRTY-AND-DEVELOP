@@ -5,7 +5,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT_DIR"
 
 FROZEN_DIR="frozen/q1"
-MANIFEST="$FROZEN_DIR/manifest.sha256"
+MANIFEST="${CONFORMANCE_MANIFEST_FILE:-conformance/frozen-manifest.sha256}"
 BREAK_GLASS_DOC="docs/break-glass.md"
 
 if [ ! -d "$FROZEN_DIR" ]; then
@@ -34,7 +34,7 @@ while IFS= read -r -d '' file; do
     echo "[conformance] FAIL: missing manifest entry: $rel"
     missing=1
   fi
-done < <(find "$FROZEN_DIR" -type f ! -name 'manifest.sha256' -print0)
+done < <(find "$FROZEN_DIR" -type f -print0)
 
 if [ "$missing" -ne 0 ]; then
   echo "[conformance] See $BREAK_GLASS_DOC for break-glass procedure."
@@ -59,7 +59,7 @@ dupe=0
 while IFS= read -r entry; do
   [ -z "$entry" ] && continue
   base=$(basename "$entry")
-  if [ "$base" = "README.md" ] || [ "$base" = "manifest.sha256" ]; then
+  if [ "$base" = "README.md" ]; then
     continue
   fi
   matches=$(find . -type f -name "$base" ! -path "./$FROZEN_DIR/*" ! -path "./.git/*")

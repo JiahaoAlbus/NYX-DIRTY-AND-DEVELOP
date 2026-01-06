@@ -8,6 +8,7 @@ Entrypoint
 
 Components
 - conformance/frozen-verify.sh validates frozen/q1 integrity and duplicate sources.
+- conformance/frozen-manifest.sha256 stores frozen file hashes outside the frozen directory.
 - tooling/scripts/conformance.sh enforces rule patterns without scanning documentation.
 
 Rules
