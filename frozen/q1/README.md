@@ -6,6 +6,14 @@ Any copies outside frozen/q1 are non-authoritative and must not be used.
 Change policy
 - Changes require break-glass approval and must be explicitly documented.
 
+Integrity controls
+- frozen/q1/manifest.sha256 records hashes for all frozen artifacts.
+- CI verifies the manifest and rejects duplicate authoritative sources.
+
+Break-glass procedure
+- Follow docs/break-glass.md before any frozen change.
+- Update manifest.sha256 and document the rationale and approvals.
+
 Included artifacts
 - nyx_q_1_frozen_list.md
 - nyx_constitution_v_1_draft.md
@@ -21,7 +29,7 @@ Included artifacts
 - nyx_whitepaper_v_1.md
 - Nyx Whitepaper V1.pdf
 - nyx_self_attack_review.md
-- NYX 五年最终时间表.docx
+- NYX ???????.docx
 
 Scope notes
 - Non-Q1 or mutable planning documents remain outside frozen/q1.

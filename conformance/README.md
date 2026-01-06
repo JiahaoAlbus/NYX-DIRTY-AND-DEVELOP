@@ -4,9 +4,15 @@ Conformance is the enforcement layer for the NYX constitution and frozen rules.
 It is the gate that rejects implementation changes that violate frozen constraints.
 
 Entrypoint
-- conformance/run.sh (CI calls this entrypoint)
-- tooling/scripts/conformance.sh (current enforcement engine)
+- conformance/run.sh is the only supported entrypoint for CI and local runs.
+
+Components
+- conformance/frozen-verify.sh validates frozen/q1 integrity and duplicate sources.
+- tooling/scripts/conformance.sh enforces rule patterns without scanning documentation.
 
 Rules
-- conformance/rules/ contains rule definitions with stable IDs (for example Q1-001).
-- Rule IDs map to frozen list items for traceability.
+- conformance/rules/ contains rule definitions with stable IDs.
+- conformance/rules/patterns.txt binds enforceable patterns to rule IDs.
+
+Failure output format
+CONFORMANCE_FAIL|<RuleID>|<Severity>|<Summary>|<Path>:<Line>|<Match>

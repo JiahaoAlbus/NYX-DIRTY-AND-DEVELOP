@@ -1,0 +1,8 @@
+# id|severity|pattern|summary
+Q1-001|critical|wallet[[:space:]]*=[[:space:]]*identity|Wallet is not identity
+Q1-001|critical|wallet.*identity|Wallet is not identity
+Q1-001|critical|identity.*wallet|Wallet is not identity
+Q1-004|critical|admin.*bypass|No trusted administrators
+Q1-004|critical|privileged.*bypass|No trusted administrators
+Q1-002|critical|fee.*exempt|No privileged fee exemptions
+Q1-004|critical|support override|No trusted administrators

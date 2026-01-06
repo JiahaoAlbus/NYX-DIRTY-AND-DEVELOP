@@ -33,7 +33,9 @@ jobs:
           changed=$(git diff --name-only "$base" "$head")
 
           if echo "$changed" | grep -q '^frozen/q1/'; then
-            echo "frozen/q1 changes are not allowed in PRs"
+            echo "FROZEN_LOCK_FAIL|FROZEN-Q1-LOCK|Changes to frozen/q1 are prohibited."
+            echo "break-glass: docs/break-glass.md"
+            echo "paths:"
             echo "$changed" | grep '^frozen/q1/' || true
             exit 1
           fi
