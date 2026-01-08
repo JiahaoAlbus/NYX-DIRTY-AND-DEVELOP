@@ -1,2 +1,7 @@
 # Default owners for the repository. Update as the team grows.
 * @JiahaoAlbus
+.github/workflows/ @JiahaoAlbus
+conformance/ @JiahaoAlbus
+tooling/scripts/ @JiahaoAlbus
+ci/ @JiahaoAlbus
+frozen/q1/ @JiahaoAlbus

@@ -24,19 +24,109 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Block PR changes to frozen/q1
+      - name: Enforce frozen/q1 lock
         shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
           changed=$(git diff --name-only "$base" "$head")
+          title="$PR_TITLE"
+          body="$PR_BODY"
+          break_glass_regex='(\[BREAK-GLASS\]|BREAK_GLASS_APPROVED)'
+
+          has_break_glass() {
+            echo "$title" | grep -Eq "$break_glass_regex" && return 0
+            git log --format=%s "$base".."$head" | grep -Eq "$break_glass_regex"
+          }
+
+          require_break_glass_fields() {
+            missing=()
+            for field in Reason Risk Rollback Approver; do
+              if ! echo "$body" | grep -Eiq "$field"; then
+                missing+=("$field")
+              fi
+            done
+
+            if [ "${#missing[@]}" -gt 0 ]; then
+              echo "FROZEN_LOCK_FAIL|FROZEN-Q1-LOCK|break-glass details missing: ${missing[*]}"
+              exit 1
+            fi
+          }
+
+          shadow_candidates=$(echo "$changed" | grep -Ei '(^|/).*frozen.*list.*|(^|/).*q1.*frozen.*' || true)
+          if [ -n "$shadow_candidates" ]; then
+            shadow_outside=$(echo "$shadow_candidates" | grep -Ev '^frozen/q1/' || true)
+            if [ -n "$shadow_outside" ]; then
+              echo "FROZEN_LOCK_FAIL|FROZEN-Q1-LOCK|shadow frozen artifacts must live under frozen/q1 only."
+              echo "$shadow_outside"
+              exit 1
+            fi
+          fi
 
           if echo "$changed" | grep -q '^frozen/q1/'; then
-            echo "FROZEN_LOCK_FAIL|FROZEN-Q1-LOCK|Changes to frozen/q1 are prohibited."
-            echo "break-glass: docs/break-glass.md"
-            echo "paths:"
-            echo "$changed" | grep '^frozen/q1/' || true
+            if ! has_break_glass; then
+              echo "FROZEN_LOCK_FAIL|FROZEN-Q1-LOCK|Changes to frozen/q1 require break-glass approval."
+              echo "break-glass: docs/break-glass.md"
+              echo "paths:"
+              echo "$changed" | grep '^frozen/q1/' || true
+              exit 1
+            fi
+            require_break_glass_fields
+          fi
+
+  law-guard:
+    name: Law Guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Protect governance and enforcement paths
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+          title="$PR_TITLE"
+          body="$PR_BODY"
+          break_glass_regex='(\[BREAK-GLASS\]|BREAK_GLASS_APPROVED)'
+          protected_regex='^(\.github/workflows/|conformance/|tooling/scripts/|ci/|frozen/q1/)'
+
+          protected=$(echo "$changed" | grep -E "$protected_regex" || true)
+          [ -z "$protected" ] && exit 0
+
+          has_break_glass() {
+            echo "$title" | grep -Eq "$break_glass_regex" && return 0
+            git log --format=%s "$base".."$head" | grep -Eq "$break_glass_regex"
+          }
+
+          if ! has_break_glass; then
+            echo "LAW_GUARD_FAIL|LAW-GUARD|Protected paths modified without break-glass approval."
+            echo "$protected"
+            exit 1
+          fi
+
+          missing=()
+          for field in Reason Risk Rollback Approver; do
+            if ! echo "$body" | grep -Eiq "$field"; then
+              missing+=("$field")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "LAW_GUARD_FAIL|LAW-GUARD|break-glass details missing: ${missing[*]}"
             exit 1
           fi
 

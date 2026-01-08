@@ -13,6 +13,7 @@ It is a last-resort process and must be auditable.
 - Regenerate conformance/frozen-manifest.sha256.
 - Update conformance mapping if the frozen list changes.
 - Add a clear audit note in the PR description.
+- PR description must include: Reason, Risk, Rollback, Approver.
 
 ## Review and verification
 - PR must include red-team steps demonstrating CI protection behavior.
