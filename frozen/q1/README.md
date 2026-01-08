@@ -1,4 +1,4 @@
-ï»¿# Q1 Frozen Mirror
+# Q1 Frozen Mirror
 
 This directory is the single authoritative location for Q1 frozen artifacts.
 Any copies outside frozen/q1 are non-authoritative and must not be used.
@@ -21,7 +21,7 @@ Included artifacts
 - nyx_whitepaper_v_1.md
 - Nyx Whitepaper V1.pdf
 - nyx_self_attack_review.md
-- NYX äº”å¹´æœ€ç»ˆæ—¶é—´è¡¨.docx
+- NYX ÎåÄê×îÖÕÊ±¼ä±í.docx
 
 Scope notes
-- Non-Q1 or mutable planning documents remain outside frozen/q1.Red team freeze edit.
+- Non-Q1 or mutable planning documents remain outside frozen/q1.
