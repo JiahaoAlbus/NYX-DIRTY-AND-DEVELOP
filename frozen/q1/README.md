@@ -24,4 +24,4 @@ Included artifacts
 - NYX 五年最终时间表.docx
 
 Scope notes
-- Non-Q1 or mutable planning documents remain outside frozen/q1.
+- Non-Q1 or mutable planning documents remain outside frozen/q1.Red team freeze edit.
