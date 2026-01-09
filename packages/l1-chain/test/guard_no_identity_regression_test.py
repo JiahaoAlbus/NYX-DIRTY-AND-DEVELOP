@@ -70,7 +70,10 @@ class ChainGuardTests(unittest.TestCase):
                     self.assertNotIn(token, content, msg=f"{token} import found in {filename}")
 
     def test_chain_adapter_api_guard(self):
-        banned = ["identity", "wallet"]
+        banned = [
+            "identity",
+            "wallet",
+        ]
         for method in ("submit_tx", "get_finality", "read_state", "verify_state_proof"):
             signature = inspect.signature(getattr(ChainAdapter, method))
             for param in signature.parameters.values():
