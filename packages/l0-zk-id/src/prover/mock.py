@@ -64,9 +64,9 @@ def verify_mock_proof(envelope: ProofEnvelope) -> bool:
     except MockProverError:
         return False
     expected = _compute_mock_proof(envelope.binding_tag, witness_hash)
-    if not isinstance(envelope.proof_bytes, (bytes, bytearray)):
+    if not isinstance(envelope.proof_bytes, bytes):
         return False
-    return hmac.compare_digest(expected, bytes(envelope.proof_bytes))
+    return hmac.compare_digest(expected, envelope.proof_bytes)
 
 
 def _compute_witness_hash(witness: object) -> bytes:

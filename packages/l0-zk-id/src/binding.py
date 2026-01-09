@@ -20,12 +20,30 @@ def compute_binding_tag(
     nonce: bytes,
     public_inputs: dict,
 ) -> bytes:
+    payload = build_binding_preimage(
+        protocol_version=protocol_version,
+        statement_id=statement_id,
+        context_id=context_id,
+        nonce=nonce,
+        public_inputs=public_inputs,
+    )
+    return hashlib.sha256(payload).digest()
+
+
+def build_binding_preimage(
+    *,
+    protocol_version: str,
+    statement_id: str,
+    context_id: bytes,
+    nonce: bytes,
+    public_inputs: dict,
+) -> bytes:
     if not isinstance(public_inputs, dict):
         raise BindingError("public_inputs must be a dict")
-    protocol_bytes = _len_prefix(_require_text(protocol_version, "protocol_version"))
-    statement_bytes = _len_prefix(_require_text(statement_id, "statement_id"))
-    context_bytes = require_bytes32(context_id, "context_id")
-    nonce_bytes = require_bytes32(nonce, "nonce")
+    protocol_bytes = encode_len_prefixed(protocol_version, "protocol_version")
+    statement_bytes = encode_len_prefixed(statement_id, "statement_id")
+    context_bytes = encode_bytes32(context_id, "context_id")
+    nonce_bytes = encode_bytes32(nonce, "nonce")
     try:
         public_inputs_bytes = canonicalize(public_inputs)
     except CanonicalizationError as exc:
@@ -41,18 +59,21 @@ def compute_binding_tag(
             public_inputs_bytes,
         ]
     )
-    return hashlib.sha256(payload).digest()
+    return payload
 
 
 def require_bytes32(value: object, field_name: str) -> bytes:
     if isinstance(value, str):
         return _parse_hex_bytes32(value, field_name)
-    if not isinstance(value, (bytes, bytearray)):
+    if not isinstance(value, bytes):
         raise BindingError(f"{field_name} must be 32 bytes")
-    data = bytes(value)
-    if len(data) != 32:
+    if len(value) != 32:
         raise BindingError(f"{field_name} must be 32 bytes")
-    return data
+    return value
+
+
+def encode_bytes32(value: object, field_name: str) -> bytes:
+    return require_bytes32(value, field_name)
 
 
 def _require_text(value: object, field_name: str) -> str:
@@ -64,8 +85,8 @@ def _require_text(value: object, field_name: str) -> str:
     return value
 
 
-def _len_prefix(text: str) -> bytes:
-    data = text.encode("utf-8")
+def encode_len_prefixed(text: str, field_name: str) -> bytes:
+    data = _require_text(text, field_name).encode("utf-8")
     if len(data) > 0xFFFFFFFF:
         raise BindingError("text field too large")
     return len(data).to_bytes(4, "big") + data

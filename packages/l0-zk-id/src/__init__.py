@@ -1,5 +1,13 @@
 from canonical import CanonicalizationError, canonicalize
-from binding import BindingError, PROTOCOL_VERSION, compute_binding_tag
+from binding import (
+    BINDING_TAG_BYTES,
+    BindingError,
+    PROTOCOL_VERSION,
+    build_binding_preimage,
+    compute_binding_tag,
+    encode_bytes32,
+    encode_len_prefixed,
+)
 from envelope import EnvelopeError, ProofEnvelope, create_default_envelope, create_envelope
 from nullifier import NullifierError, compute_nullifier
 from prover.mock import MockProverError, prove_mock
@@ -10,7 +18,11 @@ __all__ = [
     "canonicalize",
     "BindingError",
     "PROTOCOL_VERSION",
+    "BINDING_TAG_BYTES",
+    "build_binding_preimage",
     "compute_binding_tag",
+    "encode_bytes32",
+    "encode_len_prefixed",
     "EnvelopeError",
     "ProofEnvelope",
     "create_envelope",

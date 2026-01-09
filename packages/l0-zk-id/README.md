@@ -74,3 +74,10 @@ nullifier = SHA256(
 
 - This package does **not** modify or depend on `packages/l0-identity/`.
 - Only the adapter layer is expected to change when swapping in a real ZK system.
+
+## Hardening
+
+- `hmac.compare_digest` is used for binding tag, proof bytes, and nullifier comparisons.
+- Canonicalization includes DoS guards (`max_depth=64`, `max_bytes=1_048_576`) and rejects floats/bytes/surrogates/bool-as-int.
+- `ProofEnvelope` is immutable and enforces strict validation on all fields.
+- The binding tag formula and structural context separation are unchanged.

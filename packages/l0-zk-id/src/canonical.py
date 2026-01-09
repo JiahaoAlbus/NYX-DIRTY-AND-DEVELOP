@@ -4,22 +4,39 @@ import json
 from typing import Any
 
 
+MAX_CANONICAL_DEPTH = 64
+MAX_CANONICAL_BYTES = 1_048_576
+
+
 class CanonicalizationError(ValueError):
     pass
 
 
-def canonicalize(value: object) -> bytes:
-    normalized = _normalize(value)
+def canonicalize(
+    value: object,
+    *,
+    max_depth: int = MAX_CANONICAL_DEPTH,
+    max_bytes: int = MAX_CANONICAL_BYTES,
+) -> bytes:
+    if not isinstance(max_depth, int) or max_depth < 1:
+        raise CanonicalizationError("max_depth must be a positive integer")
+    if not isinstance(max_bytes, int) or max_bytes < 1:
+        raise CanonicalizationError("max_bytes must be a positive integer")
+    normalized = _normalize(value, depth=0, max_depth=max_depth)
     encoded = json.dumps(
         normalized,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
-    )
-    return encoded.encode("utf-8")
+    ).encode("utf-8")
+    if len(encoded) > max_bytes:
+        raise CanonicalizationError("canonical output exceeds max bytes")
+    return encoded
 
 
-def _normalize(value: object) -> Any:
+def _normalize(value: object, *, depth: int, max_depth: int) -> Any:
+    if depth > max_depth:
+        raise CanonicalizationError("maximum canonical depth exceeded")
     if value is None:
         return None
     if isinstance(value, bool):
@@ -30,7 +47,7 @@ def _normalize(value: object) -> Any:
         _reject_surrogates(value)
         return value
     if isinstance(value, (list, tuple)):
-        return [_normalize(item) for item in value]
+        return [_normalize(item, depth=depth + 1, max_depth=max_depth) for item in value]
     if isinstance(value, dict):
         normalized: dict[str, Any] = {}
         for key, item in value.items():
@@ -39,7 +56,7 @@ def _normalize(value: object) -> Any:
             _reject_surrogates(key)
             if key in normalized:
                 raise CanonicalizationError("duplicate dict key")
-            normalized[key] = _normalize(item)
+            normalized[key] = _normalize(item, depth=depth + 1, max_depth=max_depth)
         return normalized
     if isinstance(value, float):
         raise CanonicalizationError("float values are not permitted")
