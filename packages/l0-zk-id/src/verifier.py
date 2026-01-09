@@ -22,6 +22,7 @@ def verify_envelope(
     expected_context_id: bytes,
     expected_statement_id: str,
     expected_protocol_version: str = PROTOCOL_VERSION,
+    expected_nullifier: bytes | None = None,
 ) -> bool:
     try:
         expected_context = require_bytes32(expected_context_id, "expected_context_id")
@@ -40,14 +41,25 @@ def verify_envelope(
         return False
     if not hmac.compare_digest(context_bytes, expected_context):
         return False
-    if not isinstance(envelope.binding_tag, (bytes, bytearray)):
+    if not isinstance(envelope.binding_tag, bytes):
         return False
     if len(envelope.binding_tag) != 32:
         return False
     if envelope.nullifier is not None:
-        if not isinstance(envelope.nullifier, (bytes, bytearray)):
+        if not isinstance(envelope.nullifier, bytes):
             return False
         if len(envelope.nullifier) != 32:
+            return False
+    if expected_nullifier is not None:
+        try:
+            expected_nullifier_bytes = require_bytes32(
+                expected_nullifier, "expected_nullifier"
+            )
+        except BindingError:
+            return False
+        if envelope.nullifier is None:
+            return False
+        if not hmac.compare_digest(bytes(envelope.nullifier), expected_nullifier_bytes):
             return False
     if not isinstance(envelope.public_inputs, dict):
         return False
@@ -78,10 +90,12 @@ def verify(
     expected_statement_id: str,
     adapter: ProofAdapter,
     expected_protocol_version: str = PROTOCOL_VERSION,
+    expected_nullifier: bytes | None = None,
 ) -> bool:
     return verify_envelope(
         envelope,
         expected_context_id,
         expected_statement_id,
         expected_protocol_version,
+        expected_nullifier,
     ) and verify_proof(adapter, envelope)
