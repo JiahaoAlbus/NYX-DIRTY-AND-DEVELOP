@@ -3,3 +3,8 @@
 ~$*.xlsx
 .DS_Store
 Thumbs.db
+/main_files.txt
+/week1_files.txt
+/week2_files.txt
+/Microsoft
+/git

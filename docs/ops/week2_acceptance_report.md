@@ -31,3 +31,14 @@ Branch protection checklist (main)
 
 Final verdict
 No path exists to modify frozen rules or gatekeepers and merge to main without CI stopping it, except via explicit break-glass process.
+
+Week 2 seal statement
+Week 2 is sealed. Changes that affect L0 identity or the legal guardrails require an explicit BREAK-GLASS process.
+Protected paths:
+- .github/workflows/
+- conformance/
+- tooling/scripts/
+- ci/
+- frozen/q1/
+- packages/l0-identity/
+Exception process: use the break-glass PR template at .github/PULL_REQUEST_TEMPLATE/break_glass.md.
