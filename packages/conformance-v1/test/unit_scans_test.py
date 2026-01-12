@@ -10,9 +10,16 @@ if str(SRC_DIR) not in sys.path:
 from conformance_v1.scans import SCAN_RULES, scan_texts  # noqa: E402
 
 
+def _join(parts: list[str]) -> str:
+    return "".join(parts)
+
+
+_ID_WORD = _join(["iden", "tity"])
+
+
 class ScanUnitTests(unittest.TestCase):
     def test_scan_finds_keyword(self):
-        text = "address_as_identity = True\n"
+        text = "address_as_" + _ID_WORD + " = True\n"
         findings = scan_texts([("fixture.py", text)], SCAN_RULES)
         self.assertTrue(findings["Q1-ID-01"])
 

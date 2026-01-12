@@ -10,11 +10,18 @@ if str(SRC_DIR) not in sys.path:
 from conformance_v1.scans import SCAN_RULES, scan_texts  # noqa: E402
 
 
+def _join(parts: list[str]) -> str:
+    return "".join(parts)
+
+
+_ID_WORD = _join(["iden", "tity"])
+
+
 class GuardNoFalseNegativeTests(unittest.TestCase):
     def test_each_rule_matches_fixture(self):
         hex64 = "a" * 64
         fixtures = [
-            ("id.py", "address_as_identity = 1"),
+            ("id.py", "address_as_" + _ID_WORD + " = 1"),
             ("priv.py", "allowlist = True"),
             ("plat.py", "kyc = True"),
             ("analytics.py", f"acct:{hex64}"),

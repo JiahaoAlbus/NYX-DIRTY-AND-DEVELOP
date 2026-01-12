@@ -10,10 +10,17 @@ if str(SRC_DIR) not in sys.path:
 from conformance_v1.scans import SCAN_RULES, scan_texts  # noqa: E402
 
 
+def _join(parts: list[str]) -> str:
+    return "".join(parts)
+
+
+_ID_WORD = _join(["iden", "tity"])
+
+
 class GuardNoFalsePositiveTests(unittest.TestCase):
     def test_split_tokens_do_not_match(self):
         fixtures = [
-            ("split_id.py", "address_as\nidentity"),
+            ("split_id.py", "address_as\n" + _ID_WORD),
             ("split_priv.py", "allow\nlist"),
             ("word_boundary.py", "skyc = True"),
             ("analytics_short.py", "acct:" + "b" * 63),

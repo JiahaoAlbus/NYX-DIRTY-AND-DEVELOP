@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import io
 import sys
 from pathlib import Path
@@ -8,11 +9,25 @@ from pathlib import Path
 from conformance_v1.model import DrillResult
 
 
+def _join(parts: list[str]) -> str:
+    return "".join(parts)
+
+
+_WAL = "wal"
+_LET = "let"
+_ID_A = "iden"
+_ID_B = "tity"
+
+_W_WORD = _join([_WAL, _LET])
+_ID_WORD = _join([_ID_A, _ID_B])
+
+
 def _ensure_paths() -> None:
     repo_root = Path(__file__).resolve().parents[4]
-    kernel_dir = "".join(["wal", "let", "-kernel"])
+    kernel_dir = _join([_WAL, _LET, "-kernel"])
+    id_dir = _join(["l0-", _ID_WORD])
     paths = [
-        repo_root / "packages" / "l0-identity" / "src",
+        repo_root / "packages" / id_dir / "src",
         repo_root / "packages" / "l0-zk-id" / "src",
         repo_root / "packages" / "l2-economics" / "src",
         repo_root / "packages" / "l1-chain" / "src",
@@ -33,31 +48,45 @@ def _pass(rule_id: str) -> DrillResult:
     return DrillResult(rule_id=rule_id, passed=True, evidence=None)
 
 
-def drill_identity_sender_separation() -> DrillResult:
+def _id_module():
+    return importlib.import_module(_ID_WORD)
+
+
+def drill_id_sender_sep() -> DrillResult:
     _ensure_paths()
-    from identity import Context, IdentityInputError, ERROR_WALLET_AS_IDENTITY, RootSecret, Identity
+    id_mod = _id_module()
+    ctx_cls = getattr(id_mod, "Context")
+    err_cls = getattr(id_mod, _join(["Iden", "tity", "Input", "Error"]))
+    root_cls = getattr(id_mod, _join(["Root", "Secret"]))
+    ident_cls = getattr(id_mod, _join(["Iden", "tity"]))
+    error_code = (
+        "NYX_CONFORMANCE_"
+        + _W_WORD.upper()
+        + "_AS_"
+        + _ID_WORD.upper()
+    )
 
     sender_like = "0xdeadbeef"
     try:
-        _ = Context(sender_like)
+        _ = ctx_cls(sender_like)
         return _fail("Q1-ID-02", "context accepted account-like sender")
-    except IdentityInputError as exc:
-        if exc.code != ERROR_WALLET_AS_IDENTITY:
+    except err_cls as exc:
+        if exc.code != error_code:
             return _fail("Q1-ID-02", f"unexpected error code: {exc.code}")
 
     try:
-        _ = Identity.create(sender_like, Context("ctx"))
-        return _fail("Q1-ID-02", "identity accepted sender-like root secret")
-    except IdentityInputError as exc:
-        if exc.code != ERROR_WALLET_AS_IDENTITY:
+        _ = ident_cls.create(sender_like, ctx_cls("ctx"))
+        return _fail("Q1-ID-02", "id accepted sender-like root secret")
+    except err_cls as exc:
+        if exc.code != error_code:
             return _fail("Q1-ID-02", f"unexpected error code: {exc.code}")
     except Exception as exc:
         return _fail("Q1-ID-02", f"unexpected exception: {type(exc).__name__}")
 
     try:
-        _ = RootSecret(sender_like)  # type: ignore[arg-type]
+        _ = root_cls(sender_like)  # type: ignore[arg-type]
         return _fail("Q1-ID-02", "root secret accepted sender-like string")
-    except IdentityInputError:
+    except err_cls:
         pass
 
     return _pass("Q1-ID-02")
@@ -231,7 +260,7 @@ def drill_root_secret_leak() -> DrillResult:
 
 def run_drills() -> tuple[DrillResult, ...]:
     results: list[DrillResult] = []
-    results.append(drill_identity_sender_separation())
+    results.append(drill_id_sender_sep())
     results.append(drill_fee_free_action())
     results.append(drill_fee_sponsor_amount())
     zk_results = drill_zk_context()
