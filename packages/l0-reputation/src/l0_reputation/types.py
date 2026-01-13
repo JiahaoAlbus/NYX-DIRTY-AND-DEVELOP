@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-class LedgerTypeError(ValueError):
+class ReputationTypeError(ValueError):
     pass
 
 
@@ -13,40 +13,37 @@ class Bytes32:
 
     def __post_init__(self) -> None:
         if not isinstance(self.value, (bytes, bytearray)):
-            raise LedgerTypeError("bytes32 must be bytes")
+            raise ReputationTypeError("bytes32 must be bytes")
         if isinstance(self.value, bytearray):
             object.__setattr__(self, "value", bytes(self.value))
         if len(self.value) != 32:
-            raise LedgerTypeError("bytes32 must be 32 bytes")
+            raise ReputationTypeError("bytes32 must be 32 bytes")
 
     def hex(self) -> str:
         return self.value.hex()
 
 
 @dataclass(frozen=True)
-class Commitment:
+class PseudonymId:
     value: Bytes32
 
 
 @dataclass(frozen=True)
-class Nullifier:
+class RepRoot:
     value: Bytes32
 
 
 @dataclass(frozen=True)
-class LedgerRoot:
+class RepEventId:
     value: Bytes32
 
 
 @dataclass(frozen=True)
-class Note:
-    note_id: Bytes32
-    commitment: Commitment
-    value: int
-    memo: str | None = None
+class RepEvent:
+    event_id: RepEventId
+    context_id: Bytes32
+    payload: dict
 
     def __post_init__(self) -> None:
-        if not isinstance(self.value, int) or isinstance(self.value, bool):
-            raise LedgerTypeError("note value must be int")
-        if self.memo is not None and not isinstance(self.memo, str):
-            raise LedgerTypeError("memo must be string or None")
+        if not isinstance(self.payload, dict):
+            raise ReputationTypeError("payload must be dict")
