@@ -6,6 +6,17 @@ from conformance_v1.model import Report
 
 
 def report_to_json(report: Report) -> str:
+    attack_cards = [
+        {
+            "rule_id": card.rule_id,
+            "adversary_class": list(card.adversary_class),
+            "surface": card.surface,
+            "attack_vector": card.attack_vector,
+            "repro_command": card.repro_command,
+            "evidence": card.evidence,
+        }
+        for card in report.attack_cards()
+    ]
     payload = {
         "rules": [
             {
@@ -16,6 +27,7 @@ def report_to_json(report: Report) -> str:
                 "severity": rule.severity,
                 "rationale": rule.rationale,
                 "detection": rule.detection,
+                "repro_command": rule.repro_command,
             }
             for rule in report.rules
         ],
@@ -27,5 +39,6 @@ def report_to_json(report: Report) -> str:
             }
             for result in report.results
         ],
+        "attack_cards": attack_cards,
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)

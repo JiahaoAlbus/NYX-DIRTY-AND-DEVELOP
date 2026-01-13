@@ -1,11 +1,11 @@
 # Invariants & Gates (Testnet 0.1)
 
 ## Core Invariants (frozen)
-- Identity ≠ wallet ≠ chain account; chain sender/signature never equals identity.
+- Identity is separate from chain account and sender.
+- Chain sender/signature never equals identity.
 - State mutation actions must incur non-zero fee; sponsor may change payer only, never amount.
-- Proof context separation: any proof verified under the wrong context must fail.
-- Wallet-kernel is verify-only; it cannot generate proofs or handle root secrets.
-- Chain signatures are not identity, and no module imports sealed identity roots.
+- Client kernel is verify-only; it cannot generate proofs or handle root secrets.
+- Chain signatures carry no identity meaning, and no module imports sealed identity roots.
 
 ## Gate Stack
 - Frozen Q1 Lock (frozen docs + manifest integrity)

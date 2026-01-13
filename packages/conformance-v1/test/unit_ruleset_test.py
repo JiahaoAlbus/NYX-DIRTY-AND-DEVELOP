@@ -30,6 +30,9 @@ class RuleSetTests(unittest.TestCase):
             "Q1-ZK-01",
             "Q1-ZK-02",
             "Q1-SECRET-01",
+            "Q1-TRACE-01",
+            "Q1-TRACE-02",
+            "Q1-TRACE-03",
             "Q1-PRIV-01",
             "Q1-PLAT-01",
             "Q1-ANALYTICS-01",
@@ -45,6 +48,7 @@ class RuleSetTests(unittest.TestCase):
             self.assertTrue(rule.severity)
             self.assertTrue(rule.rationale)
             self.assertIn(rule.detection, detections)
+            self.assertTrue(rule.repro_command)
             for adversary in rule.adversary_class:
                 self.assertIn(adversary, ADVERSARY_CLASSES)
 

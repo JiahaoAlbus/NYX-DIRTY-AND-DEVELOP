@@ -34,7 +34,7 @@ Controls are present, but several checks remain placeholders and branch protecti
 
 ## Red-Team Validation Playbook
 - Modify any file under frozen/q1 in a PR; expected failing check: Frozen Q1 Lock (and Conformance (Frozen Rules Gate) if manifest mismatch); evidence: CI job logs listing paths and conformance failure output.
-- Inject a prohibited pattern into packages/ (for example "wallet = identity" in a new file); expected failing check: Conformance (Frozen Rules Gate) with Rule ID Q1-001; evidence: CONFORMANCE_FAIL log line with the matched pattern and file path.
+- Inject a prohibited pattern into packages/ (for example "account = id" in a new file); expected failing check: Conformance (Frozen Rules Gate) with Rule ID Q1-001; evidence: CONFORMANCE_FAIL log line with the matched pattern and file path.
 - Force a CI failure by adding ci/force-fail-build or ci/force-fail-lint in a PR; expected failing check: Build or Lint; evidence: job log showing forced failure marker.
 
 ## Branch Protection Configuration
