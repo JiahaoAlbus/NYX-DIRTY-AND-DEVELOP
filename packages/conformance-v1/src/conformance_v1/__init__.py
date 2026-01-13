@@ -1,6 +1,5 @@
 from conformance_v1.model import AttackCard, DrillResult, Report, Rule
 from conformance_v1.report import report_to_json
-from conformance_v1.runner import ConformanceError, run_all
 from conformance_v1.ruleset import RULES
 
 __all__ = [
@@ -13,3 +12,15 @@ __all__ = [
     "run_all",
     "report_to_json",
 ]
+
+
+def __getattr__(name: str):
+    if name in ("ConformanceError", "run_all"):
+        from conformance_v1.runner import ConformanceError, run_all
+
+        return {"ConformanceError": ConformanceError, "run_all": run_all}[name]
+    raise AttributeError(name)
+
+
+def __dir__() -> list[str]:
+    return sorted(__all__)

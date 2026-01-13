@@ -49,7 +49,8 @@ def run_all() -> Report:
     failures = report.failures()
     if failures:
         failure_ids = ",".join(result.rule_id for result in failures)
-        raise ConformanceError(f"conformance failed: {failure_ids}")
+        evidence = failures[0].evidence or "none"
+        raise ConformanceError(f"conformance failed: {failure_ids}; evidence={evidence}")
     return report
 
 
