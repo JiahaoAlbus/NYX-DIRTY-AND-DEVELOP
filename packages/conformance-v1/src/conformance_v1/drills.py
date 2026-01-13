@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import io
+import json
 import sys
 from pathlib import Path
 
@@ -258,6 +259,83 @@ def drill_root_secret_leak() -> DrillResult:
     return _pass("Q1-SECRET-01")
 
 
+def _tamper_hex(hex_str: str) -> str:
+    if not isinstance(hex_str, str) or not hex_str:
+        raise ValueError("hex string required")
+    last = hex_str[-1]
+    replacement = "0" if last != "0" else "1"
+    return hex_str[:-1] + replacement
+
+
+def _tamper_trace(trace, mutator) -> object:
+    payload = json.loads(trace.to_json())
+    mutator(payload)
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    from e2e_demo.trace import E2ETrace
+
+    return E2ETrace.from_json(raw)
+
+
+def drill_trace_tamper() -> DrillResult:
+    _ensure_paths()
+    from e2e_demo.pipeline import run_e2e
+    from e2e_demo.replay import replay_and_verify
+
+    trace, _ = run_e2e(seed=123)
+
+    def mutate(payload: dict) -> None:
+        payload["chain"]["payload"] = _tamper_hex(payload["chain"]["payload"])
+
+    try:
+        tampered = _tamper_trace(trace, mutate)
+        replay = replay_and_verify(tampered)
+    except Exception:
+        return _fail("Q1-TRACE-01", "trace tamper replay crashed")
+    if replay.ok:
+        return _fail("Q1-TRACE-01", "tampered trace replayed")
+    return _pass("Q1-TRACE-01")
+
+
+def drill_fee_tamper() -> DrillResult:
+    _ensure_paths()
+    from e2e_demo.pipeline import run_e2e
+    from e2e_demo.replay import replay_and_verify
+
+    trace, _ = run_e2e(seed=123)
+
+    def mutate(payload: dict) -> None:
+        payload["fee"]["receipt_hash"] = _tamper_hex(payload["fee"]["receipt_hash"])
+
+    try:
+        tampered = _tamper_trace(trace, mutate)
+        replay = replay_and_verify(tampered)
+    except Exception:
+        return _fail("Q1-TRACE-02", "fee tamper replay crashed")
+    if replay.ok:
+        return _fail("Q1-TRACE-02", "fee tamper replayed")
+    return _pass("Q1-TRACE-02")
+
+
+def drill_proof_tamper() -> DrillResult:
+    _ensure_paths()
+    from e2e_demo.pipeline import run_e2e
+    from e2e_demo.replay import replay_and_verify
+
+    trace, _ = run_e2e(seed=123)
+
+    def mutate(payload: dict) -> None:
+        payload["proof"]["binding_tag"] = _tamper_hex(payload["proof"]["binding_tag"])
+
+    try:
+        tampered = _tamper_trace(trace, mutate)
+        replay = replay_and_verify(tampered)
+    except Exception:
+        return _fail("Q1-TRACE-03", "proof tamper replay crashed")
+    if replay.ok:
+        return _fail("Q1-TRACE-03", "proof tamper replayed")
+    return _pass("Q1-TRACE-03")
+
+
 def run_drills() -> tuple[DrillResult, ...]:
     results: list[DrillResult] = []
     results.append(drill_id_sender_sep())
@@ -266,4 +344,7 @@ def run_drills() -> tuple[DrillResult, ...]:
     zk_results = drill_zk_context()
     results.extend(zk_results)
     results.append(drill_root_secret_leak())
+    results.append(drill_trace_tamper())
+    results.append(drill_fee_tamper())
+    results.append(drill_proof_tamper())
     return tuple(results)

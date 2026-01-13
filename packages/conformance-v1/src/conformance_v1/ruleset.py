@@ -13,6 +13,10 @@ ADVERSARY_CLASSES = (
 DETECTION_STATIC = "static scan"
 DETECTION_RUNTIME = "runtime drill"
 DETECTION_BOTH = "both"
+REPRO_COMMAND = (
+    'PYTHONPATH="packages/conformance-v1/src" '
+    "python -m conformance_v1.runner --out /tmp/nyx_conformance_report.json"
+)
 
 RULES: tuple[Rule, ...] = (
     Rule(
@@ -23,6 +27,7 @@ RULES: tuple[Rule, ...] = (
         severity="BLOCKER",
         rationale="Account/address must not become id in code paths.",
         detection=DETECTION_STATIC,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-ID-02",
@@ -32,6 +37,7 @@ RULES: tuple[Rule, ...] = (
         severity="HIGH",
         rationale="Runtime should reject account-like identifiers as id.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-FEE-01",
@@ -41,6 +47,7 @@ RULES: tuple[Rule, ...] = (
         severity="BLOCKER",
         rationale="State mutation must never be free.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-FEE-02",
@@ -50,6 +57,7 @@ RULES: tuple[Rule, ...] = (
         severity="HIGH",
         rationale="Sponsorship cannot change the fee amount.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-ZK-01",
@@ -59,6 +67,7 @@ RULES: tuple[Rule, ...] = (
         severity="BLOCKER",
         rationale="Proofs must be context-separated.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-ZK-02",
@@ -68,6 +77,7 @@ RULES: tuple[Rule, ...] = (
         severity="HIGH",
         rationale="Nullifier must bind to context to prevent reuse.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-SECRET-01",
@@ -77,6 +87,37 @@ RULES: tuple[Rule, ...] = (
         severity="BLOCKER",
         rationale="Root secret must not leak to outputs or trace.",
         detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
+    ),
+    Rule(
+        rule_id="Q1-TRACE-01",
+        adversary_class=("External Hackers",),
+        attack_vector="trace tamper replay",
+        surface="Protocol Logic",
+        severity="HIGH",
+        rationale="Tampered trace must fail replay verification.",
+        detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
+    ),
+    Rule(
+        rule_id="Q1-TRACE-02",
+        adversary_class=("External Hackers",),
+        attack_vector="fee tamper replay",
+        surface="Economic Layer",
+        severity="HIGH",
+        rationale="Fee tampering must fail replay verification.",
+        detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
+    ),
+    Rule(
+        rule_id="Q1-TRACE-03",
+        adversary_class=("External Hackers",),
+        attack_vector="proof tamper replay",
+        surface="ID/Ledger",
+        severity="HIGH",
+        rationale="Proof tampering must fail replay verification.",
+        detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-PRIV-01",
@@ -86,6 +127,7 @@ RULES: tuple[Rule, ...] = (
         severity="BLOCKER",
         rationale="No backdoor or unauthorized shortcut routes permitted.",
         detection=DETECTION_STATIC,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-PLAT-01",
@@ -95,6 +137,7 @@ RULES: tuple[Rule, ...] = (
         severity="MEDIUM",
         rationale="Backdoor gating (KYC/allow) is not permitted.",
         detection=DETECTION_STATIC,
+        repro_command=REPRO_COMMAND,
     ),
     Rule(
         rule_id="Q1-ANALYTICS-01",
@@ -104,5 +147,6 @@ RULES: tuple[Rule, ...] = (
         severity="MEDIUM",
         rationale="Do not persist full commitment identifiers in shared state.",
         detection=DETECTION_STATIC,
+        repro_command=REPRO_COMMAND,
     ),
 )
