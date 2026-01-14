@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from l0_reputation.types import Bytes32, PseudonymId, RepEvent, RepRoot
+from l0_reputation.events import RepEvent
+from l0_reputation.types import Bytes32, PseudonymId, RepRoot
 
 
 class DisclosureStatement(ABC):
