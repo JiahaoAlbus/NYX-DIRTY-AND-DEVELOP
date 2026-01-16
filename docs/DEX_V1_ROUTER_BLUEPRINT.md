@@ -35,6 +35,7 @@ Receipt schema (F0)
 - RouterReceipt
   - action: RouterActionKind
   - state_hash: bytes
+  - steps: tuple of v0 Swap actions
   - step_receipts: tuple of DexReceipt
 
 Replay contract
