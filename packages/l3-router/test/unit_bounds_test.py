@@ -1,11 +1,23 @@
+import sys
+from pathlib import Path
 import unittest
 
-from l3_dex.actions import Swap
-from l3_dex.state import DexState, PoolState
-from l3_router.actions import RouteSwap, RouterAction, RouterActionKind
-from l3_router.errors import ValidationError
-from l3_router.kernel import apply_route
-from l3_router.state import RouterState
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SRC_DIRS = [
+    REPO_ROOT / "packages" / "l3-router" / "src",
+    REPO_ROOT / "packages" / "l3-dex" / "src",
+]
+for path in SRC_DIRS:
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
+
+from l3_dex.actions import Swap  # noqa: E402
+from l3_dex.state import DexState, PoolState  # noqa: E402
+from l3_router.actions import RouteSwap, RouterAction, RouterActionKind  # noqa: E402
+from l3_router.errors import ValidationError  # noqa: E402
+from l3_router.kernel import apply_route  # noqa: E402
+from l3_router.state import RouterState  # noqa: E402
 
 _MAX_AMOUNT = 10**12
 _MAX_STEPS = 8
