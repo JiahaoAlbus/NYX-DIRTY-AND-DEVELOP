@@ -21,9 +21,10 @@ Invariant → Evidence
   - Tests: golden vectors (Week04)
   - Tests: determinism guards (Week08)
 - Integer-only arithmetic
-  - Tests: rounding and bounds property tests (Week05)
+  - Tests: packages/l3-router/test/property_router_invariants_test.py
 - Bounds and rejection rules
-  - Tests: property tests and guard tests (Week05)
+  - Tests: packages/l3-router/test/property_router_invariants_test.py
+  - Tests: packages/l3-router/test/unit_bounds_test.py
 - No account binding semantics
   - Tests: conformance drills (Week08)
 - Fee enforcement for mutations
