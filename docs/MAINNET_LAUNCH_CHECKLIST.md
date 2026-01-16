@@ -41,6 +41,12 @@ Record:
 - Bounded explorer bounds and pass/fail.
 - Conformance v3 report path.
 
+## Q5 Additions (Additive Only)
+- Router v1 receipt and replay tests MUST be green.
+- Reference client output MUST be deterministic for identical seeds.
+- Bug bounty and disclosure docs MUST be complete and current.
+- Q5 audit reproduction commands MUST be available and verified.
+
 ## Freeze / Change Control
 - Changes after freeze must follow `docs/CHANGE_CONTROL.md`.
 - Semantic changes require a new protocol version and deployment.
