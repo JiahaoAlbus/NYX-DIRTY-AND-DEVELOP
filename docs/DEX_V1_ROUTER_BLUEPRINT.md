@@ -56,4 +56,5 @@ Evidence / Verification
 
 Freeze / Change Control
 - F0: Router interface and receipt schema are locked after Week02.
-- After F0: patch-only or additive extensions; semantic changes require a new version.
+- F1: Router meaning is sealed after Week07.
+- After F1: patch-only or additive extensions; semantic changes require a new version.

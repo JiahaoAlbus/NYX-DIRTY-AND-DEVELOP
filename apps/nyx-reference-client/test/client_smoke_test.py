@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -27,6 +28,11 @@ class ClientSmokeTests(unittest.TestCase):
             self.assertEqual(len(summary.state_hash_hex), 64)
             self.assertEqual(len(summary.receipt_chain_hex), 64)
             self.assertTrue(os.path.exists(out_path))
+            with open(out_path, "r", encoding="utf-8") as handle:
+                report = json.load(handle)
+            self.assertIn("pool", report)
+            self.assertIn("step_panel", report)
+            self.assertEqual(len(report["step_panel"]), 2)
 
 
 if __name__ == "__main__":
