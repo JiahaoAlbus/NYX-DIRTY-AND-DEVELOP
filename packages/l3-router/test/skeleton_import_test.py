@@ -10,8 +10,10 @@ class SkeletonImportTests(unittest.TestCase):
         self.assertTrue(hasattr(l3_router, "RouterAction"))
         self.assertTrue(hasattr(l3_router, "RouterState"))
         self.assertTrue(hasattr(l3_router, "RouterReceipt"))
+        self.assertTrue(hasattr(l3_router, "apply_route"))
         self.assertTrue(hasattr(l3_router, "replay_route"))
-        self.assertTrue(hasattr(l3_router, "check_invariants"))
+        self.assertTrue(hasattr(l3_router, "state_hash"))
+        self.assertTrue(hasattr(l3_router, "route_state_hash"))
 
 
 if __name__ == "__main__":

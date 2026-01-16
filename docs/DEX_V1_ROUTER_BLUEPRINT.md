@@ -17,8 +17,9 @@ MUST and MUST NOT
 - Router MUST use integer arithmetic only; floats are forbidden.
 - Router MUST apply explicit bounds:
   - steps count MUST be within [1, 8].
-  - amount_in MUST be > 0.
-  - min_out MUST be >= 0.
+  - amount_in MUST be in [1, 1_000_000_000_000].
+  - min_out MUST be in [0, 1_000_000_000_000].
+  - reserves MUST be in [0, 1_000_000_000_000_000_000].
 - Router MUST produce deterministic receipts with stable ordering.
 - Router MUST NOT introduce account or signer semantics.
 - Router MUST use existing fee enforcement; no parallel fee pathway.
