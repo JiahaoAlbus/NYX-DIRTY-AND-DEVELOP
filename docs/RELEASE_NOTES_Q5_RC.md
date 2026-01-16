@@ -34,5 +34,8 @@ Tagging (Requires Maintainer Action)
 - `git tag -a q5-rc1 -m "NYX Q5 RC1"`
 - `git push origin q5-rc1`
 
+Release Window Status
+- No-Go: mainnet tag not authorized.
+
 Freeze / Change Control
 - Changes follow `docs/CHANGE_CONTROL.md`.
