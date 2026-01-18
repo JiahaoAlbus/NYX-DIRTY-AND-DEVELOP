@@ -56,3 +56,4 @@ Record:
 - Blocking items (if No-Go):
   - Release window not executed.
   - Mainnet tag not authorized.
+- Q6 security gate report: Pending.
