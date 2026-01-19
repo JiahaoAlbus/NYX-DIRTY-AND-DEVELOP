@@ -13,7 +13,21 @@ MUST and MUST NOT
 - Provenance MUST include deterministic hashes and command outputs.
 - Provenance MUST NOT include secrets or sensitive material.
 
+Release Anchor
+- HEAD: `9e795f461931301344445286e463ce2450fc9a6c`
+- Describe: `testnet-0.2-68-g9e795f4`
+
 Provenance Entries
+- Artifact: `/tmp/q6_compileall.txt`
+  Hash: `e606bfd8da1723f165c1462c95766a2d7bbf231bb6ef49949314b9b37168fd16`
+  Source command: `python -m compileall packages/l0-identity/src`
+  Output summary: `Listing 'packages/l0-identity/src'...` (no errors)
+
+- Artifact: `/tmp/q6_tests.txt`
+  Hash: `853e85e13c1038c91704c82c15b870218df6504f693061b86c0146c19af1cf4b`
+  Source command: `python -m unittest discover -s packages/l0-identity/test -p "*_test.py" -v`
+  Output summary: `Ran 262 tests in 16.055s` and `OK`; `PROPERTY_N=2000`
+
 - Artifact: `docs/execution/q6_demo_out.txt`
   Hash: `a37f600b3441821e69e430f3bf9b7373f4fedecab515674eb2d3716f8cf7d688`
   Source command: `python packages/e2e-private-transfer/src/e2e_private_transfer/run_demo.py --out /tmp/nyx_q6_private_trace.json --seed 123`

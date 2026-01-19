@@ -14,15 +14,15 @@ MUST and MUST NOT
 - The test MUST NOT include secrets or private keys.
 
 Test Summary
-- Status: Pending
-- Date (UTC):
-- Operator:
+- Status: Completed (format validation only)
+- Date (UTC): 2026-01-19
+- Operator: local execution (no CI)
 
 Test Steps
-- Input format:
-- Submission channel:
-- Response time observed:
-- Evidence reference:
+- Input format: `report_id, summary, severity, repro_steps, evidence, environment`
+- Submission channel: No external inbox configured in repo; documented process only
+- Response time observed: N/A (no external inbox configured)
+- Evidence reference: `docs/SECURITY_DISCLOSURE_PROCESS.md` and `docs/BUG_BOUNTY_PROGRAM.md`
 
 Evidence / Verification
 - Disclosure process reference: `docs/SECURITY_DISCLOSURE_PROCESS.md`.

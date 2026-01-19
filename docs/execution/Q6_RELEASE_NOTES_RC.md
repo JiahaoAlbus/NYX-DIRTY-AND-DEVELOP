@@ -14,9 +14,12 @@ MUST and MUST NOT
 - Notes MUST NOT include secrets or sensitive material.
 
 Release Notes
-- Status: Pending
+- Status: Completed (superseded by mainnet evidence report)
 - Included evidence:
+  - `docs/execution/Q6_DRYRUN_1_REPORT.md`
+  - `docs/execution/Q6_SECURITY_GATE_REPORT.md`
 - Known blockers (if any):
+  - Mainnet tag pending after evidence PR merge
 
 Evidence / Verification
 - Evidence paths should reference Q6 execution reports.
