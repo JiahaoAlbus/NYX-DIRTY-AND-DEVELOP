@@ -18,3 +18,6 @@ Runbook with details: `docs/TESTNET_0_1_RUNBOOK.md`.
 
 ## Security Boundary
 Mock/stdlib implementations only; no production-grade cryptography or HSM/keystore. Invariants and gate summary: `docs/INVARIANTS_AND_GATES.md`.
+
+## Public Usage Contract (Q6)
+Deterministic verification commands and output contract: `docs/execution/Q6_PUBLIC_USAGE_CONTRACT.md`.
