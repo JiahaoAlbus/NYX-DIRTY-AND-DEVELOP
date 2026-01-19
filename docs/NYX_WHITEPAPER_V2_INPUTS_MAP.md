@@ -10,8 +10,8 @@ Non-Scope
 - Any new protocol semantics or speculative design changes.
 
 Version Anchor
-- HEAD: `9b166b9c4f0281106c02566c937f6ebdfec6161c`
-- Describe: `mainnet-1.0-attest-2-g9b166b9`
+- HEAD: `9e795f461931301344445286e463ce2450fc9a6c`
+- Describe: `mainnet-1.0-attest`
 - Tags: `mainnet-1.0`, `mainnet-1.0-attest`, `testnet-0.1`, `testnet-0.2`
 
 ## Documentation Inventory
