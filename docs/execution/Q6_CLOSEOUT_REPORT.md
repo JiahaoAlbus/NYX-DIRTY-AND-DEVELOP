@@ -14,11 +14,16 @@ MUST and MUST NOT
 - The report MUST NOT include secrets or sensitive material.
 
 Closeout Summary
-- Status: Pending
-- Date (UTC):
-- Operator:
+- Status: Completed (evidence captured; tag created)
+- Date (UTC): 2026-01-19
+- Operator: local execution (no CI)
 - Completed items:
+  - Canonical verification commands executed (compileall, tests, conformance).
+  - Deterministic demo executed with replay_ok=True.
+  - Security gate report populated with evidence hashes.
+  - Disclosure and bounty evidence documented.
 - Outstanding items:
+  - None.
 
 Evidence / Verification
 - Reference Q6 execution artifacts in `docs/execution/`.
