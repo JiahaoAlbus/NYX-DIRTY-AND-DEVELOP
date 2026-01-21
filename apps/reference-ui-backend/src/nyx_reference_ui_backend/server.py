@@ -12,6 +12,8 @@ from nyx_reference_ui_backend.evidence import (
     list_runs,
     load_evidence,
     run_evidence,
+    _safe_run_dir,
+    _safe_artifact_path,
 )
 
 
@@ -113,11 +115,13 @@ class ReferenceUIHandler(BaseHTTPRequestHandler):
         if path == "/artifact":
             run_id = (query.get("run_id") or [""])[0]
             name = (query.get("name") or [""])[0]
-            if not name:
-                self._send_text("name required", HTTPStatus.BAD_REQUEST)
+            try:
+                repo_root = self._repo_root()
+                runs_root = repo_root / "apps" / "reference-ui-backend" / "runs"
+                artifact_path = _safe_artifact_path(runs_root, run_id, name)
+            except EvidenceError:
+                self._send_text("not found", HTTPStatus.NOT_FOUND)
                 return
-            repo_root = self._repo_root()
-            artifact_path = repo_root / "apps" / "reference-ui-backend" / "runs" / run_id / "artifacts" / name
             if not artifact_path.exists():
                 self._send_text("not found", HTTPStatus.NOT_FOUND)
                 return

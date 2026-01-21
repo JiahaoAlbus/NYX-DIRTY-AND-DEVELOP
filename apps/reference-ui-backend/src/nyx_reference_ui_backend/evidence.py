@@ -75,12 +75,56 @@ def _read_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+
+ALLOWED_ARTIFACT_NAMES = {
+    "protocol_anchor.json",
+    "inputs.json",
+    "outputs.json",
+    "receipt_hashes.json",
+    "state_hash.txt",
+    "replay_ok.txt",
+    "stdout.txt",
+    "evidence.json",
+    "manifest.json",
+    "export.zip",
+}
+
+
 def _sanitize_run_id(run_id: str) -> str:
     if not run_id:
         raise EvidenceError("run_id required")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", run_id):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", run_id):
         raise EvidenceError("run_id contains invalid characters")
     return run_id
+
+
+def _validate_artifact_name(name: str) -> str:
+    if not name:
+        raise EvidenceError("artifact name required")
+    if "/" in name or "\\" in name:
+        raise EvidenceError("artifact name must be basename")
+    if name not in ALLOWED_ARTIFACT_NAMES:
+        raise EvidenceError("artifact name not allowed")
+    return name
+
+
+def _safe_run_dir(run_root: Path, run_id: str) -> Path:
+    rid = _sanitize_run_id(run_id)
+    run_dir = (run_root / rid).resolve()
+    root_resolved = run_root.resolve()
+    if root_resolved not in run_dir.parents and run_dir != root_resolved:
+        raise EvidenceError("run_id not allowed")
+    return run_dir
+
+
+def _safe_artifact_path(run_root: Path, run_id: str, name: str) -> Path:
+    run_dir = _safe_run_dir(run_root, run_id)
+    safe_name = _validate_artifact_name(name)
+    target = (run_dir / "artifacts" / safe_name).resolve()
+    if run_dir not in target.parents:
+        raise EvidenceError("artifact path not allowed")
+    return target
+
 
 
 def _run_root(base_dir: Path | None = None) -> Path:
@@ -137,7 +181,7 @@ def run_evidence(seed: int, run_id: str | None, base_dir: Path | None = None) ->
 
     rid = _sanitize_run_id(run_id or f"seed-{seed}")
     run_root = _run_root(base_dir)
-    run_dir = run_root / rid
+    run_dir = _safe_run_dir(run_root, rid)
     artifacts_dir = run_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -194,7 +238,8 @@ def run_evidence(seed: int, run_id: str | None, base_dir: Path | None = None) ->
 def load_evidence(run_id: str, base_dir: Path | None = None) -> EvidencePayload:
     rid = _sanitize_run_id(run_id)
     run_root = _run_root(base_dir)
-    artifacts_dir = run_root / rid / "artifacts"
+    run_dir = _safe_run_dir(run_root, rid)
+    artifacts_dir = run_dir / "artifacts"
     if not artifacts_dir.exists():
         raise EvidenceError("run_id not found")
 
@@ -241,7 +286,7 @@ def _sha256_bytes(data: bytes) -> str:
 def build_export_zip(run_id: str, base_dir: Path | None = None) -> bytes:
     rid = _sanitize_run_id(run_id)
     run_root = _run_root(base_dir)
-    run_dir = run_root / rid
+    run_dir = _safe_run_dir(run_root, rid)
     artifacts_dir = run_dir / "artifacts"
     if not artifacts_dir.exists():
         raise EvidenceError("run_id not found")
