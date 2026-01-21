@@ -39,8 +39,6 @@ class PathTraversalGuardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_root = Path(tmp)
             run_id = "seed-123"
-            run_dir = run_root / run_id / "artifacts"
-            run_dir.mkdir(parents=True, exist_ok=True)
             artifact = "stdout.txt"
             path = evidence._safe_artifact_path(run_root, run_id, artifact)
             self.assertTrue(path.name == artifact)

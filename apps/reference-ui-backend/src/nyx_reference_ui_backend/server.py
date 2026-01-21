@@ -12,8 +12,8 @@ from nyx_reference_ui_backend.evidence import (
     list_runs,
     load_evidence,
     run_evidence,
-    _safe_run_dir,
     _safe_artifact_path,
+    _sanitize_run_id,
 )
 
 
@@ -70,12 +70,16 @@ class ReferenceUIHandler(BaseHTTPRequestHandler):
             return
         seed = payload.get("seed")
         run_id = payload.get("run_id")
+        if not run_id:
+            self._send_json({"error": "run_id required"}, HTTPStatus.BAD_REQUEST)
+            return
         try:
-            run_evidence(seed=seed, run_id=run_id)
+            safe_run_id = _sanitize_run_id(run_id)
+            run_evidence(seed=seed, run_id=safe_run_id)
         except (EvidenceError, TypeError):
             self._send_json({"error": "run failed"}, HTTPStatus.BAD_REQUEST)
             return
-        response = {"run_id": run_id or f"seed-{seed}", "status": "complete"}
+        response = {"run_id": safe_run_id, "status": "complete"}
         self._send_json(response)
 
     def do_GET(self):

@@ -98,6 +98,12 @@ def _sanitize_run_id(run_id: str) -> str:
     return run_id
 
 
+def _run_key(run_id: str) -> str:
+    rid = _sanitize_run_id(run_id)
+    digest = hashlib.sha256(rid.encode("utf-8")).hexdigest()
+    return digest[:32]
+
+
 def _validate_artifact_name(name: str) -> str:
     if not name:
         raise EvidenceError("artifact name required")
@@ -109,8 +115,8 @@ def _validate_artifact_name(name: str) -> str:
 
 
 def _safe_run_dir(run_root: Path, run_id: str) -> Path:
-    rid = _sanitize_run_id(run_id)
-    run_dir = (run_root / rid).resolve()
+    key = _run_key(run_id)
+    run_dir = (run_root / key).resolve()
     root_resolved = run_root.resolve()
     if root_resolved not in run_dir.parents and run_dir != root_resolved:
         raise EvidenceError("run_id not allowed")
@@ -172,18 +178,21 @@ def _summary_stdout(trace, replay_ok: bool) -> str:
     )
 
 
-def run_evidence(seed: int, run_id: str | None, base_dir: Path | None = None) -> EvidencePayload:
+def run_evidence(seed: int, run_id: str, base_dir: Path | None = None) -> EvidencePayload:
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise EvidenceError("seed must be int")
+    if not isinstance(run_id, str) or isinstance(run_id, bool):
+        raise EvidenceError("run_id required")
     _ensure_paths()
     from e2e_private_transfer.pipeline import run_private_transfer
     from e2e_private_transfer.replay import replay_and_verify
 
-    rid = _sanitize_run_id(run_id or f"seed-{seed}")
+    rid = _sanitize_run_id(run_id)
     run_root = _run_root(base_dir)
     run_dir = _safe_run_dir(run_root, rid)
     artifacts_dir = run_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "run_id.txt").write_text(rid + "\n", encoding="utf-8")
 
     trace, _ = run_private_transfer(seed=seed)
     replay_ok = replay_and_verify(trace)
@@ -275,7 +284,11 @@ def list_runs(base_dir: Path | None = None) -> list[RunRecord]:
         if not entry.is_dir():
             continue
         status = "complete" if (entry / "artifacts").exists() else "unknown"
-        records.append(RunRecord(run_id=entry.name, status=status, error=None))
+        run_id_path = entry / "run_id.txt"
+        run_id = entry.name
+        if run_id_path.exists():
+            run_id = run_id_path.read_text(encoding="utf-8").strip() or entry.name
+        records.append(RunRecord(run_id=run_id, status=status, error=None))
     return records
 
 
