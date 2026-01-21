@@ -32,12 +32,14 @@ def _ensure_paths() -> None:
         repo_root / "packages" / id_dir / "src",
         repo_root / "packages" / "l0-zk-id" / "src",
         repo_root / "packages" / "l2-economics" / "src",
+        repo_root / "packages" / "l2-platform-fee" / "src",
         repo_root / "packages" / "l1-chain" / "src",
         repo_root / "packages" / kernel_dir / "src",
         repo_root / "packages" / "l3-dex" / "src",
         repo_root / "packages" / "l3-router" / "src",
         repo_root / "packages" / "e2e-demo" / "src",
         repo_root / "apps" / "nyx-reference-client" / "src",
+        repo_root / "apps" / "reference-ui-backend" / "src",
     ]
     for path in paths:
         path_str = str(path)
@@ -190,6 +192,154 @@ def drill_fee_sponsor_amount() -> DrillResult:
         pass
 
     return _pass("Q1-FEE-02")
+
+
+def drill_platform_fee_additive() -> DrillResult:
+    _ensure_paths()
+    from action import ActionDescriptor, ActionKind
+    from engine import FeeEngineV0
+    from fee import FeeComponentId, FeeVector
+    from l2_platform_fee.fee_hook import enforce_platform_fee, quote_platform_fee
+    from l2_platform_fee.errors import PlatformFeeError
+
+    action_descriptor = ActionDescriptor(
+        kind=ActionKind.STATE_MUTATION,
+        module="conformance",
+        action="mutate",
+        payload={"op": "set", "key": "k", "value": "v"},
+    )
+    engine = FeeEngineV0()
+    quote = quote_platform_fee(engine, action_descriptor, payer="payer", platform_fee_amount=1)
+
+    bad_vector = FeeVector.for_action(
+        ActionKind.STATE_MUTATION,
+        (
+            (FeeComponentId.BASE, 1),
+            (FeeComponentId.BYTES, 0),
+            (FeeComponentId.COMPUTE, 0),
+        ),
+    )
+    try:
+        enforce_platform_fee(
+            engine,
+            quote,
+            paid_protocol_vector=bad_vector,
+            paid_platform_amount=1,
+            payer="payer",
+        )
+        return _fail("Q7-FEE-PLAT-01", "accepted mismatched protocol vector")
+    except PlatformFeeError:
+        pass
+
+    try:
+        enforce_platform_fee(
+            engine,
+            quote,
+            paid_protocol_vector=quote.protocol_quote.fee_vector,
+            paid_platform_amount=0,
+            payer="payer",
+        )
+        return _fail("Q7-FEE-PLAT-01", "accepted lower platform amount")
+    except PlatformFeeError:
+        pass
+
+    return _pass("Q7-FEE-PLAT-01")
+
+
+def drill_public_usage_contract() -> DrillResult:
+    _ensure_paths()
+    from nyx_reference_ui_backend.evidence import EvidenceError, load_evidence, run_evidence
+
+    required_fields = (
+        "protocol_anchor",
+        "inputs",
+        "outputs",
+        "receipt_hashes",
+        "state_hash",
+        "replay_ok",
+        "stdout",
+    )
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            run_evidence(seed=123, run_id="contract-123", base_dir=base_dir)
+            payload = load_evidence("contract-123", base_dir=base_dir)
+    except EvidenceError as exc:
+        return _fail("Q7-OUTPUT-01", f"evidence error: {exc}")
+
+    for field in required_fields:
+        if not hasattr(payload, field):
+            return _fail("Q7-OUTPUT-01", f"missing field: {field}")
+    if not payload.receipt_hashes:
+        return _fail("Q7-OUTPUT-01", "empty receipt_hashes")
+    if not payload.state_hash:
+        return _fail("Q7-OUTPUT-01", "empty state_hash")
+    return _pass("Q7-OUTPUT-01")
+
+
+def drill_evidence_ordering() -> DrillResult:
+    _ensure_paths()
+    from nyx_reference_ui_backend import evidence as ev
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            run_id = "order-123"
+            ev.run_evidence(seed=123, run_id=run_id, base_dir=base_dir)
+            run_dir = ev._safe_run_dir(base_dir, run_id)
+            evidence_path = run_dir / "evidence.json"
+            raw = evidence_path.read_text(encoding="utf-8")
+            payload = json.loads(raw)
+            expected = ev._json_dumps(payload)
+            if raw != expected:
+                return _fail("Q7-OUTPUT-02", "evidence ordering drift")
+    except Exception as exc:
+        return _fail("Q7-OUTPUT-02", f"ordering check failed: {type(exc).__name__}")
+
+    return _pass("Q7-OUTPUT-02")
+
+
+def drill_ui_copy_guard() -> DrillResult:
+    _ensure_paths()
+    repo_root = Path(__file__).resolve().parents[4]
+    ui_dirs = [
+        repo_root / "apps" / "reference-ui",
+        repo_root / "apps" / "reference-ui-backend",
+    ]
+    tokens = [
+        "login",
+        "sign up",
+        "signup",
+        "connect wallet",
+        "wallet connect",
+        "balances",
+        "profile",
+        "message history",
+        "ticker",
+        "price",
+        "mainnet live",
+        "uptime",
+        "validator",
+        "consensus active",
+        "synced",
+    ]
+    for root in ui_dirs:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if path.is_dir():
+                continue
+            if path.suffix not in {".html", ".js", ".css", ".md", ".py"}:
+                continue
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            lower = content.lower()
+            for token in tokens:
+                if token in lower:
+                    return _fail("Q7-UI-01", f"ui copy token found: {token}")
+    return _pass("Q7-UI-01")
 
 
 def drill_zk_context() -> tuple[DrillResult, DrillResult]:
@@ -556,6 +706,10 @@ def run_drills() -> tuple[DrillResult, ...]:
     results.append(drill_id_sender_sep())
     results.append(drill_fee_free_action())
     results.append(drill_fee_sponsor_amount())
+    results.append(drill_platform_fee_additive())
+    results.append(drill_public_usage_contract())
+    results.append(drill_evidence_ordering())
+    results.append(drill_ui_copy_guard())
     zk_results = drill_zk_context()
     results.extend(zk_results)
     results.append(drill_root_secret_leak())

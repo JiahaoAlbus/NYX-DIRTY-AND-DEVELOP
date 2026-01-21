@@ -1,0 +1,2 @@
+class PlatformFeeError(ValueError):
+    pass

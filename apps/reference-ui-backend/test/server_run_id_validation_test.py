@@ -44,6 +44,17 @@ class ServerRunIdValidationTests(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
+    def test_long_run_id_returns_400(self):
+        server, thread = self._start_server()
+        try:
+            long_id = "a" * 65
+            status, _ = self._post_json(server.server_port, {"seed": 123, "run_id": long_id})
+            self.assertEqual(status, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

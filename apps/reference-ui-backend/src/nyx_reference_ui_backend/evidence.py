@@ -275,6 +275,20 @@ def load_evidence(run_id: str, base_dir: Path | None = None) -> EvidencePayload:
     )
 
 
+def verify_evidence_payload(payload: EvidencePayload) -> None:
+    if not isinstance(payload.outputs, dict):
+        raise EvidenceError("outputs must be dict")
+    outputs_state = payload.outputs.get("state_hash")
+    if outputs_state != payload.state_hash:
+        raise EvidenceError("state_hash mismatch")
+    outputs_receipts = payload.outputs.get("receipt_hashes")
+    if outputs_receipts != payload.receipt_hashes:
+        raise EvidenceError("receipt_hashes mismatch")
+    outputs_replay = payload.outputs.get("replay_ok")
+    if outputs_replay != payload.replay_ok:
+        raise EvidenceError("replay_ok mismatch")
+
+
 def list_runs(base_dir: Path | None = None) -> list[RunRecord]:
     run_root = _run_root(base_dir)
     if not run_root.exists():
