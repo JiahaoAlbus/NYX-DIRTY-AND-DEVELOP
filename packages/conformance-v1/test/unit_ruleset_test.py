@@ -27,6 +27,7 @@ class RuleSetTests(unittest.TestCase):
             "Q1-ID-02",
             "Q1-FEE-01",
             "Q1-FEE-02",
+            "Q7-FEE-PLAT-01",
             "Q1-ZK-01",
             "Q1-ZK-02",
             "Q1-SECRET-01",
@@ -42,6 +43,7 @@ class RuleSetTests(unittest.TestCase):
             "Q5-ROUTER-04",
             "Q5-CLIENT-01",
             "Q5-OPS-01",
+            "Q7-OUTPUT-01",
         }
         self.assertEqual(expected_ids, {rule.rule_id for rule in RULES})
 
