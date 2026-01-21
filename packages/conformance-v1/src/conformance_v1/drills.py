@@ -277,6 +277,71 @@ def drill_public_usage_contract() -> DrillResult:
     return _pass("Q7-OUTPUT-01")
 
 
+def drill_evidence_ordering() -> DrillResult:
+    _ensure_paths()
+    from nyx_reference_ui_backend import evidence as ev
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            run_id = "order-123"
+            ev.run_evidence(seed=123, run_id=run_id, base_dir=base_dir)
+            run_dir = ev._safe_run_dir(base_dir, run_id)
+            evidence_path = run_dir / "evidence.json"
+            raw = evidence_path.read_text(encoding="utf-8")
+            payload = json.loads(raw)
+            expected = ev._json_dumps(payload)
+            if raw != expected:
+                return _fail("Q7-OUTPUT-02", "evidence ordering drift")
+    except Exception as exc:
+        return _fail("Q7-OUTPUT-02", f"ordering check failed: {type(exc).__name__}")
+
+    return _pass("Q7-OUTPUT-02")
+
+
+def drill_ui_copy_guard() -> DrillResult:
+    _ensure_paths()
+    repo_root = Path(__file__).resolve().parents[4]
+    ui_dirs = [
+        repo_root / "apps" / "reference-ui",
+        repo_root / "apps" / "reference-ui-backend",
+    ]
+    tokens = [
+        "login",
+        "sign up",
+        "signup",
+        "connect wallet",
+        "wallet connect",
+        "balances",
+        "profile",
+        "message history",
+        "ticker",
+        "price",
+        "mainnet live",
+        "uptime",
+        "validator",
+        "consensus active",
+        "synced",
+    ]
+    for root in ui_dirs:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if path.is_dir():
+                continue
+            if path.suffix not in {".html", ".js", ".css", ".md", ".py"}:
+                continue
+            try:
+                content = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            lower = content.lower()
+            for token in tokens:
+                if token in lower:
+                    return _fail("Q7-UI-01", f"ui copy token found: {token}")
+    return _pass("Q7-UI-01")
+
+
 def drill_zk_context() -> tuple[DrillResult, DrillResult]:
     _ensure_paths()
     import hashlib
@@ -643,6 +708,8 @@ def run_drills() -> tuple[DrillResult, ...]:
     results.append(drill_fee_sponsor_amount())
     results.append(drill_platform_fee_additive())
     results.append(drill_public_usage_contract())
+    results.append(drill_evidence_ordering())
+    results.append(drill_ui_copy_guard())
     zk_results = drill_zk_context()
     results.extend(zk_results)
     results.append(drill_root_secret_leak())
