@@ -4,17 +4,18 @@ from pathlib import Path
 import sys
 
 
-ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "src"
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_ROOT.parents[1]
+SRC = BACKEND_ROOT / "src"
 PKG_PATHS = [
     SRC,
-    ROOT.parents[1] / "packages" / "e2e-private-transfer" / "src",
-    ROOT.parents[1] / "packages" / "l2-private-ledger" / "src",
-    ROOT.parents[1] / "packages" / "l0-zk-id" / "src",
-    ROOT.parents[1] / "packages" / "l2-economics" / "src",
-    ROOT.parents[1] / "packages" / "l2-platform-fee" / "src",
-    ROOT.parents[1] / "packages" / "l1-chain" / "src",
-    ROOT.parents[1] / "packages" / "wallet-kernel" / "src",
+    REPO_ROOT / "packages" / "e2e-private-transfer" / "src",
+    REPO_ROOT / "packages" / "l2-private-ledger" / "src",
+    REPO_ROOT / "packages" / "l0-zk-id" / "src",
+    REPO_ROOT / "packages" / "l2-economics" / "src",
+    REPO_ROOT / "packages" / "l2-platform-fee" / "src",
+    REPO_ROOT / "packages" / "l1-chain" / "src",
+    REPO_ROOT / "packages" / "wallet-kernel" / "src",
 ]
 for path in PKG_PATHS:
     path_str = str(path)
