@@ -28,27 +28,55 @@
     <div>
       <div class="badge">Preview Only</div>
       <h1>Route Swap Preview</h1>
-      <p>Select a deterministic route template and execute a reproducible run via the backend.</p>
+      <p>Execute a deterministic route swap template and export evidence.</p>
     </div>
     <div class="callout">
       <strong>Evidence Truth Layer</strong>
       <p class="placeholder">All evidence fields are rendered verbatim from the backend and exported without modification.</p>
     </div>
   </section>
-  <section>
-    <div class="section-title">Modules</div>
-    <div class="card-grid"><div class="card"><h3>Inputs</h3><p class="placeholder">Seed and run identifier are required for deterministic runs.</p></div>
-<div class="card"><h3>Outputs</h3><p class="placeholder">State hash, receipt hashes, and replay flag.</p></div></div>
+
+  <section class="card">
+    <div class="section-title">Run Parameters</div>
+    <form id="exchange-form" class="form-grid">
+      <div>
+        <label for="seed">Seed</label>
+        <input id="seed" name="seed" type="number" value="123" required />
+      </div>
+      <div>
+        <label for="run-id">Run ID</label>
+        <input id="run-id" name="run_id" type="text" value="exchange-demo" required />
+      </div>
+      <div>
+        <label for="route">Route Template</label>
+        <select id="route" name="route">
+          <option value="basic">Basic Route</option>
+          <option value="multi-hop">Multi-Hop Preview</option>
+          <option value="balanced">Balanced Route</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button type="submit" id="run-btn">Execute</button>
+      </div>
+    </form>
+    <p class="notice">Backend endpoint: /run (module=exchange, action=route_swap)</p>
   </section>
-  <section>
-    <div class="section-title">Status</div>
-    <div class="card">
-      <p class="placeholder">Preview only. Provided by backend. Not live system data.</p>
+
+  <section class="evidence-panel" id="evidence-panel">
+    <div class="section-title">Evidence Summary</div>
+    <div class="evidence-grid" id="evidence-grid">
+      <div>state_hash: <span id="state-hash">—</span></div>
+      <div>receipt_hashes: <span id="receipt-hashes">—</span></div>
+      <div>replay_ok: <span id="replay-ok">—</span></div>
+      <div>export: <a id="export-link" href="#">Download bundle</a></div>
     </div>
+    <p class="notice" id="status-text">Preview only. Provided by backend. Not live system data.</p>
   </section>
 </main>
 <footer class="footer">
   NYX Portal Preview. Deterministic evidence only.
 </footer>
+<script src="/js/exchange.js"></script>
 </body>
 </html>
