@@ -224,6 +224,25 @@ def _platform_fee_for_marketplace(payload: object) -> dict[str, object]:
     }
 
 
+def _entertainment_state(seed: int, payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        raise EvidenceError("entertainment payload must be object")
+    mode = payload.get("mode")
+    step = payload.get("step")
+    if not isinstance(mode, str) or not mode or isinstance(mode, bool):
+        raise EvidenceError("mode required")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", mode):
+        raise EvidenceError("mode contains invalid characters")
+    if not isinstance(step, int) or isinstance(step, bool):
+        raise EvidenceError("step must be int")
+    if step < 0 or step > 10:
+        raise EvidenceError("step out of bounds")
+    digest = hashlib.sha256(
+        f"NYX:ENT:STEP:v1:{mode}:{step}:{seed}".encode("utf-8")
+    ).hexdigest()
+    return {"mode": mode, "step": step, "state_hash": digest}
+
+
 def run_evidence(
     seed: int,
     run_id: str,
@@ -270,6 +289,8 @@ def run_evidence(
     }
     if mod == "marketplace" and act == "order_intent":
         outputs["platform_fee"] = _platform_fee_for_marketplace(payload)
+    if mod == "entertainment" and act == "state_step":
+        outputs["entertainment_state"] = _entertainment_state(seed, payload)
 
     (artifacts_dir / "protocol_anchor.json").write_text(_json_dumps(protocol_anchor), encoding="utf-8")
     (artifacts_dir / "inputs.json").write_text(_json_dumps(inputs), encoding="utf-8")

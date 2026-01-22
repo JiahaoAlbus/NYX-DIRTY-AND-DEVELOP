@@ -40,6 +40,11 @@ class WebAssetsExistTests(unittest.TestCase):
         script = root / "js" / "marketplace.js"
         self.assertTrue(script.exists(), "missing marketplace.js")
 
+    def test_entertainment_script_exists(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "static"
+        script = root / "js" / "entertainment.js"
+        self.assertTrue(script.exists(), "missing entertainment.js")
+
 
 if __name__ == "__main__":
     unittest.main()
