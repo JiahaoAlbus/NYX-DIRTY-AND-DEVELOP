@@ -21,34 +21,75 @@
       <a href="/protocol-library/">Protocol Library</a>
     </nav>
   </div>
-  <div class="banner">Week 2 Preview — No live data. No accounts. No wallet. No trading. No messaging.</div>
+  <div class="banner">Week 6 Preview — No live data. No accounts. No wallet. No trading. No messaging.</div>
 </header>
 <main class="container">
   <section class="hero">
     <div>
       <div class="badge">Preview Only</div>
       <h1>Order Intent Evidence</h1>
-      <p>Create a deterministic order intent and export the evidence bundle.</p>
+      <p>Create a deterministic order intent and export evidence.</p>
     </div>
     <div class="callout">
       <strong>Evidence Truth Layer</strong>
-      <p class="placeholder">All evidence fields are rendered verbatim from the backend and exported without modification.</p>
+      <p class="placeholder">Evidence fields are rendered verbatim and exported without modification.</p>
     </div>
   </section>
-  <section>
-    <div class="section-title">Modules</div>
-    <div class="card-grid"><div class="card"><h3>Catalog</h3><p class="placeholder">Static catalog preview; no live inventory.</p></div>
-<div class="card"><h3>Evidence</h3><p class="placeholder">Outputs remain deterministic and replayable.</p></div></div>
-  </section>
-  <section>
-    <div class="section-title">Status</div>
-    <div class="card">
-      <p class="placeholder">Preview only. Provided by backend. Not live system data.</p>
+
+  <section class="card">
+    <div class="section-title">Catalog (Static Preview)</div>
+    <div class="card-grid">
+      <div class="card"><h3>Solar Kit</h3><p class="placeholder">ID: kit-01</p></div>
+      <div class="card"><h3>Signal Pod</h3><p class="placeholder">ID: pod-02</p></div>
+      <div class="card"><h3>Trace Pack</h3><p class="placeholder">ID: trace-03</p></div>
     </div>
+  </section>
+
+  <section class="card">
+    <div class="section-title">Order Intent</div>
+    <form id="market-form" class="form-grid">
+      <div>
+        <label for="seed">Seed</label>
+        <input id="seed" name="seed" type="number" value="123" required />
+      </div>
+      <div>
+        <label for="run-id">Run ID</label>
+        <input id="run-id" name="run_id" type="text" value="market-demo" required />
+      </div>
+      <div>
+        <label for="item-id">Item</label>
+        <select id="item-id" name="item_id">
+          <option value="kit-01">Solar Kit</option>
+          <option value="pod-02">Signal Pod</option>
+          <option value="trace-03">Trace Pack</option>
+        </select>
+      </div>
+      <div>
+        <label for="qty">Quantity</label>
+        <input id="qty" name="qty" type="number" value="1" min="1" required />
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button type="submit" id="run-btn">Submit</button>
+      </div>
+    </form>
+    <p class="notice">Backend endpoint: /run (module=marketplace, action=order_intent)</p>
+  </section>
+
+  <section class="evidence-panel" id="evidence-panel">
+    <div class="section-title">Evidence Summary</div>
+    <div class="evidence-grid" id="evidence-grid">
+      <div>state_hash: <span id="state-hash">—</span></div>
+      <div>receipt_hashes: <span id="receipt-hashes">—</span></div>
+      <div>replay_ok: <span id="replay-ok">—</span></div>
+      <div>export: <a id="export-link" href="#">Download bundle</a></div>
+    </div>
+    <p class="notice" id="status-text">Preview only. Provided by backend. Not live system data.</p>
   </section>
 </main>
 <footer class="footer">
   NYX Portal Preview. Deterministic evidence only.
 </footer>
+<script src="/js/marketplace.js"></script>
 </body>
 </html>

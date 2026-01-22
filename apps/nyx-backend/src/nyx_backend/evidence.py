@@ -61,6 +61,7 @@ def _ensure_paths() -> None:
         repo_root / "packages" / "l2-private-ledger" / "src",
         repo_root / "packages" / "l0-zk-id" / "src",
         repo_root / "packages" / "l2-economics" / "src",
+        repo_root / "packages" / "l2-platform-fee" / "src",
         repo_root / "packages" / "l1-chain" / "src",
         repo_root / "packages" / "wallet-kernel" / "src",
     ]
@@ -187,6 +188,42 @@ def _summary_stdout(state_hash: str, receipt_hashes: list[str], replay_ok: bool)
     )
 
 
+def _platform_fee_for_marketplace(payload: object) -> dict[str, object]:
+    from action import ActionDescriptor, ActionKind
+    from engine import FeeEngineV0
+    from l2_platform_fee.fee_hook import enforce_platform_fee, quote_platform_fee
+
+    action = ActionDescriptor(
+        kind=ActionKind.STATE_MUTATION,
+        module="marketplace",
+        action="order_intent",
+        payload=payload,
+    )
+    engine = FeeEngineV0()
+    payer = "platform-payer"
+    platform_amount = 1
+    quote = quote_platform_fee(
+        engine,
+        action,
+        payer=payer,
+        platform_fee_amount=platform_amount,
+    )
+    receipt = enforce_platform_fee(
+        engine,
+        quote,
+        paid_protocol_vector=quote.protocol_quote.fee_vector,
+        paid_platform_amount=quote.platform_fee_amount,
+        payer=quote.payer,
+    )
+    return {
+        "platform_fee_amount": quote.platform_fee_amount,
+        "protocol_fee_total": quote.protocol_quote.fee_vector.total(),
+        "total_due": quote.total_due,
+        "total_paid": receipt.total_paid,
+        "payer": quote.payer,
+    }
+
+
 def run_evidence(
     seed: int,
     run_id: str,
@@ -231,6 +268,8 @@ def run_evidence(
         "receipt_hashes": receipt_hashes,
         "replay_ok": replay_ok,
     }
+    if mod == "marketplace" and act == "order_intent":
+        outputs["platform_fee"] = _platform_fee_for_marketplace(payload)
 
     (artifacts_dir / "protocol_anchor.json").write_text(_json_dumps(protocol_anchor), encoding="utf-8")
     (artifacts_dir / "inputs.json").write_text(_json_dumps(inputs), encoding="utf-8")
