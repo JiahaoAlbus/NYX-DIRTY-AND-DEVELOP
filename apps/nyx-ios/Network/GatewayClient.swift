@@ -18,9 +18,33 @@ struct GatewayError: Error {
 
 final class GatewayClient {
     private let baseURL: URL
+    private let maxRetries = 1
+    private var evidenceCache: [String: EvidenceBundle] = [:]
 
-    init(baseURL: URL = URL(string: "http://localhost:8090")!) {
+    init(baseURL: URL = URL(string: "http://localhost:8091")!) {
         self.baseURL = baseURL
+    }
+
+    private func requestData(_ request: URLRequest) async throws -> Data {
+        var attempts = 0
+        var lastError: Error?
+        while attempts <= maxRetries {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw GatewayError(message: "invalid response")
+                }
+                if httpResponse.statusCode >= 400 {
+                    let errorText = String(data: data, encoding: .utf8) ?? "request failed"
+                    throw GatewayError(message: errorText)
+                }
+                return data
+            } catch {
+                lastError = error
+                attempts += 1
+            }
+        }
+        throw lastError ?? GatewayError(message: "request failed")
     }
 
     func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {
@@ -38,32 +62,24 @@ final class GatewayClient {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GatewayError(message: "invalid response")
-        }
-        if httpResponse.statusCode >= 400 {
-            let errorText = String(data: data, encoding: .utf8) ?? "run failed"
-            throw GatewayError(message: errorText)
-        }
+        let data = try await requestData(request)
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
     func fetchEvidence(runId: String) async throws -> EvidenceBundle {
+        if let cached = evidenceCache[runId] {
+            return cached
+        }
         var components = URLComponents(url: baseURL.appendingPathComponent("evidence"), resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "run_id", value: runId)]
         guard let url = components?.url else {
             throw GatewayError(message: "invalid url")
         }
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GatewayError(message: "invalid response")
-        }
-        if httpResponse.statusCode >= 400 {
-            let errorText = String(data: data, encoding: .utf8) ?? "evidence failed"
-            throw GatewayError(message: errorText)
-        }
-        return try JSONDecoder().decode(EvidenceBundle.self, from: data)
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let bundle = try JSONDecoder().decode(EvidenceBundle.self, from: data)
+        evidenceCache[runId] = bundle
+        return bundle
     }
 
     func fetchExportZip(runId: String) async throws -> Data {
@@ -72,14 +88,7 @@ final class GatewayClient {
         guard let url = components?.url else {
             throw GatewayError(message: "invalid url")
         }
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GatewayError(message: "invalid response")
-        }
-        if httpResponse.statusCode >= 400 {
-            let errorText = String(data: data, encoding: .utf8) ?? "export failed"
-            throw GatewayError(message: errorText)
-        }
-        return data
+        let request = URLRequest(url: url)
+        return try await requestData(request)
     }
 }

@@ -36,7 +36,7 @@ final class EvidenceViewModel: ObservableObject {
             stateHash = bundle.stateHash
             receiptHashes = bundle.receiptHashes
             replayOk = bundle.replayOk
-            status = "Evidence ready. Preview only. Provided by backend."
+            status = "Evidence ready. Testnet Alpha. Provided by backend."
         } catch {
             status = "Error: \(error)"
         }
@@ -75,8 +75,11 @@ struct ContentView: View {
                 .tabItem { Label("Market", systemImage: "bag") }
             EntertainmentView(model: model)
                 .tabItem { Label("Play", systemImage: "sparkles") }
+            TrustView()
+                .tabItem { Label("Trust", systemImage: "shield") }
             EvidenceInspectorView(model: model)
                 .tabItem { Label("Evidence", systemImage: "doc.plaintext") }
         }
+        .accentColor(SolsticePalette.accent)
     }
 }

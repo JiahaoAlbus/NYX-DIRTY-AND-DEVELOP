@@ -1,14 +1,22 @@
 import SwiftUI
 
+struct SolsticePalette {
+    static let background = Color(red: 0.99, green: 0.98, blue: 0.96)
+    static let banner = Color(red: 0.99, green: 0.93, blue: 0.75)
+    static let accent = Color(red: 0.93, green: 0.74, blue: 0.2)
+    static let card = Color(red: 1.0, green: 0.98, blue: 0.94)
+}
+
 struct PreviewBanner: View {
     let text: String
 
     var body: some View {
         Text(text)
             .font(.footnote)
-            .padding(8)
+            .padding(10)
             .frame(maxWidth: .infinity)
-            .background(Color.yellow.opacity(0.2))
+            .background(SolsticePalette.banner)
+            .cornerRadius(8)
     }
 }
 
@@ -35,7 +43,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Preview only. No accounts. No live data.")
+                PreviewBanner(text: "Testnet Alpha. Preview only. No accounts. No live data.")
                 Text("NYX Portal")
                     .font(.largeTitle)
                 Text("Deterministic evidence flows only.")
@@ -45,27 +53,53 @@ struct HomeView: View {
             }
             .padding()
             .navigationTitle("World")
+            .background(SolsticePalette.background)
         }
     }
 }
 
 struct ExchangeView: View {
     @ObservedObject var model: EvidenceViewModel
-    @State private var route = "basic"
+    @State private var assetIn = "asset-a"
+    @State private var assetOut = "asset-b"
+    @State private var amount = "5"
+    @State private var minOut = "3"
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Preview only. No live market data.")
+                PreviewBanner(text: "Testnet Alpha. No live market data.")
                 RunInputsView(model: model)
-                Picker("Route", selection: $route) {
-                    Text("Basic").tag("basic")
-                    Text("Split").tag("split")
+                Picker("Asset In", selection: $assetIn) {
+                    Text("asset-a").tag("asset-a")
+                    Text("asset-b").tag("asset-b")
                 }
                 .pickerStyle(.segmented)
+                Picker("Asset Out", selection: $assetOut) {
+                    Text("asset-b").tag("asset-b")
+                    Text("asset-c").tag("asset-c")
+                }
+                .pickerStyle(.segmented)
+                TextField("Amount", text: $amount)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Min Out", text: $minOut)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
                 Button("Execute Route") {
+                    let amountValue = Int(amount) ?? 1
+                    let minOutValue = Int(minOut) ?? 1
                     Task {
-                        await model.run(module: "exchange", action: "route_swap", payload: ["route": route])
+                        await model.run(
+                            module: "exchange",
+                            action: "route_swap",
+                            payload: [
+                                "asset_in": assetIn,
+                                "asset_out": assetOut,
+                                "amount": amountValue,
+                                "min_out": minOutValue,
+                            ]
+                        )
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -74,24 +108,32 @@ struct ExchangeView: View {
             }
             .padding()
             .navigationTitle("Exchange")
+            .background(SolsticePalette.background)
         }
     }
 }
 
 struct ChatView: View {
     @ObservedObject var model: EvidenceViewModel
+    @State private var channel = "general"
     @State private var message = "Hello"
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Preview only. No accounts or chat history.")
+                PreviewBanner(text: "Testnet Alpha. No accounts or live chat history.")
                 RunInputsView(model: model)
+                TextField("Channel", text: $channel)
+                    .textFieldStyle(.roundedBorder)
                 TextField("Message", text: $message)
                     .textFieldStyle(.roundedBorder)
                 Button("Submit Event") {
                     Task {
-                        await model.run(module: "chat", action: "message_event", payload: ["message": message])
+                        await model.run(
+                            module: "chat",
+                            action: "message_event",
+                            payload: ["channel": channel, "message": message]
+                        )
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -100,24 +142,31 @@ struct ChatView: View {
             }
             .padding()
             .navigationTitle("Chat")
+            .background(SolsticePalette.background)
         }
     }
 }
 
 struct MarketplaceView: View {
     @ObservedObject var model: EvidenceViewModel
-    @State private var itemId = "kit-01"
+    @State private var sku = "sku-1"
     @State private var quantity = "1"
+
+    private let catalog: [String: (String, Int)] = [
+        "sku-1": ("Signal Pack", 10),
+        "sku-2": ("Orbit Node", 12),
+        "sku-3": ("Trace Kit", 8),
+    ]
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Preview only. Static catalog.")
+                PreviewBanner(text: "Testnet Alpha. Static catalog only.")
                 RunInputsView(model: model)
-                Picker("Item", selection: $itemId) {
-                    Text("Solar Kit").tag("kit-01")
-                    Text("Signal Pod").tag("pod-02")
-                    Text("Trace Pack").tag("trace-03")
+                Picker("Item", selection: $sku) {
+                    Text("Signal Pack").tag("sku-1")
+                    Text("Orbit Node").tag("sku-2")
+                    Text("Trace Kit").tag("sku-3")
                 }
                 .pickerStyle(.menu)
                 TextField("Quantity", text: $quantity)
@@ -125,11 +174,17 @@ struct MarketplaceView: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Create Order Intent") {
                     let qty = Int(quantity) ?? 1
+                    let item = catalog[sku] ?? ("Signal Pack", 10)
                     Task {
                         await model.run(
                             module: "marketplace",
                             action: "order_intent",
-                            payload: ["item_id": itemId, "quantity": qty]
+                            payload: [
+                                "sku": sku,
+                                "title": item.0,
+                                "price": item.1,
+                                "qty": qty,
+                            ]
                         )
                     }
                 }
@@ -139,6 +194,7 @@ struct MarketplaceView: View {
             }
             .padding()
             .navigationTitle("Marketplace")
+            .background(SolsticePalette.background)
         }
     }
 }
@@ -151,7 +207,7 @@ struct EntertainmentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Preview only. Deterministic steps.")
+                PreviewBanner(text: "Testnet Alpha. Deterministic steps.")
                 RunInputsView(model: model)
                 Picker("Mode", selection: $mode) {
                     Text("Pulse").tag("pulse")
@@ -178,6 +234,25 @@ struct EntertainmentView: View {
             }
             .padding()
             .navigationTitle("Entertainment")
+            .background(SolsticePalette.background)
+        }
+    }
+}
+
+struct TrustView: View {
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                PreviewBanner(text: "Testnet Alpha. Evidence-first operations.")
+                Text("Trust & Evidence")
+                    .font(.title2)
+                Text("No live mainnet data. Evidence is deterministic and replayable.")
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Trust")
+            .background(SolsticePalette.background)
         }
     }
 }
@@ -196,7 +271,7 @@ struct EvidenceSummary: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color.yellow.opacity(0.1))
+        .background(SolsticePalette.card)
         .cornerRadius(12)
     }
 }
@@ -253,6 +328,7 @@ struct EvidenceInspectorView: View {
             }
             .padding()
             .navigationTitle("Evidence")
+            .background(SolsticePalette.background)
         }
     }
 }
