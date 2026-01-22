@@ -25,6 +25,11 @@ class WebAssetsExistTests(unittest.TestCase):
         self.assertIn("Week 2 Preview", page)
         self.assertIn("No live data", page)
 
+    def test_exchange_script_exists(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "static"
+        script = root / "js" / "exchange.js"
+        self.assertTrue(script.exists(), "missing exchange.js")
+
 
 if __name__ == "__main__":
     unittest.main()
