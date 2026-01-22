@@ -30,6 +30,11 @@ class WebAssetsExistTests(unittest.TestCase):
         script = root / "js" / "exchange.js"
         self.assertTrue(script.exists(), "missing exchange.js")
 
+    def test_chat_script_exists(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "static"
+        script = root / "js" / "chat.js"
+        self.assertTrue(script.exists(), "missing chat.js")
+
 
 if __name__ == "__main__":
     unittest.main()

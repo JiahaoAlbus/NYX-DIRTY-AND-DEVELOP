@@ -21,34 +21,58 @@
       <a href="/protocol-library/">Protocol Library</a>
     </nav>
   </div>
-  <div class="banner">Week 2 Preview — No live data. No accounts. No wallet. No trading. No messaging.</div>
+  <div class="banner">Week 5 Preview — No live data. No accounts. No wallet. No messaging.</div>
 </header>
 <main class="container">
   <section class="hero">
     <div>
       <div class="badge">Preview Only</div>
       <h1>Message Event Receipt</h1>
-      <p>Compose a message event and export a deterministic evidence bundle.</p>
+      <p>Submit a deterministic message event and export evidence.</p>
     </div>
     <div class="callout">
       <strong>Evidence Truth Layer</strong>
-      <p class="placeholder">All evidence fields are rendered verbatim from the backend and exported without modification.</p>
+      <p class="placeholder">Evidence fields are rendered verbatim and exported without modification.</p>
     </div>
   </section>
-  <section>
-    <div class="section-title">Modules</div>
-    <div class="card-grid"><div class="card"><h3>No Inbox</h3><p class="placeholder">No user accounts or message history are stored.</p></div>
-<div class="card"><h3>Receipts</h3><p class="placeholder">Events are captured as deterministic receipts.</p></div></div>
+
+  <section class="card">
+    <div class="section-title">Message Event</div>
+    <form id="chat-form" class="form-grid">
+      <div>
+        <label for="seed">Seed</label>
+        <input id="seed" name="seed" type="number" value="123" required />
+      </div>
+      <div>
+        <label for="run-id">Run ID</label>
+        <input id="run-id" name="run_id" type="text" value="chat-demo" required />
+      </div>
+      <div style="grid-column: span 2;">
+        <label for="message">Message (text only)</label>
+        <input id="message" name="message" type="text" value="hello nyx" required />
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button type="submit" id="run-btn">Submit</button>
+      </div>
+    </form>
+    <p class="notice">Backend endpoint: /run (module=chat, action=message_event)</p>
   </section>
-  <section>
-    <div class="section-title">Status</div>
-    <div class="card">
-      <p class="placeholder">Preview only. Provided by backend. Not live system data.</p>
+
+  <section class="evidence-panel" id="evidence-panel">
+    <div class="section-title">Evidence Summary</div>
+    <div class="evidence-grid" id="evidence-grid">
+      <div>state_hash: <span id="state-hash">—</span></div>
+      <div>receipt_hashes: <span id="receipt-hashes">—</span></div>
+      <div>replay_ok: <span id="replay-ok">—</span></div>
+      <div>export: <a id="export-link" href="#">Download bundle</a></div>
     </div>
+    <p class="notice" id="status-text">Preview only. Provided by backend. Not live system data.</p>
   </section>
 </main>
 <footer class="footer">
   NYX Portal Preview. Deterministic evidence only.
 </footer>
+<script src="/js/chat.js"></script>
 </body>
 </html>
