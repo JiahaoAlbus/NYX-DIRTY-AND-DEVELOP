@@ -22,8 +22,8 @@ class WebAssetsExistTests(unittest.TestCase):
     def test_banner_present(self) -> None:
         root = Path(__file__).resolve().parents[1] / "static"
         page = (root / "home" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("Week 2 Preview", page)
-        self.assertIn("No live data", page)
+        self.assertIn("Testnet Alpha", page)
+        self.assertIn("No live mainnet data", page)
 
     def test_exchange_script_exists(self) -> None:
         root = Path(__file__).resolve().parents[1] / "static"
