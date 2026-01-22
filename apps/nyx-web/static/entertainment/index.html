@@ -21,34 +21,66 @@
       <a href="/protocol-library/">Protocol Library</a>
     </nav>
   </div>
-  <div class="banner">Week 2 Preview — No live data. No accounts. No wallet. No trading. No messaging.</div>
+  <div class="banner">Week 7 Preview — No live data. No accounts. No wallet. No trading. No messaging.</div>
 </header>
 <main class="container">
   <section class="hero">
     <div>
       <div class="badge">Preview Only</div>
       <h1>Mini-Event State Steps</h1>
-      <p>Trigger bounded mini-event transitions and export evidence.</p>
+      <p>Execute bounded deterministic steps and export evidence.</p>
     </div>
     <div class="callout">
       <strong>Evidence Truth Layer</strong>
-      <p class="placeholder">All evidence fields are rendered verbatim from the backend and exported without modification.</p>
+      <p class="placeholder">Evidence fields are rendered verbatim and exported without modification.</p>
     </div>
   </section>
-  <section>
-    <div class="section-title">Modules</div>
-    <div class="card-grid"><div class="card"><h3>Bounded</h3><p class="placeholder">Inputs are restricted to deterministic ranges.</p></div>
-<div class="card"><h3>Replay</h3><p class="placeholder">State steps are replayable and verifiable.</p></div></div>
+
+  <section class="card">
+    <div class="section-title">Mini-Event Selector</div>
+    <form id="entertainment-form" class="form-grid">
+      <div>
+        <label for="seed">Seed</label>
+        <input id="seed" name="seed" type="number" value="123" required />
+      </div>
+      <div>
+        <label for="run-id">Run ID</label>
+        <input id="run-id" name="run_id" type="text" value="entertain-demo" required />
+      </div>
+      <div>
+        <label for="mode">Mode</label>
+        <select id="mode" name="mode">
+          <option value="pulse">Pulse</option>
+          <option value="orbit">Orbit</option>
+          <option value="signal">Signal</option>
+        </select>
+      </div>
+      <div>
+        <label for="step">Step</label>
+        <input id="step" name="step" type="number" value="1" min="0" max="10" required />
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button type="submit" id="run-btn">Execute</button>
+      </div>
+    </form>
+    <p class="notice">Backend endpoint: /run (module=entertainment, action=state_step)</p>
   </section>
-  <section>
-    <div class="section-title">Status</div>
-    <div class="card">
-      <p class="placeholder">Preview only. Provided by backend. Not live system data.</p>
+
+  <section class="evidence-panel" id="evidence-panel">
+    <div class="section-title">Evidence Summary</div>
+    <div class="evidence-grid" id="evidence-grid">
+      <div>state_hash: <span id="state-hash">—</span></div>
+      <div>receipt_hashes: <span id="receipt-hashes">—</span></div>
+      <div>replay_ok: <span id="replay-ok">—</span></div>
+      <div>export: <a id="export-link" href="#">Download bundle</a></div>
     </div>
+    <p class="notice" id="status-text">Preview only. Provided by backend. Not live system data.</p>
   </section>
 </main>
 <footer class="footer">
   NYX Portal Preview. Deterministic evidence only.
 </footer>
+<script src="/js/entertainment.js"></script>
 </body>
 </html>
