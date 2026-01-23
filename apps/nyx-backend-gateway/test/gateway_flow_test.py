@@ -1,3 +1,4 @@
+import _bootstrap
 import hashlib
 import os
 import tempfile
