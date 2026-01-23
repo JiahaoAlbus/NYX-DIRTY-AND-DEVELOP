@@ -281,6 +281,7 @@ struct MarketplaceView: View {
 
 struct EntertainmentView: View {
     @ObservedObject var model: EvidenceViewModel
+    @State private var selectedItemId = ""
     @State private var mode = "pulse"
     @State private var step = "1"
 
@@ -289,10 +290,26 @@ struct EntertainmentView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Alpha. Deterministic steps.")
                 RunInputsView(model: model)
+                Button("Refresh Items") {
+                    Task {
+                        await model.refreshEntertainmentItems()
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                if !model.entertainmentItems.isEmpty {
+                    Picker("Item", selection: $selectedItemId) {
+                        ForEach(model.entertainmentItems) { item in
+                            Text(item.title).tag(item.itemId)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
                 Picker("Mode", selection: $mode) {
                     Text("Pulse").tag("pulse")
-                    Text("Orbit").tag("orbit")
-                    Text("Signal").tag("signal")
+                    Text("Drift").tag("drift")
+                    Text("Scan").tag("scan")
                 }
                 .pickerStyle(.segmented)
                 TextField("Step", text: $step)
@@ -301,20 +318,34 @@ struct EntertainmentView: View {
                 Button("Execute Step") {
                     let stepValue = Int(step) ?? 0
                     Task {
-                        await model.run(
-                            module: "entertainment",
-                            action: "state_step",
-                            payload: ["mode": mode, "step": stepValue]
-                        )
+                        if selectedItemId.isEmpty, let first = model.entertainmentItems.first {
+                            selectedItemId = first.itemId
+                        }
+                        await model.runEntertainmentStep(itemId: selectedItemId, mode: mode, step: stepValue)
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                if !model.entertainmentEvents.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent Events")
+                            .font(.headline)
+                        ForEach(model.entertainmentEvents.prefix(6)) { event in
+                            Text("\(event.itemId) • \(event.mode) • step \(event.step)")
+                                .font(.footnote)
+                        }
+                    }
+                }
                 EvidenceSummary(model: model)
                 Spacer()
             }
             .padding()
             .navigationTitle("Entertainment")
             .background(SolsticePalette.background)
+            .onAppear {
+                Task {
+                    await model.refreshEntertainmentItems()
+                }
+            }
         }
     }
 }

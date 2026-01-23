@@ -134,7 +134,7 @@ class GatewayFlowTests(unittest.TestCase):
         self._run_and_check(
             "entertainment",
             "state_step",
-            {"mode": "alpha", "step": 2},
+            {"item_id": "ent-001", "mode": "pulse", "step": 2},
         )
 
 

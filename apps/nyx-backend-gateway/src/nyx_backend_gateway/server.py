@@ -9,9 +9,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from nyx_backend_gateway.env import load_env_file
+import nyx_backend_gateway.gateway as gateway
 from nyx_backend_gateway.gateway import GatewayError, execute_run, _run_root, _db_path
 from nyx_backend_gateway.storage import (
     create_connection,
+    list_entertainment_events,
+    list_entertainment_items,
     list_listings,
     list_messages,
     list_orders,
@@ -259,6 +262,30 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
+            if self.path == "/entertainment/step":
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                step_payload = payload.get("payload")
+                if step_payload is None:
+                    step_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result = execute_run(
+                    seed=seed,
+                    run_id=run_id,
+                    module="entertainment",
+                    action="state_step",
+                    payload=step_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                    }
+                )
+                return
             self._send_text("not found", HTTPStatus.NOT_FOUND)
         except GatewayError as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -388,6 +415,26 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 purchases = list_purchases(conn, listing_id=listing_id)
                 conn.close()
                 self._send_json({"purchases": purchases})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/entertainment/items":
+            try:
+                conn = create_connection(_db_path())
+                gateway._ensure_entertainment_items(conn)
+                items = list_entertainment_items(conn)
+                conn.close()
+                self._send_json({"items": items})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/entertainment/events":
+            try:
+                conn = create_connection(_db_path())
+                item_id = (query.get("item_id") or [""])[0] or None
+                events = list_entertainment_events(conn, item_id=item_id)
+                conn.close()
+                self._send_json({"events": events})
             except Exception as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
