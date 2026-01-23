@@ -1,3 +1,4 @@
+import _bootstrap
 import json
 import os
 import tempfile

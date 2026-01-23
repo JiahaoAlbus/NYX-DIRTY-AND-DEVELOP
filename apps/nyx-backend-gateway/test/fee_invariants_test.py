@@ -1,3 +1,4 @@
+import _bootstrap
 import os
 import unittest
 
