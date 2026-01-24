@@ -13,6 +13,8 @@ final class EvidenceViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var listings: [ListingRow] = []
     @Published var purchases: [PurchaseRow] = []
+    @Published var entertainmentItems: [EntertainmentItemRow] = []
+    @Published var entertainmentEvents: [EntertainmentEventRow] = []
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
 
@@ -217,6 +219,49 @@ final class EvidenceViewModel: ObservableObject {
     func refreshPurchases(listingId: String) async {
         do {
             purchases = try await client.fetchPurchases(listingId: listingId)
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func refreshEntertainmentItems() async {
+        do {
+            entertainmentItems = try await client.fetchEntertainmentItems()
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func refreshEntertainmentEvents(itemId: String) async {
+        do {
+            entertainmentEvents = try await client.fetchEntertainmentEvents(itemId: itemId)
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func runEntertainmentStep(itemId: String, mode: String, step: Int) async {
+        guard let seedInt = Int(seed) else {
+            status = "Seed must be an integer"
+            return
+        }
+        if runId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            status = "Run ID required"
+            return
+        }
+        status = "Executing step..."
+        do {
+            _ = try await client.runEntertainmentStep(seed: seedInt, runId: runId, itemId: itemId, mode: mode, step: step)
+            let bundle = try await client.fetchEvidence(runId: runId)
+            evidence = bundle
+            stateHash = bundle.stateHash
+            receiptHashes = bundle.receiptHashes
+            replayOk = bundle.replayOk
+            await refreshEntertainmentEvents(itemId: itemId)
+            status = "Step recorded. Evidence ready."
         } catch {
             status = "Error: \(error)"
         }

@@ -95,6 +95,23 @@ class Purchase:
 
 
 @dataclass(frozen=True)
+class EntertainmentItem:
+    item_id: str
+    title: str
+    summary: str
+    category: str
+
+
+@dataclass(frozen=True)
+class EntertainmentEvent:
+    event_id: str
+    item_id: str
+    mode: str
+    step: int
+    run_id: str
+
+
+@dataclass(frozen=True)
 class Receipt:
     receipt_id: str
     module: str
@@ -296,6 +313,67 @@ def list_purchases(conn: sqlite3.Connection, listing_id: str | None = None, limi
     return [{col: row[col] for col in row.keys()} for row in rows]
 
 
+def insert_entertainment_item(conn: sqlite3.Connection, item: EntertainmentItem) -> None:
+    item_id = _validate_text(item.item_id, "item_id")
+    if not isinstance(item.title, str) or not item.title or isinstance(item.title, bool):
+        raise StorageError("title required")
+    if len(item.title) > 128:
+        raise StorageError("title too long")
+    if not isinstance(item.summary, str) or not item.summary or isinstance(item.summary, bool):
+        raise StorageError("summary required")
+    if len(item.summary) > 256:
+        raise StorageError("summary too long")
+    category = _validate_text(item.category, "category", r"[A-Za-z0-9_-]{1,32}")
+    conn.execute(
+        "INSERT OR IGNORE INTO entertainment_items (item_id, title, summary, category) VALUES (?, ?, ?, ?)",
+        (item_id, item.title, item.summary, category),
+    )
+    conn.commit()
+
+
+def list_entertainment_items(conn: sqlite3.Connection, limit: int = 100) -> list[dict[str, object]]:
+    if limit < 1 or limit > 200:
+        raise StorageError("limit out of bounds")
+    rows = conn.execute(
+        "SELECT * FROM entertainment_items ORDER BY item_id ASC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
+def insert_entertainment_event(conn: sqlite3.Connection, event: EntertainmentEvent) -> None:
+    event_id = _validate_text(event.event_id, "event_id")
+    item_id = _validate_text(event.item_id, "item_id")
+    mode = _validate_text(event.mode, "mode", r"[A-Za-z0-9_-]{1,32}")
+    step = _validate_int(event.step, "step", 0)
+    run_id = _validate_text(event.run_id, "run_id")
+    conn.execute(
+        "INSERT INTO entertainment_events (event_id, item_id, mode, step, run_id) VALUES (?, ?, ?, ?, ?)",
+        (event_id, item_id, mode, step, run_id),
+    )
+    conn.commit()
+
+
+def list_entertainment_events(
+    conn: sqlite3.Connection,
+    item_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, object]]:
+    if limit < 1 or limit > 200:
+        raise StorageError("limit out of bounds")
+    clauses = []
+    params: list[object] = []
+    if item_id:
+        clauses.append("item_id = ?")
+        params.append(_validate_text(item_id, "item_id"))
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM entertainment_events {where} ORDER BY event_id ASC LIMIT ?",
+        (*params, limit),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
 def insert_receipt(conn: sqlite3.Connection, receipt: Receipt) -> None:
     receipt_id = _validate_text(receipt.receipt_id, "receipt_id")
     module = _validate_text(receipt.module, "module")
@@ -339,6 +417,8 @@ def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> di
         "messages",
         "listings",
         "purchases",
+        "entertainment_items",
+        "entertainment_events",
         "receipts",
         "fee_ledger",
     }:

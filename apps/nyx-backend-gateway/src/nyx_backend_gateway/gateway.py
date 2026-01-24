@@ -9,6 +9,8 @@ from nyx_backend_gateway.exchange import ExchangeError, cancel_order, place_orde
 from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.storage import (
     EvidenceRun,
+    EntertainmentEvent,
+    EntertainmentItem,
     FeeLedger,
     Listing,
     MessageEvent,
@@ -16,6 +18,8 @@ from nyx_backend_gateway.storage import (
     Purchase,
     Receipt,
     create_connection,
+    insert_entertainment_event,
+    insert_entertainment_item,
     insert_evidence_run,
     insert_fee_ledger,
     insert_listing,
@@ -40,6 +44,35 @@ class GatewayResult:
 
 _MAX_AMOUNT = 1_000_000
 _MAX_PRICE = 1_000_000
+_ENTERTAINMENT_MODES = {"pulse", "drift", "scan"}
+
+
+def _entertainment_items() -> list[EntertainmentItem]:
+    return [
+        EntertainmentItem(
+            item_id="ent-001",
+            title="Signal Drift",
+            summary="Deterministic state steps for testnet alpha.",
+            category="pulse",
+        ),
+        EntertainmentItem(
+            item_id="ent-002",
+            title="Echo Field",
+            summary="Bounded steps with stable evidence output.",
+            category="drift",
+        ),
+        EntertainmentItem(
+            item_id="ent-003",
+            title="Arc Loop",
+            summary="Preview-only loop with deterministic receipts.",
+            category="scan",
+        ),
+    ]
+
+
+def _ensure_entertainment_items(conn) -> None:
+    for item in _entertainment_items():
+        insert_entertainment_item(conn, item)
 
 
 def _repo_root() -> Path:
@@ -154,9 +187,12 @@ def _validate_purchase_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_entertainment_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    item_id = _require_text(payload, "item_id", max_len=32)
     mode = _require_text(payload, "mode", max_len=32)
+    if mode not in _ENTERTAINMENT_MODES:
+        raise GatewayError("mode not allowed")
     step = _require_int(payload, "step", 0, 20)
-    return {"mode": mode, "step": step}
+    return {"item_id": item_id, "mode": mode, "step": step}
 
 
 def execute_run(
@@ -312,6 +348,21 @@ def execute_run(
                 purchase_id=_deterministic_id("purchase", run_id),
                 listing_id=payload["listing_id"],
                 qty=payload["qty"],
+                run_id=run_id,
+            ),
+        )
+    if module == "entertainment" and action == "state_step":
+        _ensure_entertainment_items(conn)
+        item_record = load_by_id(conn, "entertainment_items", "item_id", payload["item_id"])
+        if item_record is None:
+            raise GatewayError("item_id not found")
+        insert_entertainment_event(
+            conn,
+            EntertainmentEvent(
+                event_id=_deterministic_id("ent-event", run_id),
+                item_id=payload["item_id"],
+                mode=payload["mode"],
+                step=payload["step"],
                 run_id=run_id,
             ),
         )

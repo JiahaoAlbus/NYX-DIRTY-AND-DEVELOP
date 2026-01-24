@@ -115,4 +115,25 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS entertainment_items (
+            item_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            category TEXT NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS entertainment_events (
+            event_id TEXT PRIMARY KEY,
+            item_id TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            step INTEGER NOT NULL,
+            run_id TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()

@@ -188,6 +188,41 @@ final class GatewayClient {
         return payload["purchases"] ?? []
     }
 
+    func fetchEntertainmentItems() async throws -> [EntertainmentItemRow] {
+        let url = baseURL.appendingPathComponent("entertainment/items")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [EntertainmentItemRow]].self, from: data)
+        return payload["items"] ?? []
+    }
+
+    func fetchEntertainmentEvents(itemId: String) async throws -> [EntertainmentEventRow] {
+        var components = URLComponents(url: baseURL.appendingPathComponent("entertainment/events"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "item_id", value: itemId)]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [EntertainmentEventRow]].self, from: data)
+        return payload["events"] ?? []
+    }
+
+    func runEntertainmentStep(seed: Int, runId: String, itemId: String, mode: String, step: Int) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("entertainment/step")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": ["item_id": itemId, "mode": mode, "step": step],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
     func fetchEvidence(runId: String) async throws -> EvidenceBundle {
         if let cached = evidenceCache[runId] {
             return cached
