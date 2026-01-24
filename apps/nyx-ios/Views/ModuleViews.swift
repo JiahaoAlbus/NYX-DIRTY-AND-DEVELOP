@@ -43,7 +43,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Preview only. No accounts. No live data.")
+                PreviewBanner(text: "Testnet Beta. No external accounts. No live data.")
                 Text("NYX Portal")
                     .font(.largeTitle)
                 Text("Deterministic evidence flows only.")
@@ -244,7 +244,7 @@ struct ChatView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. No accounts or live chat history.")
+                PreviewBanner(text: "Testnet Beta. No external accounts or live chat history.")
                 RunInputsView(model: model)
                 TextField("Channel", text: $channel)
                     .textFieldStyle(.roundedBorder)
