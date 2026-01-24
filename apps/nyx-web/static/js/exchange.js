@@ -56,7 +56,7 @@
       receiptHashes.textContent = (evidence.receipt_hashes || []).join(", ") || "—";
       replayOk.textContent = String(evidence.replay_ok);
       exportLink.href = apiBase + "/export.zip?run_id=" + encodeURIComponent(runId);
-      setStatus("Evidence ready. Testnet Alpha. Provided by backend.");
+      setStatus("Evidence ready. Testnet Beta. Provided by backend.");
     } catch (err) {
       setStatus("Error: " + err.message);
     } finally {

@@ -44,7 +44,7 @@ final class EvidenceViewModel: ObservableObject {
             stateHash = bundle.stateHash
             receiptHashes = bundle.receiptHashes
             replayOk = bundle.replayOk
-            status = "Evidence ready. Testnet Alpha. Provided by backend."
+            status = "Evidence ready. Testnet Beta. Provided by backend."
         } catch {
             status = "Error: \(error)"
         }

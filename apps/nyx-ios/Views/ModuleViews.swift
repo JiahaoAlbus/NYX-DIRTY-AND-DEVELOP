@@ -43,7 +43,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. Preview only. No accounts. No live data.")
+                PreviewBanner(text: "Testnet Beta. Preview only. No accounts. No live data.")
                 Text("NYX Portal")
                     .font(.largeTitle)
                 Text("Deterministic evidence flows only.")
@@ -70,7 +70,7 @@ struct ExchangeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. No live market data.")
+                PreviewBanner(text: "Testnet Beta. No live market data.")
                 RunInputsView(model: model)
                 Picker("Side", selection: $side) {
                     Text("BUY").tag("BUY")
@@ -167,7 +167,7 @@ struct ChatView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. No accounts or live chat history.")
+                PreviewBanner(text: "Testnet Beta. No accounts or live chat history.")
                 RunInputsView(model: model)
                 TextField("Channel", text: $channel)
                     .textFieldStyle(.roundedBorder)
@@ -214,7 +214,7 @@ struct MarketplaceView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. Listings are testnet-only.")
+                PreviewBanner(text: "Testnet Beta. Listings are testnet-only.")
                 RunInputsView(model: model)
                 TextField("SKU", text: $sku)
                     .textFieldStyle(.roundedBorder)
@@ -288,7 +288,7 @@ struct EntertainmentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. Deterministic steps.")
+                PreviewBanner(text: "Testnet Beta. Deterministic steps.")
                 RunInputsView(model: model)
                 Button("Refresh Items") {
                     Task {
@@ -354,10 +354,10 @@ struct TrustView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Alpha. Evidence-first operations.")
+                PreviewBanner(text: "Testnet Beta. Evidence-first operations.")
                 Text("Trust & Evidence")
                     .font(.title2)
-                Text("No live mainnet data. Evidence is deterministic and replayable.")
+                Text("Testnet Beta. No live data. Evidence is deterministic and replayable.")
                     .foregroundColor(.secondary)
                 Spacer()
             }

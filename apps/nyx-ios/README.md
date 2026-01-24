@@ -1,4 +1,4 @@
-# NYX iOS Reference Client (Testnet Alpha)
+# NYX iOS Reference Client (Testnet Beta)
 
 Purpose
 - Provide a SwiftUI reference client that mirrors deterministic flows and renders evidence verbatim.
