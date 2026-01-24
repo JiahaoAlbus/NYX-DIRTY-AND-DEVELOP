@@ -1,3 +1,4 @@
+from .gateway import GatewayError, GatewayResult, execute_run
 from .migrations import apply_migrations
 from .storage import (
     EvidenceRun,
@@ -20,6 +21,8 @@ from .storage import (
 
 __all__ = [
     "EvidenceRun",
+    "GatewayError",
+    "GatewayResult",
     "Listing",
     "MessageEvent",
     "Order",
@@ -28,6 +31,7 @@ __all__ = [
     "Trade",
     "apply_migrations",
     "create_connection",
+    "execute_run",
     "insert_evidence_run",
     "insert_listing",
     "insert_message_event",
