@@ -1,5 +1,6 @@
 import _bootstrap
 import hashlib
+import os
 import tempfile
 from pathlib import Path
 import unittest
@@ -24,6 +25,9 @@ def _find_run_dir(run_root: Path, run_id: str) -> Path | None:
 
 
 class GatewayFlowTests(unittest.TestCase):
+    def setUp(self) -> None:
+        os.environ.setdefault("NYX_TESTNET_FEE_ADDRESS", "testnet-fee-address")
+
     def _run_and_check(self, module: str, action: str, payload: dict) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "gateway.db"
@@ -44,6 +48,9 @@ class GatewayFlowTests(unittest.TestCase):
             receipt = load_by_id(conn, "receipts", "receipt_id", _receipt_id(run_id))
             self.assertIsNotNone(evidence)
             self.assertIsNotNone(receipt)
+            if module == "exchange":
+                fee = load_by_id(conn, "fee_ledger", "run_id", run_id)
+                self.assertIsNotNone(fee)
             conn.close()
             run_dir = _find_run_dir(run_root, run_id)
             self.assertIsNotNone(run_dir)
@@ -55,6 +62,26 @@ class GatewayFlowTests(unittest.TestCase):
             "exchange",
             "route_swap",
             {"asset_in": "asset-a", "asset_out": "asset-b", "amount": 5, "min_out": 3},
+        )
+
+    def test_exchange_place_order_flow(self) -> None:
+        self._run_and_check(
+            "exchange",
+            "place_order",
+            {
+                "side": "BUY",
+                "asset_in": "asset-a",
+                "asset_out": "asset-b",
+                "amount": 5,
+                "price": 10,
+            },
+        )
+
+    def test_exchange_cancel_order_flow(self) -> None:
+        self._run_and_check(
+            "exchange",
+            "cancel_order",
+            {"order_id": "order-unknown"},
         )
 
     def test_chat_flow(self) -> None:

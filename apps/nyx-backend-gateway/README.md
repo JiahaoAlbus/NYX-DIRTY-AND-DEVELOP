@@ -15,14 +15,19 @@ Non-Scope
 
 Endpoints
 - POST /run (seed, run_id, module, action, payload)
+- POST /exchange/place_order (seed, run_id, payload: side/asset_in/asset_out/amount/price)
+- POST /exchange/cancel_order (seed, run_id, payload: order_id)
 - GET /status?run_id=...
 - GET /evidence?run_id=...
 - GET /artifact?run_id=...&name=...
 - GET /export.zip?run_id=...
 - GET /list
+- GET /exchange/orders
+- GET /exchange/orderbook
+- GET /exchange/trades
 
 Run (local)
-- python -m nyx_backend_gateway.server
+- python -m nyx_backend_gateway.server --env-file .env.example
 
 Verification
 - Storage migrations and roundtrip tests under `apps/nyx-backend-gateway/test`.

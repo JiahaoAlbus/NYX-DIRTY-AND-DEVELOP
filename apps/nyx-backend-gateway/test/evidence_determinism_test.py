@@ -1,0 +1,56 @@
+import _bootstrap
+import json
+import tempfile
+from pathlib import Path
+import unittest
+
+from nyx_backend.evidence import run_evidence
+
+
+def _find_run_dir(run_root: Path, run_id: str) -> Path:
+    for entry in run_root.iterdir():
+        if not entry.is_dir():
+            continue
+        run_id_path = entry / "run_id.txt"
+        if run_id_path.exists() and run_id_path.read_text(encoding="utf-8").strip() == run_id:
+            return entry
+    raise AssertionError("run directory not found")
+
+
+class EvidenceDeterminismTests(unittest.TestCase):
+    def test_exchange_evidence_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs"
+            payload = {
+                "asset_in": "asset-a",
+                "asset_out": "asset-b",
+                "amount": 5,
+                "min_out": 3,
+            }
+            first = run_evidence(
+                seed=123,
+                run_id="run-a",
+                module="exchange",
+                action="route_swap",
+                payload=payload,
+                base_dir=run_root,
+            )
+            second = run_evidence(
+                seed=123,
+                run_id="run-b",
+                module="exchange",
+                action="route_swap",
+                payload=payload,
+                base_dir=run_root,
+            )
+            self.assertEqual(first.state_hash, second.state_hash)
+            self.assertEqual(first.receipt_hashes, second.receipt_hashes)
+            first_dir = _find_run_dir(run_root, "run-a")
+            second_dir = _find_run_dir(run_root, "run-b")
+            first_json = json.loads((first_dir / "evidence.json").read_text(encoding="utf-8"))
+            second_json = json.loads((second_dir / "evidence.json").read_text(encoding="utf-8"))
+            self.assertEqual(first_json, second_json)
+
+
+if __name__ == "__main__":
+    unittest.main()

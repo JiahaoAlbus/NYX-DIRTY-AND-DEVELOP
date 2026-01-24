@@ -5,6 +5,7 @@ import unittest
 
 from nyx_backend_gateway.storage import (
     EvidenceRun,
+    FeeLedger,
     Listing,
     MessageEvent,
     Order,
@@ -13,6 +14,7 @@ from nyx_backend_gateway.storage import (
     Trade,
     create_connection,
     insert_evidence_run,
+    insert_fee_ledger,
     insert_listing,
     insert_message_event,
     insert_order,
@@ -108,6 +110,19 @@ class StorageRoundtripTests(unittest.TestCase):
         )
         insert_receipt(self.conn, receipt)
         self.assertIsNotNone(load_by_id(self.conn, "receipts", "receipt_id", "receipt-1"))
+
+        fee = FeeLedger(
+            fee_id="fee-1",
+            module="exchange",
+            action="route_swap",
+            protocol_fee_total=5,
+            platform_fee_amount=1,
+            total_paid=6,
+            fee_address="testnet-fee-addr",
+            run_id="run-001",
+        )
+        insert_fee_ledger(self.conn, fee)
+        self.assertIsNotNone(load_by_id(self.conn, "fee_ledger", "fee_id", "fee-1"))
 
 
 if __name__ == "__main__":

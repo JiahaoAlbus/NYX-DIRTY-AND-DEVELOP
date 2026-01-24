@@ -60,16 +60,23 @@ struct HomeView: View {
 
 struct ExchangeView: View {
     @ObservedObject var model: EvidenceViewModel
+    @State private var side = "BUY"
     @State private var assetIn = "asset-a"
     @State private var assetOut = "asset-b"
     @State private var amount = "5"
-    @State private var minOut = "3"
+    @State private var price = "10"
+    @State private var cancelOrderId = ""
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Alpha. No live market data.")
                 RunInputsView(model: model)
+                Picker("Side", selection: $side) {
+                    Text("BUY").tag("BUY")
+                    Text("SELL").tag("SELL")
+                }
+                .pickerStyle(.segmented)
                 Picker("Asset In", selection: $assetIn) {
                     Text("asset-a").tag("asset-a")
                     Text("asset-b").tag("asset-b")
@@ -83,26 +90,65 @@ struct ExchangeView: View {
                 TextField("Amount", text: $amount)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
-                TextField("Min Out", text: $minOut)
+                TextField("Price", text: $price)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
-                Button("Execute Route") {
+                Button("Place Order") {
                     let amountValue = Int(amount) ?? 1
-                    let minOutValue = Int(minOut) ?? 1
+                    let priceValue = Int(price) ?? 1
                     Task {
-                        await model.run(
-                            module: "exchange",
-                            action: "route_swap",
+                        await model.placeOrder(
                             payload: [
+                                "side": side,
                                 "asset_in": assetIn,
                                 "asset_out": assetOut,
                                 "amount": amountValue,
-                                "min_out": minOutValue,
+                                "price": priceValue,
                             ]
                         )
                     }
                 }
                 .buttonStyle(.borderedProminent)
+
+                TextField("Cancel Order ID", text: $cancelOrderId)
+                    .textFieldStyle(.roundedBorder)
+                Button("Cancel Order") {
+                    Task {
+                        await model.cancelOrder(orderId: cancelOrderId)
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                Button("Refresh Orderbook") {
+                    Task {
+                        await model.refreshOrderBook()
+                        await model.refreshTrades()
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Orderbook (Buy)")
+                        .font(.headline)
+                    ForEach(model.buyOrders.prefix(5)) { order in
+                        Text("\(order.amount) @ \(order.price) \(order.assetIn)/\(order.assetOut)")
+                            .font(.footnote)
+                    }
+                    Text("Orderbook (Sell)")
+                        .font(.headline)
+                        .padding(.top, 8)
+                    ForEach(model.sellOrders.prefix(5)) { order in
+                        Text("\(order.amount) @ \(order.price) \(order.assetIn)/\(order.assetOut)")
+                            .font(.footnote)
+                    }
+                    Text("Trades")
+                        .font(.headline)
+                        .padding(.top, 8)
+                    ForEach(model.trades.prefix(5)) { trade in
+                        Text("\(trade.amount) @ \(trade.price)")
+                            .font(.footnote)
+                    }
+                }
                 EvidenceSummary(model: model)
                 Spacer()
             }

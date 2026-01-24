@@ -66,6 +66,51 @@ final class GatewayClient {
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
+    func placeOrder(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("exchange/place_order")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": payload,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
+    func cancelOrder(seed: Int, runId: String, orderId: String) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("exchange/cancel_order")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": ["order_id": orderId],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
+    func fetchOrderBook() async throws -> OrderBook {
+        let url = baseURL.appendingPathComponent("exchange/orderbook")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(OrderBook.self, from: data)
+    }
+
+    func fetchTrades() async throws -> [TradeRow] {
+        let url = baseURL.appendingPathComponent("exchange/trades")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [TradeRow]].self, from: data)
+        return payload["trades"] ?? []
+    }
+
     func fetchEvidence(runId: String) async throws -> EvidenceBundle {
         if let cached = evidenceCache[runId] {
             return cached

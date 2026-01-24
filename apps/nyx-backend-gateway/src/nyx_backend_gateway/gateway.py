@@ -5,22 +5,23 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from nyx_backend_gateway.exchange import ExchangeError, cancel_order, place_order
+from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.storage import (
     EvidenceRun,
+    FeeLedger,
     Listing,
     MessageEvent,
     Order,
     Purchase,
     Receipt,
-    Trade,
     create_connection,
     insert_evidence_run,
+    insert_fee_ledger,
     insert_listing,
     insert_message_event,
-    insert_order,
     insert_purchase,
     insert_receipt,
-    insert_trade,
 )
 
 
@@ -34,6 +35,10 @@ class GatewayResult:
     state_hash: str
     receipt_hashes: list[str]
     replay_ok: bool
+
+
+_MAX_AMOUNT = 1_000_000
+_MAX_PRICE = 1_000_000
 
 
 def _repo_root() -> Path:
@@ -64,6 +69,14 @@ def _deterministic_id(prefix: str, run_id: str) -> str:
     return f"{prefix}-{digest[:16]}"
 
 
+def _order_id(run_id: str) -> str:
+    return _deterministic_id("order", run_id)
+
+
+def _receipt_id(run_id: str) -> str:
+    return _deterministic_id("receipt", run_id)
+
+
 def _require_text(payload: dict[str, Any], key: str, max_len: int = 64) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value or isinstance(value, bool):
@@ -73,12 +86,14 @@ def _require_text(payload: dict[str, Any], key: str, max_len: int = 64) -> str:
     return value
 
 
-def _require_int(payload: dict[str, Any], key: str, min_value: int = 1) -> int:
+def _require_int(payload: dict[str, Any], key: str, min_value: int = 1, max_value: int | None = None) -> int:
     value = payload.get(key)
     if not isinstance(value, int) or isinstance(value, bool):
         raise GatewayError(f"{key} must be int")
     if value < min_value:
         raise GatewayError(f"{key} out of bounds")
+    if max_value is not None and value > max_value:
+        raise GatewayError(f"{key} too large")
     return value
 
 
@@ -86,8 +101,27 @@ def _validate_exchange_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "asset_in": _require_text(payload, "asset_in"),
         "asset_out": _require_text(payload, "asset_out"),
-        "amount": _require_int(payload, "amount", 1),
-        "min_out": _require_int(payload, "min_out", 1),
+        "amount": _require_int(payload, "amount", 1, _MAX_AMOUNT),
+        "min_out": _require_int(payload, "min_out", 1, _MAX_PRICE),
+    }
+
+
+def _validate_place_order(payload: dict[str, Any]) -> dict[str, Any]:
+    side = _require_text(payload, "side", max_len=8).upper()
+    if side not in {"BUY", "SELL"}:
+        raise GatewayError("side must be BUY or SELL")
+    return {
+        "side": side,
+        "asset_in": _require_text(payload, "asset_in"),
+        "asset_out": _require_text(payload, "asset_out"),
+        "amount": _require_int(payload, "amount", 1, _MAX_AMOUNT),
+        "price": _require_int(payload, "price", 1, _MAX_PRICE),
+    }
+
+
+def _validate_cancel(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "order_id": _require_text(payload, "order_id"),
     }
 
 
@@ -100,14 +134,14 @@ def _validate_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
 def _validate_market_payload(payload: dict[str, Any]) -> dict[str, Any]:
     sku = _require_text(payload, "sku")
     title = _require_text(payload, "title", max_len=120)
-    price = _require_int(payload, "price", 1)
-    qty = _require_int(payload, "qty", 1)
+    price = _require_int(payload, "price", 1, _MAX_PRICE)
+    qty = _require_int(payload, "qty", 1, _MAX_AMOUNT)
     return {"sku": sku, "title": title, "price": price, "qty": qty}
 
 
 def _validate_entertainment_payload(payload: dict[str, Any]) -> dict[str, Any]:
     mode = _require_text(payload, "mode", max_len=32)
-    step = _require_int(payload, "step", 0)
+    step = _require_int(payload, "step", 0, 20)
     return {"mode": mode, "step": step}
 
 
@@ -123,13 +157,17 @@ def execute_run(
 ) -> GatewayResult:
     if payload is None:
         payload = {}
-    if module == "exchange" and action == "route_swap":
+    if module == "exchange" and action in {"route_swap"}:
         payload = _validate_exchange_payload(payload)
-    elif module == "chat" and action == "message_event":
+    if module == "exchange" and action == "place_order":
+        payload = _validate_place_order(payload)
+    if module == "exchange" and action == "cancel_order":
+        payload = _validate_cancel(payload)
+    if module == "chat" and action == "message_event":
         payload = _validate_chat_payload(payload)
-    elif module == "marketplace" and action == "order_intent":
+    if module == "marketplace" and action == "order_intent":
         payload = _validate_market_payload(payload)
-    elif module == "entertainment" and action == "state_step":
+    if module == "entertainment" and action == "state_step":
         payload = _validate_entertainment_payload(payload)
 
     backend_src = _backend_src()
@@ -167,7 +205,7 @@ def execute_run(
     insert_receipt(
         conn,
         Receipt(
-            receipt_id=_deterministic_id("receipt", run_id),
+            receipt_id=_receipt_id(run_id),
             module=module,
             action=action,
             state_hash=evidence.state_hash,
@@ -176,29 +214,32 @@ def execute_run(
             run_id=run_id,
         ),
     )
-    if module == "exchange" and action == "route_swap":
-        insert_order(
-            conn,
-            Order(
-                order_id=_deterministic_id("order", run_id),
-                side="BUY",
-                amount=payload["amount"],
-                price=payload["min_out"],
-                asset_in=payload["asset_in"],
-                asset_out=payload["asset_out"],
-                run_id=run_id,
-            ),
+
+    fee_record: FeeLedger | None = None
+    if module == "exchange" and action in {"route_swap", "place_order", "cancel_order"}:
+        fee_record = route_fee(module, action, payload, run_id)
+        insert_fee_ledger(conn, fee_record)
+
+    if module == "exchange" and action == "place_order":
+        order = Order(
+            order_id=_order_id(run_id),
+            side=payload["side"],
+            amount=payload["amount"],
+            price=payload["price"],
+            asset_in=payload["asset_in"],
+            asset_out=payload["asset_out"],
+            run_id=run_id,
         )
-        insert_trade(
-            conn,
-            Trade(
-                trade_id=_deterministic_id("trade", run_id),
-                order_id=_deterministic_id("order", run_id),
-                amount=payload["amount"],
-                price=payload["min_out"],
-                run_id=run_id,
-            ),
-        )
+        try:
+            place_order(conn, order)
+        except ExchangeError as exc:
+            raise GatewayError(str(exc)) from exc
+    if module == "exchange" and action == "cancel_order":
+        try:
+            cancel_order(conn, payload["order_id"])
+        except ExchangeError as exc:
+            raise GatewayError(str(exc)) from exc
+
     if module == "chat" and action == "message_event":
         insert_message_event(
             conn,
@@ -229,6 +270,7 @@ def execute_run(
                 run_id=run_id,
             ),
         )
+
     conn.close()
 
     return GatewayResult(

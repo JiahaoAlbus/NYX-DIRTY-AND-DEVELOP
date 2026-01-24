@@ -105,6 +105,18 @@ class Receipt:
     run_id: str
 
 
+@dataclass(frozen=True)
+class FeeLedger:
+    fee_id: str
+    module: str
+    action: str
+    protocol_fee_total: int
+    platform_fee_amount: int
+    total_paid: int
+    fee_address: str
+    run_id: str
+
+
 def insert_evidence_run(conn: sqlite3.Connection, record: EvidenceRun) -> None:
     run_id = _validate_text(record.run_id, "run_id")
     module = _validate_text(record.module, "module")
@@ -139,6 +151,47 @@ def insert_order(conn: sqlite3.Connection, order: Order) -> None:
     conn.commit()
 
 
+def update_order_amount(conn: sqlite3.Connection, order_id: str, new_amount: int) -> None:
+    oid = _validate_text(order_id, "order_id")
+    amount = _validate_int(new_amount, "amount", 1)
+    conn.execute("UPDATE orders SET amount = ? WHERE order_id = ?", (amount, oid))
+    conn.commit()
+
+
+def delete_order(conn: sqlite3.Connection, order_id: str) -> None:
+    oid = _validate_text(order_id, "order_id")
+    conn.execute("DELETE FROM orders WHERE order_id = ?", (oid,))
+    conn.commit()
+
+
+def list_orders(
+    conn: sqlite3.Connection,
+    side: str | None = None,
+    asset_in: str | None = None,
+    asset_out: str | None = None,
+    order_by: str = "price ASC, order_id ASC",
+) -> list[dict[str, object]]:
+    clauses = []
+    params: list[object] = []
+    if side:
+        clauses.append("side = ?")
+        params.append(_validate_text(side, "side", r"(BUY|SELL)"))
+    if asset_in:
+        clauses.append("asset_in = ?")
+        params.append(_validate_text(asset_in, "asset_in"))
+    if asset_out:
+        clauses.append("asset_out = ?")
+        params.append(_validate_text(asset_out, "asset_out"))
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    if order_by not in {"price ASC, order_id ASC", "price DESC, order_id ASC"}:
+        raise StorageError("order_by not allowed")
+    rows = conn.execute(
+        f"SELECT * FROM orders {where} ORDER BY {order_by}",
+        params,
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
 def insert_trade(conn: sqlite3.Connection, trade: Trade) -> None:
     trade_id = _validate_text(trade.trade_id, "trade_id")
     order_id = _validate_text(trade.order_id, "order_id")
@@ -151,6 +204,11 @@ def insert_trade(conn: sqlite3.Connection, trade: Trade) -> None:
         (trade_id, order_id, amount, price, run_id),
     )
     conn.commit()
+
+
+def list_trades(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute("SELECT * FROM trades ORDER BY trade_id ASC").fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
 
 
 def insert_message_event(conn: sqlite3.Connection, message: MessageEvent) -> None:
@@ -214,8 +272,34 @@ def insert_receipt(conn: sqlite3.Connection, receipt: Receipt) -> None:
     conn.commit()
 
 
+def insert_fee_ledger(conn: sqlite3.Connection, record: FeeLedger) -> None:
+    fee_id = _validate_text(record.fee_id, "fee_id")
+    module = _validate_text(record.module, "module")
+    action = _validate_text(record.action, "action")
+    protocol_fee_total = _validate_int(record.protocol_fee_total, "protocol_fee_total", 1)
+    platform_fee_amount = _validate_int(record.platform_fee_amount, "platform_fee_amount", 0)
+    total_paid = _validate_int(record.total_paid, "total_paid", 1)
+    fee_address = _validate_text(record.fee_address, "fee_address", r"[A-Za-z0-9_:-]{8,128}")
+    run_id = _validate_text(record.run_id, "run_id")
+    conn.execute(
+        "INSERT INTO fee_ledger (fee_id, module, action, protocol_fee_total, platform_fee_amount, total_paid, fee_address, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (fee_id, module, action, protocol_fee_total, platform_fee_amount, total_paid, fee_address, run_id),
+    )
+    conn.commit()
+
+
 def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> dict[str, object] | None:
-    if table not in {"evidence_runs", "orders", "trades", "messages", "listings", "purchases", "receipts"}:
+    if table not in {
+        "evidence_runs",
+        "orders",
+        "trades",
+        "messages",
+        "listings",
+        "purchases",
+        "receipts",
+        "fee_ledger",
+    }:
         raise StorageError("table not allowed")
     key_name = _validate_text(key, "key", r"[A-Za-z0-9_]{1,32}")
     value_text = _validate_text(value, "value")

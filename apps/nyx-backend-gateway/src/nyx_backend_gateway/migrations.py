@@ -101,4 +101,18 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fee_ledger (
+            fee_id TEXT PRIMARY KEY,
+            module TEXT NOT NULL,
+            action TEXT NOT NULL,
+            protocol_fee_total INTEGER NOT NULL,
+            platform_fee_amount INTEGER NOT NULL,
+            total_paid INTEGER NOT NULL,
+            fee_address TEXT NOT NULL,
+            run_id TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()

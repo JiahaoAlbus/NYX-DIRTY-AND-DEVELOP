@@ -28,6 +28,7 @@ class StorageMigrationTests(unittest.TestCase):
                 "listings",
                 "purchases",
                 "receipts",
+                "fee_ledger",
             }
             self.assertTrue(expected.issubset(tables))
             conn.close()
