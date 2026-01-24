@@ -15,10 +15,13 @@ final class EvidenceViewModel: ObservableObject {
     @Published var purchases: [PurchaseRow] = []
     @Published var entertainmentItems: [EntertainmentItemRow] = []
     @Published var entertainmentEvents: [EntertainmentEventRow] = []
+    @Published var walletAddress: String = "—"
+    @Published var walletBalance: String = "0"
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
 
     private let client = GatewayClient()
+    private let walletStore = WalletStore()
 
     @MainActor
     func run(module: String, action: String, payload: [String: Any]) async {
@@ -151,6 +154,96 @@ final class EvidenceViewModel: ObservableObject {
     func refreshMessages(channel: String) async {
         do {
             messages = try await client.fetchMessages(channel: channel)
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func loadWallet() async {
+        let trimmed = seed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            status = "Seed required"
+            return
+        }
+        walletStore.load(seed: trimmed)
+        walletAddress = walletStore.address
+        await refreshWalletBalance()
+    }
+
+    @MainActor
+    func refreshWalletBalance() async {
+        guard walletAddress != "—" else {
+            walletBalance = "0"
+            return
+        }
+        do {
+            let balance = try await client.fetchWalletBalance(address: walletAddress)
+            walletBalance = String(balance)
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func faucetWallet(amount: Int) async {
+        guard let seedInt = Int(seed) else {
+            status = "Seed must be an integer"
+            return
+        }
+        if runId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            status = "Run ID required"
+            return
+        }
+        if walletAddress == "—" {
+            status = "Wallet address required"
+            return
+        }
+        status = "Requesting testnet funds..."
+        do {
+            _ = try await client.walletFaucet(seed: seedInt, runId: runId, address: walletAddress, amount: amount)
+            let bundle = try await client.fetchEvidence(runId: runId)
+            evidence = bundle
+            stateHash = bundle.stateHash
+            receiptHashes = bundle.receiptHashes
+            replayOk = bundle.replayOk
+            await refreshWalletBalance()
+            status = "Testnet funds credited. Evidence ready."
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func transferWallet(toAddress: String, amount: Int) async {
+        guard let seedInt = Int(seed) else {
+            status = "Seed must be an integer"
+            return
+        }
+        if runId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            status = "Run ID required"
+            return
+        }
+        if walletAddress == "—" {
+            status = "Wallet address required"
+            return
+        }
+        status = "Submitting transfer..."
+        do {
+            _ = try await client.walletTransfer(
+                seed: seedInt,
+                runId: runId,
+                from: walletAddress,
+                to: toAddress,
+                amount: amount
+            )
+            let bundle = try await client.fetchEvidence(runId: runId)
+            evidence = bundle
+            stateHash = bundle.stateHash
+            receiptHashes = bundle.receiptHashes
+            replayOk = bundle.replayOk
+            await refreshWalletBalance()
+            status = "Transfer complete. Evidence ready."
         } catch {
             status = "Error: \(error)"
         }
@@ -292,6 +385,8 @@ struct ContentView: View {
         TabView {
             HomeView(model: model)
                 .tabItem { Label("Home", systemImage: "house") }
+            WalletView(model: model)
+                .tabItem { Label("Wallet", systemImage: "creditcard") }
             ExchangeView(model: model)
                 .tabItem { Label("Exchange", systemImage: "arrow.left.arrow.right") }
             ChatView(model: model)
