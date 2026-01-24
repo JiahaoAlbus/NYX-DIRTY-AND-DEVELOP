@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 from nyx_backend_gateway.env import load_env_file
 from nyx_backend_gateway.gateway import GatewayError, execute_run, _run_root, _db_path
-from nyx_backend_gateway.storage import create_connection, list_orders, list_trades, load_by_id
+from nyx_backend_gateway.storage import create_connection, list_messages, list_orders, list_trades, load_by_id
 
 
 _MAX_BODY = 4096
@@ -179,6 +179,30 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
+            if self.path == "/chat/send":
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                message_payload = payload.get("payload")
+                if message_payload is None:
+                    message_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result = execute_run(
+                    seed=seed,
+                    run_id=run_id,
+                    module="chat",
+                    action="message_event",
+                    payload=message_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                    }
+                )
+                return
             self._send_text("not found", HTTPStatus.NOT_FOUND)
         except GatewayError as exc:
             self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -279,6 +303,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 sells = list_orders(conn, side="SELL", order_by="price ASC, order_id ASC")
                 conn.close()
                 self._send_json({"buy": buys, "sell": sells})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/chat/messages":
+            try:
+                conn = create_connection(_db_path())
+                channel = (query.get("channel") or [""])[0] or None
+                messages = list_messages(conn, channel=channel)
+                conn.close()
+                self._send_json({"messages": messages})
             except Exception as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return

@@ -17,6 +17,7 @@ Endpoints
 - POST /run (seed, run_id, module, action, payload)
 - POST /exchange/place_order (seed, run_id, payload: side/asset_in/asset_out/amount/price)
 - POST /exchange/cancel_order (seed, run_id, payload: order_id)
+- POST /chat/send (seed, run_id, payload: channel/message)
 - GET /status?run_id=...
 - GET /evidence?run_id=...
 - GET /artifact?run_id=...&name=...
@@ -25,6 +26,7 @@ Endpoints
 - GET /exchange/orders
 - GET /exchange/orderbook
 - GET /exchange/trades
+- GET /chat/messages?channel=...
 
 Run (local)
 - python -m nyx_backend_gateway.server --env-file .env.example

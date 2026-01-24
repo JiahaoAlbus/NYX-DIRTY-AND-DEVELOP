@@ -10,6 +10,7 @@ final class EvidenceViewModel: ObservableObject {
     @Published var buyOrders: [OrderRow] = []
     @Published var sellOrders: [OrderRow] = []
     @Published var trades: [TradeRow] = []
+    @Published var messages: [ChatMessage] = []
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
 
@@ -112,6 +113,40 @@ final class EvidenceViewModel: ObservableObject {
     func refreshTrades() async {
         do {
             trades = try await client.fetchTrades()
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func sendMessage(channel: String, body: String) async {
+        guard let seedInt = Int(seed) else {
+            status = "Seed must be an integer"
+            return
+        }
+        if runId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            status = "Run ID required"
+            return
+        }
+        status = "Sending message..."
+        do {
+            _ = try await client.sendMessage(seed: seedInt, runId: runId, payload: ["channel": channel, "message": body])
+            let bundle = try await client.fetchEvidence(runId: runId)
+            evidence = bundle
+            stateHash = bundle.stateHash
+            receiptHashes = bundle.receiptHashes
+            replayOk = bundle.replayOk
+            await refreshMessages(channel: channel)
+            status = "Message sent. Evidence ready."
+        } catch {
+            status = "Error: \(error)"
+        }
+    }
+
+    @MainActor
+    func refreshMessages(channel: String) async {
+        do {
+            messages = try await client.fetchMessages(channel: channel)
         } catch {
             status = "Error: \(error)"
         }

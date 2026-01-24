@@ -173,16 +173,26 @@ struct ChatView: View {
                     .textFieldStyle(.roundedBorder)
                 TextField("Message", text: $message)
                     .textFieldStyle(.roundedBorder)
-                Button("Submit Event") {
+                Button("Send Message") {
                     Task {
-                        await model.run(
-                            module: "chat",
-                            action: "message_event",
-                            payload: ["channel": channel, "message": message]
-                        )
+                        await model.sendMessage(channel: channel, body: message)
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                Button("Refresh Messages") {
+                    Task {
+                        await model.refreshMessages(channel: channel)
+                    }
+                }
+                .buttonStyle(.bordered)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent Messages")
+                        .font(.headline)
+                    ForEach(model.messages.prefix(6)) { item in
+                        Text("[\(item.channel)] \(item.body)")
+                            .font(.footnote)
+                    }
+                }
                 EvidenceSummary(model: model)
                 Spacer()
             }

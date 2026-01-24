@@ -111,6 +111,33 @@ final class GatewayClient {
         return payload["trades"] ?? []
     }
 
+    func sendMessage(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("chat/send")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": payload,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
+    func fetchMessages(channel: String) async throws -> [ChatMessage] {
+        var components = URLComponents(url: baseURL.appendingPathComponent("chat/messages"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "channel", value: channel)]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [ChatMessage]].self, from: data)
+        return payload["messages"] ?? []
+    }
+
     func fetchEvidence(runId: String) async throws -> EvidenceBundle {
         if let cached = evidenceCache[runId] {
             return cached

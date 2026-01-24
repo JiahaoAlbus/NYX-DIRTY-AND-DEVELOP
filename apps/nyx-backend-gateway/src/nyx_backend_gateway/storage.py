@@ -226,6 +226,22 @@ def insert_message_event(conn: sqlite3.Connection, message: MessageEvent) -> Non
     conn.commit()
 
 
+def list_messages(conn: sqlite3.Connection, channel: str | None = None, limit: int = 50) -> list[dict[str, object]]:
+    if limit < 1 or limit > 200:
+        raise StorageError("limit out of bounds")
+    clauses = []
+    params: list[object] = []
+    if channel:
+        clauses.append("channel = ?")
+        params.append(_validate_text(channel, "channel"))
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM messages {where} ORDER BY message_id ASC LIMIT ?",
+        (*params, limit),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
 def insert_listing(conn: sqlite3.Connection, listing: Listing) -> None:
     listing_id = _validate_text(listing.listing_id, "listing_id")
     sku = _validate_text(listing.sku, "sku")
