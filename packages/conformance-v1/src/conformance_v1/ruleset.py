@@ -130,6 +130,16 @@ RULES: tuple[Rule, ...] = (
         repro_command=REPRO_COMMAND,
     ),
     Rule(
+        rule_id="Q10-FEE-01",
+        adversary_class=("External Hackers",),
+        attack_vector="treasury routing omitted",
+        surface="Economic Layer",
+        severity="HIGH",
+        rationale="Value transfer fees must route to the configured treasury.",
+        detection=DETECTION_RUNTIME,
+        repro_command=REPRO_COMMAND,
+    ),
+    Rule(
         rule_id="Q1-ZK-01",
         adversary_class=("Onchain Analytics Firms", "External Hackers"),
         attack_vector="cross-context proof reuse",

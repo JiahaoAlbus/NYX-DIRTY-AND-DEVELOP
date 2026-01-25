@@ -39,6 +39,7 @@ def _ensure_paths() -> None:
         repo_root / "packages" / "l3-router" / "src",
         repo_root / "packages" / "e2e-demo" / "src",
         repo_root / "apps" / "nyx-backend" / "src",
+        repo_root / "apps" / "nyx-backend-gateway" / "src",
         repo_root / "apps" / "nyx-reference-client" / "src",
         repo_root / "apps" / "reference-ui-backend" / "src",
     ]
@@ -245,6 +246,44 @@ def drill_platform_fee_additive() -> DrillResult:
         pass
 
     return _pass("Q7-FEE-PLAT-01")
+
+
+def drill_treasury_fee_routing() -> DrillResult:
+    _ensure_paths()
+    import os
+
+    from nyx_backend_gateway.fees import route_fee
+    from nyx_backend_gateway.storage import (
+        apply_wallet_faucet,
+        apply_wallet_transfer,
+        create_connection,
+    )
+
+    os.environ.setdefault("NYX_TESTNET_FEE_ADDRESS", "testnet-fee-address")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "gateway.db"
+        conn = create_connection(db_path)
+        from_addr = "addr-a"
+        to_addr = "addr-b"
+        payload = {"from_address": from_addr, "to_address": to_addr, "amount": 10}
+        fee_record = route_fee("wallet", "transfer", payload, "drill-fee-1")
+        if fee_record.total_paid <= 0:
+            return _fail("Q10-FEE-01", "fee not positive")
+        funding = fee_record.total_paid + 20
+        apply_wallet_faucet(conn, from_addr, funding)
+        balances = apply_wallet_transfer(
+            conn,
+            transfer_id="transfer-1",
+            from_address=from_addr,
+            to_address=to_addr,
+            amount=10,
+            fee_total=fee_record.total_paid,
+            treasury_address=fee_record.fee_address,
+            run_id="drill-fee-1",
+        )
+        if balances.get("treasury_balance") != fee_record.total_paid:
+            return _fail("Q10-FEE-01", "treasury balance mismatch")
+    return _pass("Q10-FEE-01")
 
 
 def drill_public_usage_contract() -> DrillResult:
@@ -754,6 +793,7 @@ def run_drills() -> tuple[DrillResult, ...]:
     results.append(drill_fee_free_action())
     results.append(drill_fee_sponsor_amount())
     results.append(drill_platform_fee_additive())
+    results.append(drill_treasury_fee_routing())
     results.append(drill_public_usage_contract())
     results.append(drill_evidence_ordering())
     results.append(drill_ui_copy_guard())
