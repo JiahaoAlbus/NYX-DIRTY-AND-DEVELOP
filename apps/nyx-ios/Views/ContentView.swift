@@ -19,9 +19,19 @@ final class EvidenceViewModel: ObservableObject {
     @Published var walletBalance: String = "0"
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
+    @Published var backendAvailable: Bool = false
+    @Published var backendStatus: String = "Backend: unavailable"
 
     private let client = GatewayClient()
     private let walletStore = WalletStore()
+
+    @MainActor
+    func checkBackend() async {
+        backendStatus = "Backend: checking..."
+        let ok = await client.checkBackendAvailability(timeoutSeconds: 3.0)
+        backendAvailable = ok
+        backendStatus = ok ? "Backend: available" : "Backend: unavailable"
+    }
 
     @MainActor
     func run(module: String, action: String, payload: [String: Any]) async {
@@ -382,24 +392,47 @@ struct ContentView: View {
     @StateObject private var model = EvidenceViewModel()
 
     var body: some View {
-        TabView {
-            HomeView(model: model)
-                .tabItem { Label("Home", systemImage: "house") }
-            WalletView(model: model)
-                .tabItem { Label("Wallet", systemImage: "creditcard") }
-            ExchangeView(model: model)
-                .tabItem { Label("Exchange", systemImage: "arrow.left.arrow.right") }
-            ChatView(model: model)
-                .tabItem { Label("Chat", systemImage: "bubble.left") }
-            MarketplaceView(model: model)
-                .tabItem { Label("Market", systemImage: "bag") }
-            EntertainmentView(model: model)
-                .tabItem { Label("Play", systemImage: "sparkles") }
-            TrustView()
-                .tabItem { Label("Trust", systemImage: "shield") }
-            EvidenceInspectorView(model: model)
-                .tabItem { Label("Evidence", systemImage: "doc.plaintext") }
+        AppShell(model: model)
+    }
+}
+
+struct AppShell: View {
+    @ObservedObject var model: EvidenceViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("NYXPortal (Testnet)")
+                    .font(.headline)
+                Spacer()
+                Text(model.backendStatus)
+                    .font(.footnote)
+                    .foregroundColor(model.backendAvailable ? .green : .secondary)
+            }
+            .padding()
+            Divider()
+            TabView {
+                HomeView(model: model)
+                    .tabItem { Label("Home", systemImage: "house") }
+                WalletView(model: model)
+                    .tabItem { Label("Wallet", systemImage: "creditcard") }
+                ExchangeView(model: model)
+                    .tabItem { Label("Exchange", systemImage: "arrow.left.arrow.right") }
+                ChatView(model: model)
+                    .tabItem { Label("Chat", systemImage: "bubble.left") }
+                MarketplaceView(model: model)
+                    .tabItem { Label("Market", systemImage: "bag") }
+                EntertainmentView(model: model)
+                    .tabItem { Label("Play", systemImage: "sparkles") }
+                TrustView()
+                    .tabItem { Label("Trust", systemImage: "shield") }
+                EvidenceInspectorView(model: model)
+                    .tabItem { Label("Evidence", systemImage: "doc.plaintext") }
+            }
+            .accentColor(SolsticePalette.accent)
         }
-        .accentColor(SolsticePalette.accent)
+        .task {
+            await model.checkBackend()
+        }
     }
 }
