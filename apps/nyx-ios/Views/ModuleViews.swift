@@ -20,16 +20,29 @@ struct PreviewBanner: View {
     }
 }
 
+private extension View {
+    func nyxInputStyle() -> some View {
+        padding(8)
+            .background(RoundedRectangle(cornerRadius: 8).stroke(.secondary))
+    }
+}
+
 struct RunInputsView: View {
     @ObservedObject var model: EvidenceViewModel
 
     var body: some View {
+        let seedBinding = Binding<Int>(
+            get: { Int(model.seed) ?? 0 },
+            set: { model.seed = String($0) }
+        )
         VStack(alignment: .leading, spacing: 12) {
-            TextField("Seed", text: $model.seed)
+            TextField("Seed", value: seedBinding, format: .number)
+            #if os(iOS)
                 .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
+            #endif
+                .nyxInputStyle()
             TextField("Run ID", text: $model.runId)
-                .textFieldStyle(.roundedBorder)
+                .nyxInputStyle()
             Text(model.status)
                 .font(.footnote)
                 .foregroundColor(.secondary)
@@ -61,8 +74,8 @@ struct HomeView: View {
 struct WalletView: View {
     @ObservedObject var model: EvidenceViewModel
     @State private var transferTo = "receiver-001"
-    @State private var transferAmount = "5"
-    @State private var faucetAmount = "50"
+    @State private var transferAmount = 5
+    @State private var faucetAmount = 50
 
     var body: some View {
         NavigationStack {
@@ -97,13 +110,14 @@ struct WalletView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Testnet Faucet")
                         .font(.headline)
-                    TextField("Amount", text: $faucetAmount)
+                    TextField("Amount", value: $faucetAmount, format: .number)
+                    #if os(iOS)
                         .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
+                    #endif
+                        .nyxInputStyle()
                     Button("Request Testnet Funds") {
-                        let amountValue = Int(faucetAmount) ?? 1
                         Task {
-                            await model.faucetWallet(amount: amountValue)
+                            await model.faucetWallet(amount: faucetAmount)
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -113,14 +127,15 @@ struct WalletView: View {
                     Text("Transfer")
                         .font(.headline)
                     TextField("To Address", text: $transferTo)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Amount", text: $transferAmount)
+                        .nyxInputStyle()
+                    TextField("Amount", value: $transferAmount, format: .number)
+                    #if os(iOS)
                         .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
+                    #endif
+                        .nyxInputStyle()
                     Button("Send Transfer") {
-                        let amountValue = Int(transferAmount) ?? 1
                         Task {
-                            await model.transferWallet(toAddress: transferTo, amount: amountValue)
+                            await model.transferWallet(toAddress: transferTo, amount: transferAmount)
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -140,8 +155,8 @@ struct ExchangeView: View {
     @State private var side = "BUY"
     @State private var assetIn = "asset-a"
     @State private var assetOut = "asset-b"
-    @State private var amount = "5"
-    @State private var price = "10"
+    @State private var amount = 5
+    @State private var price = 10
     @State private var cancelOrderId = ""
 
     var body: some View {
@@ -182,23 +197,25 @@ struct ExchangeView: View {
                     Text("asset-c").tag("asset-c")
                 }
                 .pickerStyle(.segmented)
-                TextField("Amount", text: $amount)
+                TextField("Amount", value: $amount, format: .number)
+                #if os(iOS)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Price", text: $price)
+                #endif
+                    .nyxInputStyle()
+                TextField("Price", value: $price, format: .number)
+                #if os(iOS)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                #endif
+                    .nyxInputStyle()
                 Button("Place Order") {
-                    let amountValue = Int(amount) ?? 1
-                    let priceValue = Int(price) ?? 1
                     Task {
                         await model.placeOrder(
                             payload: [
                                 "side": side,
                                 "asset_in": assetIn,
                                 "asset_out": assetOut,
-                                "amount": amountValue,
-                                "price": priceValue,
+                                "amount": amount,
+                                "price": price,
                             ]
                         )
                     }
@@ -206,7 +223,7 @@ struct ExchangeView: View {
                 .buttonStyle(.borderedProminent)
 
                 TextField("Cancel Order ID", text: $cancelOrderId)
-                    .textFieldStyle(.roundedBorder)
+                    .nyxInputStyle()
                 Button("Cancel Order") {
                     Task {
                         await model.cancelOrder(orderId: cancelOrderId)
@@ -265,9 +282,9 @@ struct ChatView: View {
                 PreviewBanner(text: "Testnet Beta. No external accounts or live chat history.")
                 RunInputsView(model: model)
                 TextField("Channel", text: $channel)
-                    .textFieldStyle(.roundedBorder)
+                    .nyxInputStyle()
                 TextField("Message", text: $message)
-                    .textFieldStyle(.roundedBorder)
+                    .nyxInputStyle()
                 Button("Send Message") {
                     Task {
                         await model.sendMessage(channel: channel, body: message)
@@ -302,9 +319,9 @@ struct MarketplaceView: View {
     @ObservedObject var model: EvidenceViewModel
     @State private var sku = "sku-1"
     @State private var title = "Signal Pack"
-    @State private var price = "10"
+    @State private var price = 10
     @State private var selectedListingId = ""
-    @State private var quantity = "1"
+    @State private var quantity = 1
 
     var body: some View {
         NavigationStack {
@@ -312,16 +329,17 @@ struct MarketplaceView: View {
                 PreviewBanner(text: "Testnet Beta. Listings are testnet-only.")
                 RunInputsView(model: model)
                 TextField("SKU", text: $sku)
-                    .textFieldStyle(.roundedBorder)
+                    .nyxInputStyle()
                 TextField("Title", text: $title)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Price", text: $price)
+                    .nyxInputStyle()
+                TextField("Price", value: $price, format: .number)
+                #if os(iOS)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                #endif
+                    .nyxInputStyle()
                 Button("Publish Listing") {
-                    let priceValue = Int(price) ?? 1
                     Task {
-                        await model.publishListing(sku: sku, title: title, price: priceValue)
+                        await model.publishListing(sku: sku, title: title, price: price)
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -341,16 +359,17 @@ struct MarketplaceView: View {
                     }
                     .pickerStyle(.menu)
                 }
-                TextField("Quantity", text: $quantity)
+                TextField("Quantity", value: $quantity, format: .number)
+                #if os(iOS)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                #endif
+                    .nyxInputStyle()
                 Button("Purchase Listing") {
-                    let qty = Int(quantity) ?? 1
                     if selectedListingId.isEmpty, let first = model.listings.first {
                         selectedListingId = first.listingId
                     }
                     Task {
-                        await model.purchaseListing(listingId: selectedListingId, qty: qty)
+                        await model.purchaseListing(listingId: selectedListingId, qty: quantity)
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -378,7 +397,7 @@ struct EntertainmentView: View {
     @ObservedObject var model: EvidenceViewModel
     @State private var selectedItemId = ""
     @State private var mode = "pulse"
-    @State private var step = "1"
+    @State private var step = 1
 
     var body: some View {
         NavigationStack {
@@ -407,16 +426,17 @@ struct EntertainmentView: View {
                     Text("Scan").tag("scan")
                 }
                 .pickerStyle(.segmented)
-                TextField("Step", text: $step)
+                TextField("Step", value: $step, format: .number)
+                #if os(iOS)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                #endif
+                    .nyxInputStyle()
                 Button("Execute Step") {
-                    let stepValue = Int(step) ?? 0
                     Task {
                         if selectedItemId.isEmpty, let first = model.entertainmentItems.first {
                             selectedItemId = first.itemId
                         }
-                        await model.runEntertainmentStep(itemId: selectedItemId, mode: mode, step: stepValue)
+                        await model.runEntertainmentStep(itemId: selectedItemId, mode: mode, step: step)
                     }
                 }
                 .buttonStyle(.borderedProminent)
