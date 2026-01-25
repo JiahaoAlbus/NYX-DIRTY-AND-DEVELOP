@@ -117,6 +117,27 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     )
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS wallet_accounts (
+            address TEXT PRIMARY KEY,
+            balance INTEGER NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wallet_transfers (
+            transfer_id TEXT PRIMARY KEY,
+            from_address TEXT NOT NULL,
+            to_address TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            fee_total INTEGER NOT NULL,
+            treasury_address TEXT NOT NULL,
+            run_id TEXT NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS entertainment_items (
             item_id TEXT PRIMARY KEY,
             title TEXT NOT NULL,

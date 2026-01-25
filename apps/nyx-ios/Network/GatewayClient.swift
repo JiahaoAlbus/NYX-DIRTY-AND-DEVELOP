@@ -208,6 +208,52 @@ final class GatewayClient {
         return payload["events"] ?? []
     }
 
+    func fetchWalletBalance(address: String) async throws -> Int {
+        var components = URLComponents(url: baseURL.appendingPathComponent("wallet/balance"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "address", value: address)]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: Int].self, from: data)
+        return payload["balance"] ?? 0
+    }
+
+    func walletFaucet(seed: Int, runId: String, address: String, amount: Int) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("wallet/faucet")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": ["address": address, "amount": amount],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
+    func walletTransfer(seed: Int, runId: String, from: String, to: String, amount: Int) async throws -> RunResponse {
+        let url = baseURL.appendingPathComponent("wallet/transfer")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": [
+                "from_address": from,
+                "to_address": to,
+                "amount": amount,
+            ],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(RunResponse.self, from: data)
+    }
+
     func runEntertainmentStep(seed: Int, runId: String, itemId: String, mode: String, step: Int) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("entertainment/step")
         var request = URLRequest(url: url)

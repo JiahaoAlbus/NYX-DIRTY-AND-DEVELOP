@@ -58,6 +58,83 @@ struct HomeView: View {
     }
 }
 
+struct WalletView: View {
+    @ObservedObject var model: EvidenceViewModel
+    @State private var transferTo = "receiver-001"
+    @State private var transferAmount = "5"
+    @State private var faucetAmount = "50"
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                PreviewBanner(text: "Testnet Beta. Local wallet only. No external account linkage.")
+                RunInputsView(model: model)
+                Button("Load Wallet from Seed") {
+                    Task {
+                        await model.loadWallet()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Address")
+                        .font(.headline)
+                    Text(model.walletAddress)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Text("Balance")
+                        .font(.headline)
+                        .padding(.top, 6)
+                    Text(model.walletBalance)
+                        .font(.footnote)
+                }
+                Button("Refresh Balance") {
+                    Task {
+                        await model.refreshWalletBalance()
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Testnet Faucet")
+                        .font(.headline)
+                    TextField("Amount", text: $faucetAmount)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Request Testnet Funds") {
+                        let amountValue = Int(faucetAmount) ?? 1
+                        Task {
+                            await model.faucetWallet(amount: amountValue)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Transfer")
+                        .font(.headline)
+                    TextField("To Address", text: $transferTo)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Amount", text: $transferAmount)
+                        .keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Send Transfer") {
+                        let amountValue = Int(transferAmount) ?? 1
+                        Task {
+                            await model.transferWallet(toAddress: transferTo, amount: amountValue)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                EvidenceSummary(model: model)
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Wallet")
+            .background(SolsticePalette.background)
+        }
+    }
+}
+
 struct ExchangeView: View {
     @ObservedObject var model: EvidenceViewModel
     @State private var side = "BUY"

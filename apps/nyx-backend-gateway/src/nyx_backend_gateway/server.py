@@ -10,7 +10,15 @@ from urllib.parse import parse_qs, urlparse
 
 from nyx_backend_gateway.env import load_env_file
 import nyx_backend_gateway.gateway as gateway
-from nyx_backend_gateway.gateway import GatewayError, execute_run, _run_root, _db_path
+from nyx_backend_gateway.gateway import (
+    GatewayError,
+    execute_run,
+    execute_wallet_faucet,
+    execute_wallet_transfer,
+    fetch_wallet_balance,
+    _run_root,
+    _db_path,
+)
 from nyx_backend_gateway.storage import (
     create_connection,
     list_entertainment_events,
@@ -214,6 +222,60 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
+            if self.path == "/wallet/faucet":
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                faucet_payload = payload.get("payload")
+                if faucet_payload is None:
+                    faucet_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result, balance = execute_wallet_faucet(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=faucet_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                        "address": faucet_payload.get("address"),
+                        "balance": balance,
+                    }
+                )
+                return
+            if self.path == "/wallet/transfer":
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                transfer_payload = payload.get("payload")
+                if transfer_payload is None:
+                    transfer_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result, balances, fee_record = execute_wallet_transfer(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=transfer_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                        "from_address": transfer_payload.get("from_address"),
+                        "to_address": transfer_payload.get("to_address"),
+                        "amount": transfer_payload.get("amount"),
+                        "fee_total": fee_record.total_paid,
+                        "treasury_address": fee_record.fee_address,
+                        "from_balance": balances["from_balance"],
+                        "to_balance": balances["to_balance"],
+                        "treasury_balance": balances["treasury_balance"],
+                    }
+                )
+                return
             if self.path == "/marketplace/listing":
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
@@ -357,6 +419,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
             records = list_runs(base_dir=_run_root())
             payload = [{"run_id": record.run_id, "status": record.status} for record in records]
             self._send_json({"runs": payload})
+            return
+        if path == "/wallet/balance":
+            try:
+                address = (query.get("address") or [""])[0]
+                balance = fetch_wallet_balance(address=address)
+                self._send_json({"address": address, "balance": balance})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
         if path == "/exchange/orders":
             try:

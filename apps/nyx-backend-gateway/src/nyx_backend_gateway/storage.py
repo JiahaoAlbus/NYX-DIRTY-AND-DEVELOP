@@ -38,6 +38,10 @@ def _validate_int(value: object, name: str, min_value: int = 0) -> int:
     return value
 
 
+def _validate_wallet_address(value: object, name: str = "address") -> str:
+    return _validate_text(value, name, r"[A-Za-z0-9_-]{1,64}")
+
+
 @dataclass(frozen=True)
 class EvidenceRun:
     run_id: str
@@ -131,6 +135,23 @@ class FeeLedger:
     platform_fee_amount: int
     total_paid: int
     fee_address: str
+    run_id: str
+
+
+@dataclass(frozen=True)
+class WalletAccount:
+    address: str
+    balance: int
+
+
+@dataclass(frozen=True)
+class WalletTransfer:
+    transfer_id: str
+    from_address: str
+    to_address: str
+    amount: int
+    fee_total: int
+    treasury_address: str
     run_id: str
 
 
@@ -407,6 +428,127 @@ def insert_fee_ledger(conn: sqlite3.Connection, record: FeeLedger) -> None:
         (fee_id, module, action, protocol_fee_total, platform_fee_amount, total_paid, fee_address, run_id),
     )
     conn.commit()
+
+
+def _ensure_wallet_account(conn: sqlite3.Connection, address: str) -> None:
+    addr = _validate_wallet_address(address)
+    conn.execute(
+        "INSERT OR IGNORE INTO wallet_accounts (address, balance) VALUES (?, ?)",
+        (addr, 0),
+    )
+
+
+def get_wallet_balance(conn: sqlite3.Connection, address: str) -> int:
+    addr = _validate_wallet_address(address)
+    _ensure_wallet_account(conn, addr)
+    row = conn.execute(
+        "SELECT balance FROM wallet_accounts WHERE address = ?",
+        (addr,),
+    ).fetchone()
+    if row is None:
+        return 0
+    return int(row[0])
+
+
+def set_wallet_balance(conn: sqlite3.Connection, address: str, balance: int) -> None:
+    addr = _validate_wallet_address(address)
+    amount = _validate_int(balance, "balance", 0)
+    _ensure_wallet_account(conn, addr)
+    conn.execute(
+        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
+        (amount, addr),
+    )
+
+
+def insert_wallet_transfer(conn: sqlite3.Connection, transfer: WalletTransfer) -> None:
+    transfer_id = _validate_text(transfer.transfer_id, "transfer_id")
+    from_address = _validate_wallet_address(transfer.from_address, "from_address")
+    to_address = _validate_wallet_address(transfer.to_address, "to_address")
+    amount = _validate_int(transfer.amount, "amount", 1)
+    fee_total = _validate_int(transfer.fee_total, "fee_total", 0)
+    treasury_address = _validate_wallet_address(transfer.treasury_address, "treasury_address")
+    run_id = _validate_text(transfer.run_id, "run_id")
+    conn.execute(
+        "INSERT INTO wallet_transfers (transfer_id, from_address, to_address, amount, fee_total, treasury_address, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (transfer_id, from_address, to_address, amount, fee_total, treasury_address, run_id),
+    )
+
+
+def apply_wallet_transfer(
+    conn: sqlite3.Connection,
+    *,
+    transfer_id: str,
+    from_address: str,
+    to_address: str,
+    amount: int,
+    fee_total: int,
+    treasury_address: str,
+    run_id: str,
+) -> dict[str, int]:
+    transfer_id = _validate_text(transfer_id, "transfer_id")
+    from_addr = _validate_wallet_address(from_address, "from_address")
+    to_addr = _validate_wallet_address(to_address, "to_address")
+    treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
+    amt = _validate_int(amount, "amount", 1)
+    fee = _validate_int(fee_total, "fee_total", 0)
+    if from_addr == to_addr:
+        raise StorageError("from_address must differ")
+    _ensure_wallet_account(conn, from_addr)
+    _ensure_wallet_account(conn, to_addr)
+    _ensure_wallet_account(conn, treasury_addr)
+    row = conn.execute(
+        "SELECT balance FROM wallet_accounts WHERE address = ?",
+        (from_addr,),
+    ).fetchone()
+    current = int(row[0]) if row else 0
+    total_debit = amt + fee
+    if current < total_debit:
+        raise StorageError("insufficient balance")
+    new_from = current - total_debit
+    new_to = get_wallet_balance(conn, to_addr) + amt
+    new_treasury = get_wallet_balance(conn, treasury_addr) + fee
+    conn.execute(
+        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
+        (new_from, from_addr),
+    )
+    conn.execute(
+        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
+        (new_to, to_addr),
+    )
+    conn.execute(
+        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
+        (new_treasury, treasury_addr),
+    )
+    insert_wallet_transfer(
+        conn,
+        WalletTransfer(
+            transfer_id=transfer_id,
+            from_address=from_addr,
+            to_address=to_addr,
+            amount=amt,
+            fee_total=fee,
+            treasury_address=treasury_addr,
+            run_id=run_id,
+        ),
+    )
+    conn.commit()
+    return {
+        "from_balance": new_from,
+        "to_balance": new_to,
+        "treasury_balance": new_treasury,
+    }
+
+
+def apply_wallet_faucet(conn: sqlite3.Connection, address: str, amount: int) -> int:
+    addr = _validate_wallet_address(address)
+    amt = _validate_int(amount, "amount", 1)
+    _ensure_wallet_account(conn, addr)
+    current = get_wallet_balance(conn, addr)
+    new_balance = current + amt
+    set_wallet_balance(conn, addr, new_balance)
+    conn.commit()
+    return new_balance
 
 
 def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> dict[str, object] | None:

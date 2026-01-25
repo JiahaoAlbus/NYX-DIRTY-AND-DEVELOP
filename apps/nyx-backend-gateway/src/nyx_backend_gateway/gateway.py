@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,8 @@ from nyx_backend_gateway.storage import (
     Order,
     Purchase,
     Receipt,
+    apply_wallet_faucet,
+    apply_wallet_transfer,
     create_connection,
     insert_entertainment_event,
     insert_entertainment_item,
@@ -26,6 +29,7 @@ from nyx_backend_gateway.storage import (
     insert_message_event,
     insert_purchase,
     insert_receipt,
+    get_wallet_balance,
     load_by_id,
 )
 
@@ -45,6 +49,7 @@ class GatewayResult:
 _MAX_AMOUNT = 1_000_000
 _MAX_PRICE = 1_000_000
 _ENTERTAINMENT_MODES = {"pulse", "drift", "scan"}
+_ADDRESS_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _entertainment_items() -> list[EntertainmentItem]:
@@ -118,6 +123,48 @@ def _require_text(payload: dict[str, Any], key: str, max_len: int = 64) -> str:
     if len(value) > max_len:
         raise GatewayError(f"{key} too long")
     return value
+
+
+def _require_address(payload: dict[str, Any], key: str) -> str:
+    value = _require_text(payload, key, max_len=64)
+    if not _ADDRESS_PATTERN.fullmatch(value):
+        raise GatewayError(f"{key} invalid")
+    return value
+
+
+def _require_amount(payload: dict[str, Any], key: str = "amount", max_value: int = _MAX_AMOUNT) -> int:
+    value = payload.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise GatewayError(f"{key} must be int")
+    if value <= 0 or value > max_value:
+        raise GatewayError(f"{key} out of bounds")
+    return value
+
+
+def _validate_wallet_transfer(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise GatewayError("payload must be object")
+    from_address = _require_address(payload, "from_address")
+    to_address = _require_address(payload, "to_address")
+    if from_address == to_address:
+        raise GatewayError("addresses must differ")
+    amount = _require_amount(payload, "amount")
+    return {
+        "from_address": from_address,
+        "to_address": to_address,
+        "amount": amount,
+    }
+
+
+def _validate_wallet_faucet(payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise GatewayError("payload must be object")
+    address = _require_address(payload, "address")
+    amount = _require_amount(payload, "amount", max_value=_MAX_AMOUNT)
+    return {
+        "address": address,
+        "amount": amount,
+    }
 
 
 def _require_int(payload: dict[str, Any], key: str, min_value: int = 1, max_value: int | None = None) -> int:
@@ -375,3 +422,158 @@ def execute_run(
         receipt_hashes=evidence.receipt_hashes,
         replay_ok=evidence.replay_ok,
     )
+
+
+def execute_wallet_transfer(
+    *,
+    seed: int,
+    run_id: str,
+    payload: dict[str, Any],
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
+    validated = _validate_wallet_transfer(payload)
+    fee_record = route_fee("wallet", "transfer", validated, run_id)
+    conn = create_connection(db_path or _db_path())
+    from_balance = get_wallet_balance(conn, validated["from_address"])
+    total_debit = validated["amount"] + fee_record.total_paid
+    if from_balance < total_debit:
+        raise GatewayError("insufficient balance")
+
+    backend_src = _backend_src()
+    if str(backend_src) not in __import__("sys").path:
+        __import__("sys").path.insert(0, str(backend_src))
+    from nyx_backend.evidence import EvidenceError, run_evidence
+
+    run_root = run_root or _run_root()
+    try:
+        evidence = run_evidence(
+            seed=seed,
+            run_id=run_id,
+            module="wallet",
+            action="transfer",
+            payload=validated,
+            base_dir=run_root,
+        )
+    except EvidenceError as exc:
+        raise GatewayError(str(exc)) from exc
+
+    insert_evidence_run(
+        conn,
+        EvidenceRun(
+            run_id=run_id,
+            module="wallet",
+            action="transfer",
+            seed=seed,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+    )
+    insert_receipt(
+        conn,
+        Receipt(
+            receipt_id=_receipt_id(run_id),
+            module="wallet",
+            action="transfer",
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+            run_id=run_id,
+        ),
+    )
+    balances = apply_wallet_transfer(
+        conn,
+        transfer_id=_deterministic_id("wallet", run_id),
+        from_address=validated["from_address"],
+        to_address=validated["to_address"],
+        amount=validated["amount"],
+        fee_total=fee_record.total_paid,
+        treasury_address=fee_record.fee_address,
+        run_id=run_id,
+    )
+    insert_fee_ledger(conn, fee_record)
+    return (
+        GatewayResult(
+            run_id=run_id,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+        balances,
+        fee_record,
+    )
+
+
+def execute_wallet_faucet(
+    *,
+    seed: int,
+    run_id: str,
+    payload: dict[str, Any],
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, int]:
+    validated = _validate_wallet_faucet(payload)
+    conn = create_connection(db_path or _db_path())
+
+    backend_src = _backend_src()
+    if str(backend_src) not in __import__("sys").path:
+        __import__("sys").path.insert(0, str(backend_src))
+    from nyx_backend.evidence import EvidenceError, run_evidence
+
+    run_root = run_root or _run_root()
+    try:
+        evidence = run_evidence(
+            seed=seed,
+            run_id=run_id,
+            module="wallet",
+            action="faucet",
+            payload=validated,
+            base_dir=run_root,
+        )
+    except EvidenceError as exc:
+        raise GatewayError(str(exc)) from exc
+
+    insert_evidence_run(
+        conn,
+        EvidenceRun(
+            run_id=run_id,
+            module="wallet",
+            action="faucet",
+            seed=seed,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+    )
+    insert_receipt(
+        conn,
+        Receipt(
+            receipt_id=_receipt_id(run_id),
+            module="wallet",
+            action="faucet",
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+            run_id=run_id,
+        ),
+    )
+    balance = apply_wallet_faucet(
+        conn,
+        validated["address"],
+        validated["amount"],
+    )
+    return (
+        GatewayResult(
+            run_id=run_id,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+        balance,
+    )
+
+
+def fetch_wallet_balance(*, address: str, db_path: Path | None = None) -> int:
+    conn = create_connection(db_path or _db_path())
+    return get_wallet_balance(conn, address)
