@@ -149,6 +149,24 @@ struct ExchangeView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Beta. No live market data.")
                 RunInputsView(model: model)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Wallet Context")
+                        .font(.headline)
+                    Text(model.walletAddress)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Text("Balance")
+                        .font(.footnote)
+                    Text(model.walletBalance)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Button("Refresh Wallet Balance") {
+                        Task {
+                            await model.refreshWalletBalance()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
                 Picker("Side", selection: $side) {
                     Text("BUY").tag("BUY")
                     Text("SELL").tag("SELL")
