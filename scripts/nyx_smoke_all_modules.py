@@ -114,16 +114,32 @@ def _record_evidence(base_url: str, run_id: str, out_dir: Path) -> None:
     _write_bytes(out_dir / run_id / "export.zip", zip_raw_1)
 
 
+def _resolve_out_dir(repo_root: Path, out_dir_arg: str) -> Path:
+    if out_dir_arg:
+        out_dir = Path(out_dir_arg).expanduser()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+    out_dir = repo_root / "docs" / "evidence" / "smoke" / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--run-id", default="smoke-run")
     parser.add_argument("--base-url", default="http://127.0.0.1:8091")
+    parser.add_argument("--out-dir", default="")
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    out_dir = repo_root / "docs" / "evidence" / "smoke" / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _resolve_out_dir(repo_root, args.out_dir)
+
+    if args.dry_run:
+        _write_bytes(out_dir / "dry_run.txt", b"dry-run")
+        print(f"Smoke artifacts: {out_dir}")
+        return 0
 
     proc = None
     if not _health_ok(args.base_url):
