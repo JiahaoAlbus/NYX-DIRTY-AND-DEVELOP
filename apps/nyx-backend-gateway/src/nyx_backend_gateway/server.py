@@ -29,6 +29,7 @@ from nyx_backend_gateway.storage import (
     list_messages,
     list_orders,
     list_purchases,
+    list_receipts,
     list_trades,
     load_by_id,
     StorageError,
@@ -79,6 +80,7 @@ def _capabilities() -> dict[str, object]:
             "POST /portal/v1/auth/verify",
             "POST /portal/v1/auth/logout",
             "GET /portal/v1/me",
+            "GET /portal/v1/activity",
             "POST /chat/v1/rooms",
             "GET /chat/v1/rooms",
             "POST /chat/v1/rooms/{room_id}/messages",
@@ -678,6 +680,21 @@ class GatewayHandler(BaseHTTPRequestHandler):
             except GatewayError as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
+        if path == "/portal/v1/activity":
+            try:
+                session = self._require_auth()
+                limit_raw = (query.get("limit") or ["50"])[0]
+                try:
+                    limit = int(limit_raw)
+                except ValueError:
+                    raise GatewayError("limit invalid")
+                conn = create_connection(_db_path())
+                receipts = list_receipts(conn, limit=limit)
+                conn.close()
+                self._send_json({"account_id": session.account_id, "receipts": receipts})
+            except (GatewayError, portal.PortalError, StorageError) as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/status":
             try:
                 run_id = self._require_query_run_id(query)
@@ -806,7 +823,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             room_id = parts[4]
             try:
                 _ = self._require_auth()
-                after_raw = (query.get("after") or [''])[0] or None
+                after_raw = (query.get("after") or [""])[0] or None
                 limit_raw = (query.get("limit") or [""])[0] or None
                 after = int(after_raw) if after_raw else None
                 limit = int(limit_raw) if limit_raw else 50

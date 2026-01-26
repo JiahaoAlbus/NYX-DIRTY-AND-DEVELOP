@@ -19,10 +19,43 @@ if [ -f "$ROOT/cswdz.env" ]; then
   ENV_FILE="$ROOT/cswdz.env"
 fi
 
+check_health() {
+  "$PYTHON_BIN" - <<'PY'
+import sys
+import urllib.request
+
+url = "http://127.0.0.1:8091/healthz"
+try:
+    with urllib.request.urlopen(url, timeout=0.5) as resp:
+        body = resp.read().decode("utf-8", errors="ignore")
+    if '"ok":true' in body.replace(" ", ""):
+        sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+PY
+}
+
+if check_health; then
+  echo "READY http://127.0.0.1:8091 (already running)"
+  exit 0
+fi
+
+LISTENER_PID=""
+if command -v lsof >/dev/null 2>&1; then
+  LISTENER_PID="$(lsof -tiTCP:8091 -sTCP:LISTEN || true)"
+fi
+
+if [ -n "$LISTENER_PID" ]; then
+  echo "Port 8091 in use without healthy backend; stopping PID $LISTENER_PID"
+  kill "$LISTENER_PID" >/dev/null 2>&1 || true
+  sleep 1
+fi
+
 "$PYTHON_BIN" -m nyx_backend_gateway.server --host 127.0.0.1 --port 8091 --env-file "$ENV_FILE" &
 SERVER_PID=$!
 
-python - <<'PY'
+"$PYTHON_BIN" - <<'PY'
 import socket
 import sys
 import time

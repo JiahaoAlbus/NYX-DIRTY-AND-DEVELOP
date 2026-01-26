@@ -370,6 +370,26 @@ def list_chat_messages(conn: sqlite3.Connection, room_id: str, after: int | None
     return [{col: row[col] for col in row.keys()} for row in rows]
 
 
+def list_receipts(conn: sqlite3.Connection, limit: int = 50) -> list[dict[str, object]]:
+    lim = _validate_int(limit, "limit", 1, 500)
+    rows = conn.execute(
+        "SELECT receipt_id, module, action, state_hash, receipt_hashes, replay_ok, run_id "
+        "FROM receipts ORDER BY receipt_id ASC LIMIT ?",
+        (lim,),
+    ).fetchall()
+    results = []
+    for row in rows:
+        record = {col: row[col] for col in row.keys()}
+        raw_hashes = record.get("receipt_hashes", "[]")
+        try:
+            record["receipt_hashes"] = json.loads(raw_hashes)
+        except json.JSONDecodeError:
+            record["receipt_hashes"] = []
+        record["replay_ok"] = bool(record.get("replay_ok"))
+        results.append(record)
+    return results
+
+
 def insert_order(conn: sqlite3.Connection, order: Order) -> None:
     order_id = _validate_text(order.order_id, "order_id")
     side = _validate_text(order.side, "side", r"(BUY|SELL)")
