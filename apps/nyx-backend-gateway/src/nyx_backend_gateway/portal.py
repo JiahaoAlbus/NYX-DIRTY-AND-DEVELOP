@@ -1,0 +1,221 @@
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from nyx_backend_gateway.env import get_portal_challenge_ttl_seconds, get_portal_session_secret
+from nyx_backend_gateway.storage import (
+    ChatMessage,
+    ChatRoom,
+    PortalAccount,
+    PortalChallenge,
+    PortalSession,
+    StorageError,
+    consume_portal_challenge,
+    insert_chat_message,
+    insert_chat_room,
+    insert_portal_account,
+    insert_portal_challenge,
+    insert_portal_session,
+    list_chat_messages,
+    list_chat_rooms,
+    load_portal_account,
+    load_portal_account_by_handle,
+    load_portal_session,
+)
+
+
+class PortalError(ValueError):
+    pass
+
+
+def _canonical_json(value: dict[str, Any]) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _derive_account_id(handle: str, pubkey: str) -> str:
+    digest = _sha256_hex(f"portal:acct:{handle}:{pubkey}".encode("utf-8"))
+    return f"acct-{digest[:16]}"
+
+
+def _validate_handle(handle: object) -> str:
+    if not isinstance(handle, str) or not handle or isinstance(handle, bool):
+        raise PortalError("handle required")
+    if len(handle) < 3 or len(handle) > 24:
+        raise PortalError("handle length invalid")
+    if not all(ch.islower() or ch.isdigit() or ch in {"_", "-"} for ch in handle):
+        raise PortalError("handle invalid")
+    return handle
+
+
+def _validate_pubkey(pubkey: object) -> str:
+    if not isinstance(pubkey, str) or not pubkey or isinstance(pubkey, bool):
+        raise PortalError("pubkey required")
+    if len(pubkey) > 256:
+        raise PortalError("pubkey too long")
+    try:
+        raw = base64.b64decode(pubkey.encode("utf-8"), validate=True)
+    except Exception as exc:
+        raise PortalError("pubkey invalid") from exc
+    if len(raw) < 16:
+        raise PortalError("pubkey invalid")
+    return pubkey
+
+
+def create_account(conn, handle: str, pubkey: str) -> PortalAccount:
+    safe_handle = _validate_handle(handle)
+    safe_pubkey = _validate_pubkey(pubkey)
+    existing = load_portal_account_by_handle(conn, safe_handle)
+    if existing is not None:
+        raise PortalError("handle unavailable")
+    account_id = _derive_account_id(safe_handle, safe_pubkey)
+    created_at = int(time.time())
+    account = PortalAccount(
+        account_id=account_id,
+        handle=safe_handle,
+        public_key=safe_pubkey,
+        created_at=created_at,
+        status="active",
+    )
+    insert_portal_account(conn, account)
+    return account
+
+
+def load_account(conn, account_id: str) -> PortalAccount | None:
+    return load_portal_account(conn, account_id)
+
+
+def issue_challenge(conn, account_id: str) -> PortalChallenge:
+    account = load_portal_account(conn, account_id)
+    if account is None:
+        raise PortalError("account not found")
+    secret = get_portal_session_secret()
+    issued_at = int(time.time())
+    nonce = _sha256_hex(f"nonce:{account_id}:{issued_at}:{secret}".encode("utf-8"))
+    ttl = get_portal_challenge_ttl_seconds()
+    challenge = PortalChallenge(
+        account_id=account.account_id,
+        nonce=nonce,
+        expires_at=issued_at + ttl,
+        used=0,
+    )
+    insert_portal_challenge(conn, challenge)
+    return challenge
+
+
+def _verify_signature(pubkey: str, nonce: str, signature_b64: str) -> bool:
+    try:
+        key = base64.b64decode(pubkey.encode("utf-8"), validate=True)
+    except Exception:
+        return False
+    try:
+        provided = base64.b64decode(signature_b64.encode("utf-8"), validate=True)
+    except Exception:
+        return False
+    expected = hmac.new(key, nonce.encode("utf-8"), hashlib.sha256).digest()
+    return hmac.compare_digest(expected, provided)
+
+
+def verify_challenge(conn, account_id: str, nonce: str, signature: str) -> PortalSession:
+    challenge = consume_portal_challenge(conn, account_id, nonce)
+    if challenge is None:
+        raise PortalError("challenge not found")
+    if challenge.used:
+        raise PortalError("challenge already used")
+    if int(time.time()) > challenge.expires_at:
+        raise PortalError("challenge expired")
+    account = load_portal_account(conn, account_id)
+    if account is None:
+        raise PortalError("account not found")
+    if not _verify_signature(account.public_key, nonce, signature):
+        raise PortalError("signature invalid")
+    secret = get_portal_session_secret()
+    token = _sha256_hex(f"session:{account_id}:{nonce}:{secret}".encode("utf-8"))
+    expires_at = int(time.time()) + 3600
+    session = PortalSession(token=token, account_id=account_id, expires_at=expires_at)
+    insert_portal_session(conn, session)
+    return session
+
+
+def require_session(conn, token: str) -> PortalSession:
+    session = load_portal_session(conn, token)
+    if session is None:
+        raise PortalError("session not found")
+    if int(time.time()) > session.expires_at:
+        raise PortalError("session expired")
+    return session
+
+
+def logout_session(conn, token: str) -> None:
+    from nyx_backend_gateway.storage import delete_portal_session
+
+    delete_portal_session(conn, token)
+
+
+def create_room(conn, name: str, is_public: bool = True) -> ChatRoom:
+    if not isinstance(name, str) or not name or len(name) > 48:
+        raise PortalError("room name invalid")
+    created_at = int(time.time())
+    room_id = f"room-{_sha256_hex(f'{name}:{created_at}'.encode('utf-8'))[:12]}"
+    room = ChatRoom(room_id=room_id, name=name, created_at=created_at, is_public=1 if is_public else 0)
+    insert_chat_room(conn, room)
+    return room
+
+
+def list_rooms(conn) -> list[dict[str, object]]:
+    return list_chat_rooms(conn)
+
+
+def post_message(conn, room_id: str, sender_account_id: str, body: str) -> tuple[dict[str, object], dict[str, object]]:
+    if not isinstance(body, str) or not body or len(body) > 512:
+        raise PortalError("message invalid")
+    messages = list_chat_messages(conn, room_id=room_id, after=None, limit=1_000_000)
+    if messages:
+        last = messages[-1]
+        prev_digest = str(last["chain_head"])
+        seq = int(last["seq"]) + 1
+    else:
+        prev_digest = "0" * 64
+        seq = 1
+    message_id = f"msg-{_sha256_hex(f'{room_id}:{seq}'.encode('utf-8'))[:12]}"
+    message_fields = {
+        "message_id": message_id,
+        "room_id": room_id,
+        "sender_account_id": sender_account_id,
+        "body": body,
+        "seq": seq,
+    }
+    msg_digest = _sha256_hex(_canonical_json(message_fields).encode("utf-8"))
+    chain_head = _sha256_hex(f"{prev_digest}{msg_digest}".encode("utf-8"))
+    created_at = int(time.time())
+    record = ChatMessage(
+        message_id=message_id,
+        room_id=room_id,
+        sender_account_id=sender_account_id,
+        body=body,
+        seq=seq,
+        prev_digest=prev_digest,
+        msg_digest=msg_digest,
+        chain_head=chain_head,
+        created_at=created_at,
+    )
+    insert_chat_message(conn, record)
+    receipt = {
+        "prev_digest": prev_digest,
+        "msg_digest": msg_digest,
+        "chain_head": chain_head,
+    }
+    return message_fields, receipt
+
+
+def list_messages(conn, room_id: str, after: int | None, limit: int) -> list[dict[str, object]]:
+    return list_chat_messages(conn, room_id=room_id, after=after, limit=limit)

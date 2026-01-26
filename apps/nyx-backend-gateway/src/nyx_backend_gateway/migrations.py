@@ -69,6 +69,62 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     )
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS portal_accounts (
+            account_id TEXT PRIMARY KEY,
+            handle TEXT UNIQUE NOT NULL,
+            public_key TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            status TEXT NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS portal_challenges (
+            account_id TEXT NOT NULL,
+            nonce TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used INTEGER NOT NULL,
+            PRIMARY KEY (account_id, nonce)
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS portal_sessions (
+            token TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_rooms (
+            room_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            is_public INTEGER NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            message_id TEXT PRIMARY KEY,
+            room_id TEXT NOT NULL,
+            sender_account_id TEXT NOT NULL,
+            body TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            prev_digest TEXT NOT NULL,
+            msg_digest TEXT NOT NULL,
+            chain_head TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS listings (
             listing_id TEXT PRIMARY KEY,
             sku TEXT NOT NULL,

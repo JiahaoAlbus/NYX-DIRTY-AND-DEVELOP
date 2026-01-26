@@ -61,3 +61,25 @@ def get_protocol_fee_min() -> int | None:
     if value < 0:
         raise StorageError("NYX_PROTOCOL_FEE_MIN out of bounds")
     return value
+
+
+def get_portal_session_secret() -> str:
+    secret = os.environ.get("NYX_PORTAL_SESSION_SECRET", "").strip()
+    if not secret:
+        return "testnet-session-secret"
+    if len(secret) < 12:
+        raise StorageError("NYX_PORTAL_SESSION_SECRET too short")
+    return secret
+
+
+def get_portal_challenge_ttl_seconds() -> int:
+    raw = os.environ.get("NYX_PORTAL_CHALLENGE_TTL", "").strip()
+    if not raw:
+        return 300
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise StorageError("NYX_PORTAL_CHALLENGE_TTL must be int") from exc
+    if value < 60 or value > 3600:
+        raise StorageError("NYX_PORTAL_CHALLENGE_TTL out of bounds")
+    return value

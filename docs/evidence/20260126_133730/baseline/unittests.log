@@ -1,0 +1,746 @@
+test_entertainment_invalid_step_rejected (entertainment_state_test.EntertainmentStateTests) ... ok
+test_entertainment_state_deterministic (entertainment_state_test.EntertainmentStateTests) ... ok
+test_entertainment_state_present (entertainment_state_test.EntertainmentStateTests) ... ok
+test_evidence_flow (evidence_flow_test.EvidenceFlowTests) ... ok
+test_export_zip_is_deterministic (export_zip_determinism_test.ExportZipDeterminismTests) ... ok
+test_exchange_fee_summary_present (fee_summary_outputs_test.FeeSummaryOutputsTests) ... ok
+test_wallet_transfer_fee_summary_present (fee_summary_outputs_test.FeeSummaryOutputsTests) ... ok
+test_invalid_artifact_name_rejected (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_invalid_run_id_rejected (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_safe_artifact_path (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_payload_depth_too_deep_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_payload_list_too_large_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_payload_text_too_long_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_marketplace_platform_fee_metadata (platform_fee_integration_test.PlatformFeeIntegrationTests) ... ok
+test_non_marketplace_has_no_platform_fee (platform_fee_integration_test.PlatformFeeIntegrationTests) ... ok
+test_missing_run_id_returns_400 (server_run_id_validation_test.ServerRunIdValidationTests) ... ok
+test_artifact_name_rejects_path_tokens (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+test_tamper_receipt_hashes_detected (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+test_tamper_state_hash_detected (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.698s
+
+OK
+test_list_messages_by_channel (chat_storage_test.ChatStorageTests) ... ok
+test_items_and_events (entertainment_storage_test.EntertainmentStorageTests) ... ok
+test_exchange_evidence_deterministic (evidence_determinism_test.EvidenceDeterminismTests) ... ok
+test_full_match_removes_orders (exchange_engine_test.ExchangeEngineTests) ... ok
+test_partial_match_keeps_remainder (exchange_engine_test.ExchangeEngineTests) ... ok
+test_marketplace_fee_additive (fee_invariants_test.FeeInvariantTests) ... ok
+test_protocol_fee_nonzero_and_additive (fee_invariants_test.FeeInvariantTests) ... ok
+test_chat_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_entertainment_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_cancel_order_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_place_order_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_listing_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_purchase_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_listings_and_purchases (marketplace_storage_test.MarketplaceStorageTests) ... ok
+test_runtime_has_no_fake_tokens (no_fake_code_check_test.NoFakeCodeCheckTests) ... ok
+test_artifact_path_traversal_rejected (server_artifact_guard_test.ServerArtifactGuardTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:32] "POST /run HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:32] "GET /artifact?run_id=artifact-run-1&name=../x HTTP/1.1" 400 -
+ok
+test_chat_send_and_list (server_chat_smoke_test.ServerChatSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:32] "POST /chat/send HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:32] "GET /chat/messages?channel=general HTTP/1.1" 200 -
+ok
+test_entertainment_step_flow (server_entertainment_smoke_test.ServerEntertainmentSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:33] "GET /entertainment/items HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:33] "POST /entertainment/step HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:33] "GET /entertainment/events?item_id=ent-001 HTTP/1.1" 200 -
+ok
+test_exchange_place_order_and_orderbook (server_exchange_smoke_test.ServerExchangeSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:33] "POST /exchange/place_order HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:33] "GET /exchange/orderbook HTTP/1.1" 200 -
+ok
+test_invalid_run_id_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:34] "POST /run HTTP/1.1" 400 -
+ok
+test_message_too_long_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:34] "POST /chat/send HTTP/1.1" 400 -
+ok
+test_payload_too_large_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:35] "POST /run HTTP/1.1" 400 -
+ok
+test_listing_and_purchase (server_marketplace_smoke_test.ServerMarketplaceSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:36] "POST /marketplace/listing HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:36] "GET /marketplace/listings HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:36] "POST /marketplace/purchase HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:36] "GET /marketplace/purchases?listing_id=listing-c482b5dc7c3d32a1 HTTP/1.1" 200 -
+ok
+test_capabilities (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:36] "GET /capabilities HTTP/1.1" 200 -
+ok
+test_healthz (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:37] "GET /healthz HTTP/1.1" 200 -
+ok
+test_version (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:37] "GET /version HTTP/1.1" 200 -
+ok
+test_rejects_invalid_address (server_wallet_hardening_test.ServerWalletHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:38] "POST /wallet/transfer HTTP/1.1" 400 -
+ok
+test_rejects_negative_amount (server_wallet_hardening_test.ServerWalletHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:38] "POST /wallet/transfer HTTP/1.1" 400 -
+ok
+test_wallet_faucet_and_transfer (server_wallet_smoke_test.ServerWalletSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:39] "POST /wallet/faucet HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:39] "POST /wallet/transfer HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:39] "GET /wallet/balance?address=wallet-a HTTP/1.1" 200 -
+ok
+test_tables_created (storage_migrations_test.StorageMigrationTests) ... ok
+test_insert_and_load_records (storage_roundtrip_test.StorageRoundtripTests) ... ok
+test_insufficient_balance_rejected (wallet_transfer_test.WalletTransferTests) ... ok
+test_transfer_updates_balances_and_fees (wallet_transfer_test.WalletTransferTests) ... ok
+
+----------------------------------------------------------------------
+Ran 35 tests in 8.122s
+
+OK
+test_same_seed_same_prefixes (app_determinism_test.AppDeterminismTests) ... ok
+test_invalid_seed_rejected (app_invalid_args_test.AppInvalidArgsTests) ... ok
+test_no_secret_in_outputs (app_no_secret_leak_test.AppNoSecretLeakTests) ... ok
+test_app_smoke (app_smoke_test.AppSmokeTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.006s
+
+OK
+test_project_exists (ios_project_scaffold_test.IOSProjectScaffoldTests) ... ok
+test_project_references_sources (ios_project_scaffold_test.IOSProjectScaffoldTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+test_run_and_replay_ok (client_smoke_test.ClientSmokeTests) ... ok
+test_same_seed_same_output (determinism_guard_test.DeterminismGuardTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.003s
+
+OK
+test_banner_present (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_chat_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_entertainment_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_exchange_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_marketplace_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_required_routes_exist (ui_assets_exist_test.WebAssetsExistTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.001s
+
+OK
+test_evidence_flow (evidence_flow_test.EvidenceFlowTests) ... ok
+test_export_zip_deterministic (export_zip_determinism_test.ExportZipDeterminismTests) ... ok
+test_invalid_artifact_name_rejected (path_traversal_guard_test.PathTraversalGuardTest) ... ok
+test_invalid_run_id_rejected (path_traversal_guard_test.PathTraversalGuardTest) ... ok
+test_safe_artifact_path_with_valid_inputs (path_traversal_guard_test.PathTraversalGuardTest) ... ok
+test_invalid_run_id_returns_400 (server_run_id_validation_test.ServerRunIdValidationTests) ... ok
+test_long_run_id_returns_400 (server_run_id_validation_test.ServerRunIdValidationTests) ... ok
+test_missing_run_id_returns_400 (server_run_id_validation_test.ServerRunIdValidationTests) ... ok
+test_tamper_outputs_detected (tamper_evidence_test.TamperEvidenceTests) ... ok
+test_tamper_receipt_hashes_detected (tamper_evidence_test.TamperEvidenceTests) ... ok
+test_ui_routes_exist (ui_assets_exist_test.UIAssetsExistTests) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 1.738s
+
+OK
+conformance ok
+test_each_rule_matches_fixture (guard_no_false_negative_test.GuardNoFalseNegativeTests) ... ok
+test_split_tokens_do_not_match (guard_no_false_positive_regression_test.GuardNoFalsePositiveTests) ... ok
+test_no_frozen_gate_sequences (guard_no_frozen_gate_sequence_test.FrozenGateSequenceGuardTests) ... ok
+test_ruleset_baseline (guard_ruleset_non_dilution_test.RulesetNonDilutionTests) ... ok
+test_report_schema_fields (report_schema_test.ReportSchemaTests) ... ok
+test_runner_writes_report (runner_outfile_test.RunnerOutfileTests) ... ok
+test_drills_pass (runtime_drills_illegal_shortcuts_test.RuntimeDrillTests) ... ok
+test_tamper_variants_fail_replay (tamper_drills_stricter_test.TamperDrillStricterTests) ... ok
+test_attack_cards_emitted_on_failure (unit_report_test.ReportTests) ... ok
+test_rules_complete (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_fields (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_unique (unit_ruleset_test.RuleSetTests) ... ok
+test_scan_findings_empty_for_clean_text (unit_scans_test.ScanUnitTests) ... ok
+test_scan_finds_keyword (unit_scans_test.ScanUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.817s
+
+OK
+test_e2e_pipeline (e2e_smoke_test.E2ESmokeTests) ... ok
+test_root_secret_not_leaked (guard_trace_leak_test.TraceLeakGuardTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.002s
+
+OK
+test_same_seed_same_prefixes (determinism_test.DeterminismTests) ... ok
+test_private_transfer_e2e (e2e_smoke_test.E2ESmokeTests) ... ok
+test_no_secret_in_outputs (guard_no_secret_leak_test.SecretLeakGuardTests) ... ok
+test_tamper_matrix (tamper_matrix_test.TamperMatrixTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.007s
+
+OK
+test_no_core_imports (guard_no_core_imports_test.GuardNoCoreImportsTests) ... ok
+test_imports (skeleton_import_test.SkeletonImportTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.000s
+
+OK
+conformance ok
+conformance ok
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+conformance ok
+test_each_rule_matches_fixture (guard_no_false_negative_test.GuardNoFalseNegativeTests) ... ok
+test_split_tokens_do_not_match (guard_no_false_positive_regression_test.GuardNoFalsePositiveTests) ... ok
+test_no_frozen_gate_sequences (guard_no_frozen_gate_sequence_test.FrozenGateSequenceGuardTests) ... ok
+test_ruleset_baseline (guard_ruleset_non_dilution_test.RulesetNonDilutionTests) ... ok
+test_report_schema_fields (report_schema_test.ReportSchemaTests) ... ok
+test_runner_writes_report (runner_outfile_test.RunnerOutfileTests) ... ok
+test_drills_pass (runtime_drills_illegal_shortcuts_test.RuntimeDrillTests) ... ok
+test_tamper_variants_fail_replay (tamper_drills_stricter_test.TamperDrillStricterTests) ... ok
+test_attack_cards_emitted_on_failure (unit_report_test.ReportTests) ... ok
+test_rules_complete (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_fields (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_unique (unit_ruleset_test.RuleSetTests) ... ok
+test_scan_findings_empty_for_clean_text (unit_scans_test.ScanUnitTests) ... ok
+test_scan_finds_keyword (unit_scans_test.ScanUnitTests) ... ok
+test_account_like_input_rejected (identity_test.IdentityDerivationTests) ... ok
+test_context_bound_serialization_not_stable (identity_test.IdentityDerivationTests) ... ok
+test_context_rejects_account_like (identity_test.IdentityDerivationTests) ... ok
+test_destroyed_rejects_use (identity_test.IdentityDerivationTests) ... ok
+test_different_contexts_diverge (identity_test.IdentityDerivationTests) ... ok
+test_different_roots_diverge (identity_test.IdentityDerivationTests) ... ok
+test_illegal_transitions_fail (identity_test.IdentityDerivationTests) ... ok
+test_rotation_retires_tokens (identity_test.IdentityDerivationTests) ... ok
+test_same_context_stable (identity_test.IdentityDerivationTests) ... ok
+test_serialize_requires_context (identity_test.IdentityDerivationTests) ... ok
+test_chain_adapter_api_guard (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_state_proof (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_tx (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_forbidden_imports (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_keywords_in_src (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_payload_semantics (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_sender_independence (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_block_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_nop_keeps_state_root (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_set_and_del_change_state (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_proof_verification (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_root_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_submit_and_finality (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_tx_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_canonicalization_guards (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_canonicalization_rejects_weak_types (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_compare_digest_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_engine_api_has_no_bypass_params (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_independent_of_payer_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_framed_preimage_anti_ambiguity (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_mutation_fee_nonzero_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_no_bypass_keywords_in_src (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_sponsor_equivalence_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_invariants_property (property_fee_invariants_test.FeeInvariantPropertyTests) ... ok
+test_enforce_accepts_valid_payment (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_paid_vector (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_payer (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_quote_hash (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_mutation_fee_nonzero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_read_only_fee_zero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_sponsor_equivalence (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_entertainment_invalid_step_rejected (entertainment_state_test.EntertainmentStateTests) ... ok
+test_entertainment_state_deterministic (entertainment_state_test.EntertainmentStateTests) ... ok
+test_entertainment_state_present (entertainment_state_test.EntertainmentStateTests) ... ok
+test_evidence_flow (evidence_flow_test.EvidenceFlowTests) ... ok
+test_export_zip_is_deterministic (export_zip_determinism_test.ExportZipDeterminismTests) ... ok
+test_exchange_fee_summary_present (fee_summary_outputs_test.FeeSummaryOutputsTests) ... ok
+test_wallet_transfer_fee_summary_present (fee_summary_outputs_test.FeeSummaryOutputsTests) ... ok
+test_invalid_artifact_name_rejected (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_invalid_run_id_rejected (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_safe_artifact_path (path_traversal_guard_test.PathTraversalGuardTests) ... ok
+test_payload_depth_too_deep_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_payload_list_too_large_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_payload_text_too_long_rejected (payload_bounds_test.PayloadBoundsTests) ... ok
+test_marketplace_platform_fee_metadata (platform_fee_integration_test.PlatformFeeIntegrationTests) ... ok
+test_non_marketplace_has_no_platform_fee (platform_fee_integration_test.PlatformFeeIntegrationTests) ... ok
+test_missing_run_id_returns_400 (server_run_id_validation_test.ServerRunIdValidationTests) ... ok
+test_artifact_name_rejects_path_tokens (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+test_tamper_receipt_hashes_detected (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+test_tamper_state_hash_detected (tamper_evidence_guard_test.EvidenceTamperGuardTests) ... ok
+test_list_messages_by_channel (chat_storage_test.ChatStorageTests) ... ok
+test_items_and_events (entertainment_storage_test.EntertainmentStorageTests) ... ok
+test_exchange_evidence_deterministic (evidence_determinism_test.EvidenceDeterminismTests) ... ok
+test_full_match_removes_orders (exchange_engine_test.ExchangeEngineTests) ... ok
+test_partial_match_keeps_remainder (exchange_engine_test.ExchangeEngineTests) ... ok
+test_marketplace_fee_additive (fee_invariants_test.FeeInvariantTests) ... ok
+test_protocol_fee_nonzero_and_additive (fee_invariants_test.FeeInvariantTests) ... ok
+test_chat_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_entertainment_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_cancel_order_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_exchange_place_order_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_listing_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_marketplace_purchase_flow (gateway_flow_test.GatewayFlowTests) ... ok
+test_listings_and_purchases (marketplace_storage_test.MarketplaceStorageTests) ... ok
+test_runtime_has_no_fake_tokens (no_fake_code_check_test.NoFakeCodeCheckTests) ... ok
+test_artifact_path_traversal_rejected (server_artifact_guard_test.ServerArtifactGuardTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:50] "POST /run HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:50] "GET /artifact?run_id=artifact-run-1&name=../x HTTP/1.1" 400 -
+ok
+test_chat_send_and_list (server_chat_smoke_test.ServerChatSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:50] "POST /chat/send HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:50] "GET /chat/messages?channel=general HTTP/1.1" 200 -
+ok
+test_entertainment_step_flow (server_entertainment_smoke_test.ServerEntertainmentSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:51] "GET /entertainment/items HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:51] "POST /entertainment/step HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:51] "GET /entertainment/events?item_id=ent-001 HTTP/1.1" 200 -
+ok
+test_exchange_place_order_and_orderbook (server_exchange_smoke_test.ServerExchangeSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:51] "POST /exchange/place_order HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:51] "GET /exchange/orderbook HTTP/1.1" 200 -
+ok
+test_invalid_run_id_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:52] "POST /run HTTP/1.1" 400 -
+ok
+test_message_too_long_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:52] "POST /chat/send HTTP/1.1" 400 -
+ok
+test_payload_too_large_rejected (server_hardening_test.ServerHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:53] "POST /run HTTP/1.1" 400 -
+ok
+test_listing_and_purchase (server_marketplace_smoke_test.ServerMarketplaceSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:54] "POST /marketplace/listing HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:54] "GET /marketplace/listings HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:54] "POST /marketplace/purchase HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:54] "GET /marketplace/purchases?listing_id=listing-c482b5dc7c3d32a1 HTTP/1.1" 200 -
+ok
+test_capabilities (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:54] "GET /capabilities HTTP/1.1" 200 -
+ok
+test_healthz (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:55] "GET /healthz HTTP/1.1" 200 -
+ok
+test_version (server_meta_endpoints_test.ServerMetaEndpointsTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:55] "GET /version HTTP/1.1" 200 -
+ok
+test_rejects_invalid_address (server_wallet_hardening_test.ServerWalletHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:55] "POST /wallet/transfer HTTP/1.1" 400 -
+ok
+test_rejects_negative_amount (server_wallet_hardening_test.ServerWalletHardeningTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:56] "POST /wallet/transfer HTTP/1.1" 400 -
+ok
+test_wallet_faucet_and_transfer (server_wallet_smoke_test.ServerWalletSmokeTests) ... 127.0.0.1 - - [26/Jan/2026 13:37:56] "POST /wallet/faucet HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:56] "POST /wallet/transfer HTTP/1.1" 200 -
+127.0.0.1 - - [26/Jan/2026 13:37:56] "GET /wallet/balance?address=wallet-a HTTP/1.1" 200 -
+ok
+test_tables_created (storage_migrations_test.StorageMigrationTests) ... ok
+test_insert_and_load_records (storage_roundtrip_test.StorageRoundtripTests) ... ok
+test_insufficient_balance_rejected (wallet_transfer_test.WalletTransferTests) ... ok
+test_transfer_updates_balances_and_fees (wallet_transfer_test.WalletTransferTests) ... ok
+test_same_seed_same_prefixes (app_determinism_test.AppDeterminismTests) ... ok
+test_invalid_seed_rejected (app_invalid_args_test.AppInvalidArgsTests) ... ok
+test_no_secret_in_outputs (app_no_secret_leak_test.AppNoSecretLeakTests) ... ok
+test_app_smoke (app_smoke_test.AppSmokeTests) ... ok
+test_project_exists (ios_project_scaffold_test.IOSProjectScaffoldTests) ... ok
+test_project_references_sources (ios_project_scaffold_test.IOSProjectScaffoldTests) ... ok
+test_run_and_replay_ok (client_smoke_test.ClientSmokeTests) ... ok
+test_same_seed_same_output (determinism_guard_test.DeterminismGuardTests) ... ok
+test_banner_present (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_chat_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_entertainment_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_exchange_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_marketplace_script_exists (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_required_routes_exist (ui_assets_exist_test.WebAssetsExistTests) ... ok
+test_each_rule_matches_fixture (guard_no_false_negative_test.GuardNoFalseNegativeTests) ... ok
+test_split_tokens_do_not_match (guard_no_false_positive_regression_test.GuardNoFalsePositiveTests) ... ok
+test_no_frozen_gate_sequences (guard_no_frozen_gate_sequence_test.FrozenGateSequenceGuardTests) ... ok
+test_ruleset_baseline (guard_ruleset_non_dilution_test.RulesetNonDilutionTests) ... ok
+test_report_schema_fields (report_schema_test.ReportSchemaTests) ... ok
+test_runner_writes_report (runner_outfile_test.RunnerOutfileTests) ... ok
+test_drills_pass (runtime_drills_illegal_shortcuts_test.RuntimeDrillTests) ... ok
+test_tamper_variants_fail_replay (tamper_drills_stricter_test.TamperDrillStricterTests) ... ok
+test_attack_cards_emitted_on_failure (unit_report_test.ReportTests) ... ok
+test_rules_complete (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_fields (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_unique (unit_ruleset_test.RuleSetTests) ... ok
+test_scan_findings_empty_for_clean_text (unit_scans_test.ScanUnitTests) ... ok
+test_scan_finds_keyword (unit_scans_test.ScanUnitTests) ... ok
+test_e2e_pipeline (e2e_smoke_test.E2ESmokeTests) ... ok
+test_root_secret_not_leaked (guard_trace_leak_test.TraceLeakGuardTests) ... ok
+test_no_core_imports (guard_no_core_imports_test.GuardNoCoreImportsTests) ... ok
+test_imports (skeleton_import_test.SkeletonImportTests) ... ok
+test_interfaces_require_context_id (packages.l0-reputation.test.guard_context_binding_test.GuardContextBindingTests) ... ok
+test_invariants_hold (packages.l0-reputation.test.property_reputation_invariants_test.PropertyReputationInvariantTests) ... ok
+test_types_and_interfaces_exist (packages.l0-reputation.test.skeleton_import_test.SkeletonImportTests) ... ok
+test_apply_event_rejects_context_mismatch (packages.l0-reputation.test.unit_context_binding_test.ContextBindingTests) ... ok
+test_apply_event_rejects_pseudonym_mismatch (packages.l0-reputation.test.unit_context_binding_test.ContextBindingTests) ... ok
+test_new_pseudonym_diff_contexts (packages.l0-reputation.test.unit_context_binding_test.ContextBindingTests) ... ok
+test_fee_nonzero_for_event (packages.l0-reputation.test.unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_recompute_matches_state_root (packages.l0-reputation.test.unit_root_recompute_test.RootRecomputeTests) ... ok
+test_payer_change_keeps_amount (packages.l0-reputation.test.unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+test_create_envelope_rejects_empty_protocol (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_invalid_public_inputs (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_bytes_context (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_string_statement (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_nonce_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_invalid_binding_tag (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_non_bytes_proof (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_nullifier_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_binding_preimage_resists_ambiguity (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_nonce (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_public_inputs (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_statement_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_bool_and_int_distinct (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_key_order_equivalent (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_bytes_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_depth_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_rejects_illegal_types (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_nullifier_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_envelope_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_mock_proof_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_context_separation_property (property_context_separation_test.ContextSeparationPropertyTests) ... ok
+test_modify_public_inputs (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_protocol_version_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_prove_and_verify_same_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_statement_id_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_binding_tag (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_context_id_binding_tag_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_verify_fails_for_wrong_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_chain_adapter_api_guard (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_state_proof (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_tx (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_forbidden_imports (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_keywords_in_src (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_payload_semantics (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_sender_independence (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_block_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_nop_keeps_state_root (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_set_and_del_change_state (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_proof_verification (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_root_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_submit_and_finality (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_tx_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_canonicalization_guards (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_canonicalization_rejects_weak_types (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_compare_digest_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_engine_api_has_no_bypass_params (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_independent_of_payer_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_framed_preimage_anti_ambiguity (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_mutation_fee_nonzero_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_no_bypass_keywords_in_src (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_sponsor_equivalence_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_invariants_property (property_fee_invariants_test.FeeInvariantPropertyTests) ... ok
+test_enforce_accepts_valid_payment (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_paid_vector (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_payer (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_quote_hash (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_mutation_fee_nonzero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_read_only_fee_zero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_sponsor_equivalence (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_platform_fee_properties (property_platform_fee_test.PlatformFeePropertyTests) ... ok
+test_paid_vector_must_match (unit_enforce_paid_vector_exact_test.EnforcePaidVectorExactTests) ... ok
+test_fee_nonzero_for_mutation (unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_sponsor_keeps_amounts (unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+test_missing_fields_rejected (packages.l2-private-ledger.test.guard_binding_fields_mandatory_test.BindingFieldsGuardTests) ... ok
+test_verify_fails_without_ledger_root (packages.l2-private-ledger.test.guard_binding_fields_mandatory_test.BindingFieldsGuardTests) ... ok
+test_compare_digest_used_in_replay (packages.l2-private-ledger.test.guard_compare_digest_usage_test.CompareDigestGuardTests) ... ok
+test_fee_independent_of_payer (packages.l2-private-ledger.test.guard_fee_independent_of_payer_test.FeeIndependentOfPayerGuardTests) ... ok
+test_root_not_naive_join (packages.l2-private-ledger.test.guard_framing_anti_ambiguity_test.FramingGuardTests) ... ok
+test_no_sender_like_tokens (packages.l2-private-ledger.test.guard_no_sender_semantics_test.GuardNoSenderSemanticsTests) ... ok
+test_context_statement_separation (packages.l2-private-ledger.test.property_context_statement_separation_test.ContextStatementPropertyTests) ... ok
+test_fee_binding_properties (packages.l2-private-ledger.test.property_fee_binding_test.FeeBindingPropertyTests) ... ok
+test_property_invariants (packages.l2-private-ledger.test.property_private_ledger_test.PrivateLedgerPropertyTests) ... ok
+test_types_and_interfaces_exist (packages.l2-private-ledger.test.skeleton_import_test.SkeletonImportTests) ... ok
+test_bytes32_validation (packages.l2-private-ledger.test.unit_bytes32_test.Bytes32Tests) ... ok
+test_xor_one_bit (packages.l2-private-ledger.test.unit_bytes32_test.Bytes32Tests) ... ok
+test_double_spend_fails (packages.l2-private-ledger.test.unit_double_spend_test.DoubleSpendTests) ... ok
+test_paid_vector_must_match (packages.l2-private-ledger.test.unit_enforce_paid_vector_exact_test.EnforcePaidVectorExactTests) ... ok
+test_fee_nonzero_for_mint_and_spend (packages.l2-private-ledger.test.unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_mint_and_spend (packages.l2-private-ledger.test.unit_kernel_test.KernelTests) ... ok
+test_mint_and_spend_paths (packages.l2-private-ledger.test.unit_proof_wiring_happy_path_test.ProofWiringHappyPathTests) ... ok
+test_sponsor_equivalence (packages.l2-private-ledger.test.unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+test_order_independent (packages.l2-private-ledger.test.unit_state_root_test.StateRootTests) ... ok
+test_root_changes (packages.l2-private-ledger.test.unit_state_root_test.StateRootTests) ... ok
+test_root_recompute (packages.l2-private-ledger.test.unit_state_root_test.StateRootTests) ... ok
+test_missing_required_fields (packages.l2-private-ledger.test.unit_statement_validation_test.StatementValidationTests) ... ok
+test_rejects_bytes_and_float (packages.l2-private-ledger.test.unit_statement_validation_test.StatementValidationTests) ... ok
+test_tamper_fields_fail_verification (packages.l2-private-ledger.test.unit_tamper_fields_test.TamperFieldsTests) ... ok
+test_tamper_commitment_fails (packages.l2-private-ledger.test.unit_tamper_replay_test.TamperReplayTests) ... ok
+test_tamper_nullifier_fails (packages.l2-private-ledger.test.unit_tamper_replay_test.TamperReplayTests) ... ok
+test_tamper_root_fails (packages.l2-private-ledger.test.unit_tamper_replay_test.TamperReplayTests) ... ok
+test_imports (q3_interfaces_import_test.Q3InterfacesImportTests) ... ok
+test_no_runtime_imports (q3_interfaces_no_runtime_dependency_test.Q3InterfacesNoRuntimeDependencyTests) ... ok
+test_api_guard (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_forbidden_imports (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_keywords_in_src (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_secret_not_leaked (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_verify_only_calls (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_bytes32_validation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_proof_context_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_sender_variation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_signing_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_kernel_api_names (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_keystore_roundtrip (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_policy_default_deny (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verification (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verifier_no_prove (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_secret_repr_redacted (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_signer_sign_verify (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_rejects_bad_nonce (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_stable_hash (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_api_guard (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_forbidden_imports (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_keywords_in_src (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_secret_not_leaked (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_verify_only_calls (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_bytes32_validation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_proof_context_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_sender_variation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_signing_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_kernel_api_names (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_keystore_roundtrip (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_policy_default_deny (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verification (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verifier_no_prove (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_secret_repr_redacted (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_signer_sign_verify (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_rejects_bad_nonce (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_stable_hash (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_each_rule_matches_fixture (guard_no_false_negative_test.GuardNoFalseNegativeTests) ... ok
+test_split_tokens_do_not_match (guard_no_false_positive_regression_test.GuardNoFalsePositiveTests) ... ok
+test_no_frozen_gate_sequences (guard_no_frozen_gate_sequence_test.FrozenGateSequenceGuardTests) ... ok
+test_ruleset_baseline (guard_ruleset_non_dilution_test.RulesetNonDilutionTests) ... ok
+test_report_schema_fields (report_schema_test.ReportSchemaTests) ... ok
+test_runner_writes_report (runner_outfile_test.RunnerOutfileTests) ... ok
+test_drills_pass (runtime_drills_illegal_shortcuts_test.RuntimeDrillTests) ... ok
+test_tamper_variants_fail_replay (tamper_drills_stricter_test.TamperDrillStricterTests) ... ok
+test_attack_cards_emitted_on_failure (unit_report_test.ReportTests) ... ok
+test_rules_complete (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_fields (unit_ruleset_test.RuleSetTests) ... ok
+test_rules_unique (unit_ruleset_test.RuleSetTests) ... ok
+test_scan_findings_empty_for_clean_text (unit_scans_test.ScanUnitTests) ... ok
+test_scan_finds_keyword (unit_scans_test.ScanUnitTests) ... ok
+test_same_seed_same_prefixes (app_determinism_test.AppDeterminismTests) ... ok
+test_invalid_seed_rejected (app_invalid_args_test.AppInvalidArgsTests) ... ok
+test_no_secret_in_outputs (app_no_secret_leak_test.AppNoSecretLeakTests) ... ok
+test_app_smoke (app_smoke_test.AppSmokeTests) ... ok
+test_imports (q3_interfaces_import_test.Q3InterfacesImportTests) ... ok
+test_no_runtime_imports (q3_interfaces_no_runtime_dependency_test.Q3InterfacesNoRuntimeDependencyTests) ... ok
+test_e2e_pipeline (e2e_smoke_test.E2ESmokeTests) ... ok
+test_root_secret_not_leaked (guard_trace_leak_test.TraceLeakGuardTests) ... ok
+test_create_envelope_rejects_empty_protocol (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_invalid_public_inputs (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_bytes_context (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_string_statement (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_nonce_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_invalid_binding_tag (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_non_bytes_proof (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_nullifier_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_binding_preimage_resists_ambiguity (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_nonce (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_public_inputs (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_statement_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_bool_and_int_distinct (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_key_order_equivalent (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_bytes_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_depth_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_rejects_illegal_types (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_nullifier_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_envelope_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_mock_proof_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_context_separation_property (property_context_separation_test.ContextSeparationPropertyTests) ... ok
+test_modify_public_inputs (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_protocol_version_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_prove_and_verify_same_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_statement_id_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_binding_tag (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_context_id_binding_tag_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_verify_fails_for_wrong_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 330 tests in 26.153s
+
+OK
+PROPERTY_N=2000
+test_interfaces_require_context_id (guard_context_binding_test.GuardContextBindingTests) ... ok
+test_invariants_hold (property_reputation_invariants_test.PropertyReputationInvariantTests) ... ok
+test_types_and_interfaces_exist (skeleton_import_test.SkeletonImportTests) ... ok
+test_apply_event_rejects_context_mismatch (unit_context_binding_test.ContextBindingTests) ... ok
+test_apply_event_rejects_pseudonym_mismatch (unit_context_binding_test.ContextBindingTests) ... ok
+test_new_pseudonym_diff_contexts (unit_context_binding_test.ContextBindingTests) ... ok
+test_fee_nonzero_for_event (unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_recompute_matches_state_root (unit_root_recompute_test.RootRecomputeTests) ... ok
+test_payer_change_keeps_amount (unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.478s
+
+OK
+test_create_envelope_rejects_empty_protocol (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_invalid_public_inputs (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_bytes_context (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_non_string_statement (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_create_envelope_rejects_nonce_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_invalid_binding_tag (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_non_bytes_proof (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_envelope_rejects_nullifier_length (envelope_validation_test.EnvelopeValidationTests) ... ok
+test_binding_preimage_resists_ambiguity (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_nonce (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_public_inputs (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_binding_tag_depends_on_statement_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_bool_and_int_distinct (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_key_order_equivalent (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_bytes_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_max_depth_guard (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_canonicalization_rejects_illegal_types (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_nullifier_depends_on_context_id (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_envelope_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_verify_mock_proof_uses_compare_digest (guard_mutation_prevention_test.GuardMutationPreventionTests) ... ok
+test_context_separation_property (property_context_separation_test.ContextSeparationPropertyTests) ... ok
+test_modify_public_inputs (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_protocol_version_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_prove_and_verify_same_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_statement_id_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_binding_tag (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_tamper_context_id_binding_tag_mismatch (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+test_verify_fails_for_wrong_context (unit_context_separation_test.ContextSeparationUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.185s
+
+OK
+test_chain_adapter_api_guard (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_state_proof (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_compare_digest_usage_in_tx (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_forbidden_imports (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_no_keywords_in_src (guard_no_identity_regression_test.ChainGuardTests) ... ok
+test_payload_semantics (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_sender_independence (property_chain_invariants_test.ChainPropertyTests) ... ok
+test_block_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_nop_keeps_state_root (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_set_and_del_change_state (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_proof_verification (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_state_root_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_submit_and_finality (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+test_tx_hash_stable (unit_chain_adapter_test.ChainAdapterUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 2.813s
+
+OK
+test_canonicalization_guards (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_canonicalization_rejects_weak_types (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_compare_digest_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_engine_api_has_no_bypass_params (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_independent_of_payer_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_framed_preimage_anti_ambiguity (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_mutation_fee_nonzero_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_no_bypass_keywords_in_src (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_sponsor_equivalence_guard (guard_no_bypass_regression_test.FeeGuardRegressionTests) ... ok
+test_fee_invariants_property (property_fee_invariants_test.FeeInvariantPropertyTests) ... ok
+test_enforce_accepts_valid_payment (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_paid_vector (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_payer (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_enforce_rejects_mismatched_quote_hash (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_mutation_fee_nonzero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_read_only_fee_zero (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+test_sponsor_equivalence (unit_fee_engine_test.FeeEngineUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 2.349s
+
+OK
+PROPERTY_N=2000
+test_platform_fee_properties (property_platform_fee_test.PlatformFeePropertyTests) ... ok
+test_paid_vector_must_match (unit_enforce_paid_vector_exact_test.EnforcePaidVectorExactTests) ... ok
+test_fee_nonzero_for_mutation (unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_sponsor_keeps_amounts (unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.275s
+
+OK
+PROPERTY_N=2000
+PROPERTY_N=2000
+PROPERTY_N=2000
+test_missing_fields_rejected (guard_binding_fields_mandatory_test.BindingFieldsGuardTests) ... ok
+test_verify_fails_without_ledger_root (guard_binding_fields_mandatory_test.BindingFieldsGuardTests) ... ok
+test_compare_digest_used_in_replay (guard_compare_digest_usage_test.CompareDigestGuardTests) ... ok
+test_fee_independent_of_payer (guard_fee_independent_of_payer_test.FeeIndependentOfPayerGuardTests) ... ok
+test_root_not_naive_join (guard_framing_anti_ambiguity_test.FramingGuardTests) ... ok
+test_no_sender_like_tokens (guard_no_sender_semantics_test.GuardNoSenderSemanticsTests) ... ok
+test_context_statement_separation (property_context_statement_separation_test.ContextStatementPropertyTests) ... ok
+test_fee_binding_properties (property_fee_binding_test.FeeBindingPropertyTests) ... ok
+test_property_invariants (property_private_ledger_test.PrivateLedgerPropertyTests) ... ok
+test_types_and_interfaces_exist (skeleton_import_test.SkeletonImportTests) ... ok
+test_bytes32_validation (unit_bytes32_test.Bytes32Tests) ... ok
+test_xor_one_bit (unit_bytes32_test.Bytes32Tests) ... ok
+test_double_spend_fails (unit_double_spend_test.DoubleSpendTests) ... ok
+test_paid_vector_must_match (unit_enforce_paid_vector_exact_test.EnforcePaidVectorExactTests) ... ok
+test_fee_nonzero_for_mint_and_spend (unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_mint_and_spend (unit_kernel_test.KernelTests) ... ok
+test_mint_and_spend_paths (unit_proof_wiring_happy_path_test.ProofWiringHappyPathTests) ... ok
+test_sponsor_equivalence (unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+test_order_independent (unit_state_root_test.StateRootTests) ... ok
+test_root_changes (unit_state_root_test.StateRootTests) ... ok
+test_root_recompute (unit_state_root_test.StateRootTests) ... ok
+test_missing_required_fields (unit_statement_validation_test.StatementValidationTests) ... ok
+test_rejects_bytes_and_float (unit_statement_validation_test.StatementValidationTests) ... ok
+test_tamper_fields_fail_verification (unit_tamper_fields_test.TamperFieldsTests) ... ok
+test_tamper_commitment_fails (unit_tamper_replay_test.TamperReplayTests) ... ok
+test_tamper_nullifier_fails (unit_tamper_replay_test.TamperReplayTests) ... ok
+test_tamper_root_fails (unit_tamper_replay_test.TamperReplayTests) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 3.416s
+
+OK
+test_bounded_explorer (bounded_explorer_test.BoundedExplorerTests) ... ok
+test_imports (skeleton_import_test.SkeletonImportTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.007s
+
+OK
+PROPERTY_N=2000
+test_single_swap_vector (golden_vectors_test.GoldenVectorTests) ... ok
+test_invariants (property_router_invariants_test.RouterPropertyTests) ... ok
+test_imports (skeleton_import_test.SkeletonImportTests) ... ok
+test_failure_keeps_state_unchanged (unit_atomic_failure_test.AtomicFailureTests) ... ok
+test_amount_in_too_large (unit_bounds_test.BoundsTests) ... ok
+test_min_out_too_large (unit_bounds_test.BoundsTests) ... ok
+test_reserve_too_large (unit_bounds_test.BoundsTests) ... ok
+test_steps_too_many (unit_bounds_test.BoundsTests) ... ok
+test_paid_vector_must_match (unit_enforce_paid_vector_exact_test.EnforcePaidVectorExactTests) ... ok
+test_fee_nonzero_for_route (unit_fee_nonzero_test.FeeNonZeroTests) ... ok
+test_asset_mismatch_rejected (unit_rejects_invalid_swap_test.RejectInvalidSwapTests) ... ok
+test_empty_steps_rejected (unit_rejects_invalid_swap_test.RejectInvalidSwapTests) ... ok
+test_missing_pool_rejected (unit_rejects_invalid_swap_test.RejectInvalidSwapTests) ... ok
+test_zero_amount_rejected (unit_rejects_invalid_swap_test.RejectInvalidSwapTests) ... ok
+test_replay_matches_receipt (unit_replay_test.ReplayTests) ... ok
+test_sponsor_keeps_amounts (unit_sponsor_equivalence_test.SponsorEquivalenceTests) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.122s
+
+OK
+test_imports (q3_interfaces_import_test.Q3InterfacesImportTests) ... ok
+test_no_runtime_imports (q3_interfaces_no_runtime_dependency_test.Q3InterfacesNoRuntimeDependencyTests) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.004s
+
+OK
+PROPERTY_N=2000
+test_api_guard (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_forbidden_imports (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_no_keywords_in_src (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_secret_not_leaked (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_verify_only_calls (guard_no_privilege_escalation_test.WalletKernelGuardTests) ... ok
+test_bytes32_validation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_proof_context_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_sender_variation (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_signing_invariants (property_wallet_kernel_invariants_test.WalletKernelPropertyTests) ... ok
+test_kernel_api_names (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_keystore_roundtrip (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_policy_default_deny (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verification (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_proof_verifier_no_prove (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_secret_repr_redacted (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_signer_sign_verify (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_rejects_bad_nonce (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+test_tx_builder_stable_hash (unit_wallet_kernel_test.WalletKernelUnitTests) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.294s
+
+OK
+TOTAL_TESTS=569

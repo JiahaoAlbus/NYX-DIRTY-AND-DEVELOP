@@ -19,6 +19,7 @@ from nyx_backend_gateway.storage import (
     Purchase,
     Receipt,
     apply_wallet_faucet,
+    apply_wallet_faucet_with_fee,
     apply_wallet_transfer,
     create_connection,
     insert_entertainment_event,
@@ -165,6 +166,15 @@ def _validate_wallet_faucet(payload: dict[str, Any]) -> dict[str, Any]:
         "address": address,
         "amount": amount,
     }
+
+
+def _require_token(payload: dict[str, Any], key: str = "token") -> str:
+    token = payload.get(key, "NYXT")
+    if not isinstance(token, str) or not token or isinstance(token, bool):
+        raise GatewayError("token invalid")
+    if token != "NYXT":
+        raise GatewayError("token unsupported")
+    return token
 
 
 def _require_int(payload: dict[str, Any], key: str, min_value: int = 1, max_value: int | None = None) -> int:
@@ -571,6 +581,85 @@ def execute_wallet_faucet(
             replay_ok=evidence.replay_ok,
         ),
         balance,
+    )
+
+
+def execute_wallet_faucet_v1(
+    *,
+    seed: int,
+    run_id: str,
+    payload: dict[str, Any],
+    account_id: str,
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, int, FeeLedger]:
+    validated = _validate_wallet_faucet(payload)
+    _require_token(payload)
+    conn = create_connection(db_path or _db_path())
+
+    backend_src = _backend_src()
+    if str(backend_src) not in __import__("sys").path:
+        __import__("sys").path.insert(0, str(backend_src))
+    from nyx_backend.evidence import EvidenceError, run_evidence
+
+    run_root = run_root or _run_root()
+    try:
+        evidence = run_evidence(
+            seed=seed,
+            run_id=run_id,
+            module="wallet",
+            action="faucet",
+            payload=validated,
+            base_dir=run_root,
+        )
+    except EvidenceError as exc:
+        raise GatewayError(str(exc)) from exc
+
+    insert_evidence_run(
+        conn,
+        EvidenceRun(
+            run_id=run_id,
+            module="wallet",
+            action="faucet",
+            seed=seed,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+    )
+    insert_receipt(
+        conn,
+        Receipt(
+            receipt_id=_receipt_id(run_id),
+            module="wallet",
+            action="faucet",
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+            run_id=run_id,
+        ),
+    )
+    fee_record = route_fee("wallet", "faucet_v1", {"amount": validated["amount"]}, run_id)
+    if fee_record.total_paid <= 0:
+        raise GatewayError("fee_total must be nonzero")
+    balances = apply_wallet_faucet_with_fee(
+        conn,
+        address=validated["address"],
+        amount=validated["amount"],
+        fee_total=fee_record.total_paid,
+        treasury_address=fee_record.fee_address,
+        run_id=run_id,
+    )
+    insert_fee_ledger(conn, fee_record)
+    return (
+        GatewayResult(
+            run_id=run_id,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+        balances["balance"],
+        fee_record,
     )
 
 

@@ -159,6 +159,109 @@ final class GatewayClient {
         return payload["messages"] ?? []
     }
 
+    func createPortalAccount(handle: String, pubkey: String) async throws -> PortalAccount {
+        let url = baseURL.appendingPathComponent("portal/v1/accounts")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["handle": handle, "pubkey": pubkey],
+            options: [.sortedKeys]
+        )
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(PortalAccount.self, from: data)
+    }
+
+    func requestPortalChallenge(accountId: String) async throws -> PortalChallenge {
+        let url = baseURL.appendingPathComponent("portal/v1/auth/challenge")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["account_id": accountId],
+            options: [.sortedKeys]
+        )
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(PortalChallenge.self, from: data)
+    }
+
+    func verifyPortalChallenge(accountId: String, nonce: String, signature: String) async throws -> PortalAuthToken {
+        let url = baseURL.appendingPathComponent("portal/v1/auth/verify")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["account_id": accountId, "nonce": nonce, "signature": signature],
+            options: [.sortedKeys]
+        )
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(PortalAuthToken.self, from: data)
+    }
+
+    func fetchPortalMe(token: String) async throws -> PortalAccount {
+        let url = baseURL.appendingPathComponent("portal/v1/me")
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(PortalAccount.self, from: data)
+    }
+
+    func createChatRoom(token: String, name: String) async throws -> ChatRoomV1 {
+        let url = baseURL.appendingPathComponent("chat/v1/rooms")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["name": name], options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(ChatRoomV1.self, from: data)
+    }
+
+    func listChatRooms(token: String) async throws -> [ChatRoomV1] {
+        let url = baseURL.appendingPathComponent("chat/v1/rooms")
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [ChatRoomV1]].self, from: data)
+        return payload["rooms"] ?? []
+    }
+
+    func sendChatMessage(token: String, roomId: String, body: String) async throws -> ChatMessageResponse {
+        let url = baseURL.appendingPathComponent("chat/v1/rooms/\(roomId)/messages")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["body": body], options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(ChatMessageResponse.self, from: data)
+    }
+
+    func listChatMessages(token: String, roomId: String) async throws -> [ChatMessageV1] {
+        let url = baseURL.appendingPathComponent("chat/v1/rooms/\(roomId)/messages")
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [ChatMessageV1]].self, from: data)
+        return payload["messages"] ?? []
+    }
+
+    func faucetV1(token: String, seed: Int, runId: String, address: String, amount: Int) async throws -> FaucetV1Response {
+        let url = baseURL.appendingPathComponent("wallet/v1/faucet")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": ["address": address, "amount": amount, "token": "NYXT"],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(FaucetV1Response.self, from: data)
+    }
+
     func publishListing(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("marketplace/listing")
         var request = URLRequest(url: url)

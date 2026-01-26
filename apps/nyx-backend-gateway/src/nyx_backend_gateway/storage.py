@@ -82,6 +82,51 @@ class MessageEvent:
 
 
 @dataclass(frozen=True)
+class PortalAccount:
+    account_id: str
+    handle: str
+    public_key: str
+    created_at: int
+    status: str
+
+
+@dataclass(frozen=True)
+class PortalChallenge:
+    account_id: str
+    nonce: str
+    expires_at: int
+    used: int
+
+
+@dataclass(frozen=True)
+class PortalSession:
+    token: str
+    account_id: str
+    expires_at: int
+
+
+@dataclass(frozen=True)
+class ChatRoom:
+    room_id: str
+    name: str
+    created_at: int
+    is_public: int
+
+
+@dataclass(frozen=True)
+class ChatMessage:
+    message_id: str
+    room_id: str
+    sender_account_id: str
+    body: str
+    seq: int
+    prev_digest: str
+    msg_digest: str
+    chain_head: str
+    created_at: int
+
+
+@dataclass(frozen=True)
 class Listing:
     listing_id: str
     sku: str
@@ -171,6 +216,158 @@ def insert_evidence_run(conn: sqlite3.Connection, record: EvidenceRun) -> None:
         (run_id, module, action, seed, state_hash, receipt_hashes, replay_ok),
     )
     conn.commit()
+
+
+def insert_portal_account(conn: sqlite3.Connection, account: PortalAccount) -> None:
+    account_id = _validate_text(account.account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
+    handle = _validate_text(account.handle, "handle", r"[a-z0-9_-]{3,24}")
+    public_key = _validate_text(account.public_key, "public_key", r"[A-Za-z0-9+/=]{16,256}")
+    created_at = _validate_int(account.created_at, "created_at", 1)
+    status = _validate_text(account.status, "status", r"[A-Za-z0-9_-]{3,16}")
+    conn.execute(
+        "INSERT INTO portal_accounts (account_id, handle, public_key, created_at, status) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (account_id, handle, public_key, created_at, status),
+    )
+    conn.commit()
+
+
+def load_portal_account(conn: sqlite3.Connection, account_id: str) -> PortalAccount | None:
+    aid = _validate_text(account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
+    row = conn.execute(
+        "SELECT account_id, handle, public_key, created_at, status FROM portal_accounts WHERE account_id = ?",
+        (aid,),
+    ).fetchone()
+    if row is None:
+        return None
+    return PortalAccount(**{col: row[col] for col in row.keys()})
+
+
+def load_portal_account_by_handle(conn: sqlite3.Connection, handle: str) -> PortalAccount | None:
+    h = _validate_text(handle, "handle", r"[a-z0-9_-]{3,24}")
+    row = conn.execute(
+        "SELECT account_id, handle, public_key, created_at, status FROM portal_accounts WHERE handle = ?",
+        (h,),
+    ).fetchone()
+    if row is None:
+        return None
+    return PortalAccount(**{col: row[col] for col in row.keys()})
+
+
+def insert_portal_challenge(conn: sqlite3.Connection, challenge: PortalChallenge) -> None:
+    account_id = _validate_text(challenge.account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
+    nonce = _validate_text(challenge.nonce, "nonce", r"[A-Fa-f0-9]{32,128}")
+    expires_at = _validate_int(challenge.expires_at, "expires_at", 1)
+    used = _validate_int(challenge.used, "used", 0)
+    conn.execute(
+        "INSERT INTO portal_challenges (account_id, nonce, expires_at, used) "
+        "VALUES (?, ?, ?, ?)",
+        (account_id, nonce, expires_at, used),
+    )
+    conn.commit()
+
+
+def consume_portal_challenge(conn: sqlite3.Connection, account_id: str, nonce: str) -> PortalChallenge | None:
+    aid = _validate_text(account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
+    nn = _validate_text(nonce, "nonce", r"[A-Fa-f0-9]{32,128}")
+    row = conn.execute(
+        "SELECT account_id, nonce, expires_at, used FROM portal_challenges WHERE account_id = ? AND nonce = ?",
+        (aid, nn),
+    ).fetchone()
+    if row is None:
+        return None
+    challenge = PortalChallenge(**{col: row[col] for col in row.keys()})
+    if challenge.used:
+        return challenge
+    conn.execute(
+        "UPDATE portal_challenges SET used = 1 WHERE account_id = ? AND nonce = ?",
+        (aid, nn),
+    )
+    conn.commit()
+    return challenge
+
+
+def insert_portal_session(conn: sqlite3.Connection, session: PortalSession) -> None:
+    token = _validate_text(session.token, "token", r"[A-Fa-f0-9]{32,128}")
+    account_id = _validate_text(session.account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
+    expires_at = _validate_int(session.expires_at, "expires_at", 1)
+    conn.execute(
+        "INSERT INTO portal_sessions (token, account_id, expires_at) VALUES (?, ?, ?)",
+        (token, account_id, expires_at),
+    )
+    conn.commit()
+
+
+def load_portal_session(conn: sqlite3.Connection, token: str) -> PortalSession | None:
+    tok = _validate_text(token, "token", r"[A-Fa-f0-9]{32,128}")
+    row = conn.execute(
+        "SELECT token, account_id, expires_at FROM portal_sessions WHERE token = ?",
+        (tok,),
+    ).fetchone()
+    if row is None:
+        return None
+    return PortalSession(**{col: row[col] for col in row.keys()})
+
+
+def delete_portal_session(conn: sqlite3.Connection, token: str) -> None:
+    tok = _validate_text(token, "token", r"[A-Fa-f0-9]{32,128}")
+    conn.execute("DELETE FROM portal_sessions WHERE token = ?", (tok,))
+    conn.commit()
+
+
+def insert_chat_room(conn: sqlite3.Connection, room: ChatRoom) -> None:
+    room_id = _validate_text(room.room_id, "room_id", r"[A-Za-z0-9_-]{1,64}")
+    name = _validate_text(room.name, "name", r"[A-Za-z0-9_ -]{3,48}")
+    created_at = _validate_int(room.created_at, "created_at", 1)
+    is_public = _validate_int(room.is_public, "is_public", 0)
+    conn.execute(
+        "INSERT INTO chat_rooms (room_id, name, created_at, is_public) VALUES (?, ?, ?, ?)",
+        (room_id, name, created_at, is_public),
+    )
+    conn.commit()
+
+
+def list_chat_rooms(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute(
+        "SELECT room_id, name, created_at, is_public FROM chat_rooms ORDER BY created_at ASC, room_id ASC"
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
+def insert_chat_message(conn: sqlite3.Connection, message: ChatMessage) -> None:
+    message_id = _validate_text(message.message_id, "message_id", r"[A-Za-z0-9_-]{1,64}")
+    room_id = _validate_text(message.room_id, "room_id", r"[A-Za-z0-9_-]{1,64}")
+    sender = _validate_text(message.sender_account_id, "sender_account_id", r"[A-Za-z0-9_-]{1,64}")
+    body = _validate_text(message.body, "body", r"[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]{1,512}")
+    seq = _validate_int(message.seq, "seq", 1)
+    prev_digest = _validate_text(message.prev_digest, "prev_digest", r"[A-Fa-f0-9]{16,128}")
+    msg_digest = _validate_text(message.msg_digest, "msg_digest", r"[A-Fa-f0-9]{16,128}")
+    chain_head = _validate_text(message.chain_head, "chain_head", r"[A-Fa-f0-9]{16,128}")
+    created_at = _validate_int(message.created_at, "created_at", 1)
+    conn.execute(
+        "INSERT INTO chat_messages (message_id, room_id, sender_account_id, body, seq, prev_digest, msg_digest, "
+        "chain_head, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (message_id, room_id, sender, body, seq, prev_digest, msg_digest, chain_head, created_at),
+    )
+    conn.commit()
+
+
+def list_chat_messages(conn: sqlite3.Connection, room_id: str, after: int | None, limit: int) -> list[dict[str, object]]:
+    rid = _validate_text(room_id, "room_id", r"[A-Za-z0-9_-]{1,64}")
+    lim = _validate_int(limit, "limit", 1)
+    params: list[object] = [rid]
+    clause = ""
+    if after is not None:
+        clause = "AND seq > ?"
+        params.append(_validate_int(after, "after", 0))
+    params.append(lim)
+    rows = conn.execute(
+        "SELECT message_id, room_id, sender_account_id, body, seq, prev_digest, msg_digest, chain_head, created_at "
+        "FROM chat_messages WHERE room_id = ? "
+        f"{clause} ORDER BY seq ASC, message_id ASC LIMIT ?",
+        tuple(params),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
 
 
 def insert_order(conn: sqlite3.Connection, order: Order) -> None:
@@ -549,6 +746,44 @@ def apply_wallet_faucet(conn: sqlite3.Connection, address: str, amount: int) -> 
     set_wallet_balance(conn, addr, new_balance)
     conn.commit()
     return new_balance
+
+
+def apply_wallet_faucet_with_fee(
+    conn: sqlite3.Connection,
+    *,
+    address: str,
+    amount: int,
+    fee_total: int,
+    treasury_address: str,
+    run_id: str,
+) -> dict[str, int]:
+    addr = _validate_wallet_address(address)
+    amt = _validate_int(amount, "amount", 1)
+    fee = _validate_int(fee_total, "fee_total", 0)
+    treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
+    _ensure_wallet_account(conn, addr)
+    _ensure_wallet_account(conn, treasury_addr)
+    current = get_wallet_balance(conn, addr)
+    treasury_current = get_wallet_balance(conn, treasury_addr)
+    new_balance = current + amt
+    new_treasury = treasury_current + fee
+    set_wallet_balance(conn, addr, new_balance)
+    set_wallet_balance(conn, treasury_addr, new_treasury)
+    transfer_id = _validate_text(f"faucet-{run_id}", "transfer_id")
+    insert_wallet_transfer(
+        conn,
+        WalletTransfer(
+            transfer_id=transfer_id,
+            from_address="faucet",
+            to_address=addr,
+            amount=amt,
+            fee_total=fee,
+            treasury_address=treasury_addr,
+            run_id=run_id,
+        ),
+    )
+    conn.commit()
+    return {"balance": new_balance, "treasury_balance": new_treasury}
 
 
 def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> dict[str, object] | None:

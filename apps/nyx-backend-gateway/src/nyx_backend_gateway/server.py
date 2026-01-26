@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 
 from nyx_backend_gateway.env import load_env_file
 import nyx_backend_gateway.gateway as gateway
+import nyx_backend_gateway.portal as portal
 from nyx_backend_gateway.gateway import (
     GatewayError,
     execute_run,
@@ -36,6 +37,7 @@ from nyx_backend_gateway.storage import (
 _MAX_BODY = 4096
 _RATE_LIMIT = 120
 _RATE_WINDOW_SECONDS = 60
+_ACCOUNT_RATE_LIMIT = 60
 
 
 def _version_info() -> dict[str, str]:
@@ -56,6 +58,7 @@ def _capabilities() -> dict[str, object]:
             "wallet",
             "exchange",
             "chat",
+            "portal",
             "marketplace",
             "entertainment",
             "evidence",
@@ -70,6 +73,17 @@ def _capabilities() -> dict[str, object]:
             "GET /artifact",
             "GET /export.zip",
             "GET /list",
+            "POST /portal/v1/accounts",
+            "POST /portal/v1/auth/challenge",
+            "POST /portal/v1/auth/verify",
+            "POST /portal/v1/auth/logout",
+            "GET /portal/v1/me",
+            "POST /chat/v1/rooms",
+            "GET /chat/v1/rooms",
+            "POST /chat/v1/rooms/{room_id}/messages",
+            "GET /chat/v1/rooms/{room_id}/messages",
+            "POST /wallet/v1/faucet",
+            "POST /wallet/v1/transfer",
             "GET /wallet/balance",
             "POST /wallet/faucet",
             "POST /wallet/transfer",
@@ -173,6 +187,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
         client = self.client_address[0] if self.client_address else "unknown"
         return limiter.allow(client)
 
+    def _account_rate_limit_ok(self, account_id: str) -> bool:
+        limiter = getattr(self.server, "account_limiter", None)
+        if limiter is None:
+            return True
+        return limiter.allow(account_id)
+
     def _require_run_id(self, payload: dict) -> str:
         run_id = payload.get("run_id")
         if not isinstance(run_id, str) or not run_id or isinstance(run_id, bool):
@@ -190,6 +210,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if not run_id:
             raise GatewayError("run_id required")
         return run_id
+
+    def _require_auth(self) -> portal.PortalSession:
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            raise GatewayError("auth required")
+        token = auth.split(" ", 1)[1].strip()
+        if not token:
+            raise GatewayError("auth required")
+        conn = create_connection(_db_path())
+        try:
+            session = portal.require_session(conn, token)
+        except portal.PortalError as exc:
+            raise GatewayError(str(exc)) from exc
+        finally:
+            conn.close()
+        if not self._account_rate_limit_ok(session.account_id):
+            raise GatewayError("rate limit exceeded")
+        return session
 
     def do_POST(self) -> None:  # noqa: N802
         if not self._rate_limit_ok():
@@ -228,6 +266,169 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     }:
                         response.update(_fee_summary(module, action, extra, result.run_id))
                 self._send_json(response)
+                return
+            if self.path == "/portal/v1/accounts":
+                payload = self._parse_body()
+                conn = create_connection(_db_path())
+                try:
+                    account = portal.create_account(conn, payload.get("handle"), payload.get("pubkey"))
+                finally:
+                    conn.close()
+                self._send_json(
+                    {
+                        "account_id": account.account_id,
+                        "handle": account.handle,
+                        "pubkey": account.public_key,
+                        "created_at": account.created_at,
+                        "status": account.status,
+                    }
+                )
+                return
+            if self.path == "/portal/v1/auth/challenge":
+                payload = self._parse_body()
+                account_id = payload.get("account_id")
+                if not isinstance(account_id, str) or not account_id:
+                    raise GatewayError("account_id required")
+                conn = create_connection(_db_path())
+                try:
+                    challenge = portal.issue_challenge(conn, account_id)
+                finally:
+                    conn.close()
+                self._send_json({"nonce": challenge.nonce, "expires_at": challenge.expires_at})
+                return
+            if self.path == "/portal/v1/auth/verify":
+                payload = self._parse_body()
+                account_id = payload.get("account_id")
+                nonce = payload.get("nonce")
+                signature = payload.get("signature")
+                if not isinstance(account_id, str) or not account_id:
+                    raise GatewayError("account_id required")
+                if not isinstance(nonce, str) or not nonce:
+                    raise GatewayError("nonce required")
+                if not isinstance(signature, str) or not signature:
+                    raise GatewayError("signature required")
+                conn = create_connection(_db_path())
+                try:
+                    session = portal.verify_challenge(conn, account_id, nonce, signature)
+                finally:
+                    conn.close()
+                self._send_json({"access_token": session.token, "expires_at": session.expires_at})
+                return
+            if self.path == "/portal/v1/auth/logout":
+                session = self._require_auth()
+                conn = create_connection(_db_path())
+                try:
+                    portal.logout_session(conn, session.token)
+                finally:
+                    conn.close()
+                self._send_json({"ok": True})
+                return
+            if self.path == "/chat/v1/rooms":
+                _ = self._require_auth()
+                payload = self._parse_body()
+                name = payload.get("name")
+                is_public = payload.get("is_public", True)
+                conn = create_connection(_db_path())
+                try:
+                    room = portal.create_room(conn, name=name, is_public=bool(is_public))
+                finally:
+                    conn.close()
+                self._send_json(
+                    {
+                        "room_id": room.room_id,
+                        "name": room.name,
+                        "created_at": room.created_at,
+                        "is_public": bool(room.is_public),
+                    }
+                )
+                return
+            if self.path.startswith("/chat/v1/rooms/") and self.path.endswith("/messages"):
+                parts = self.path.split("/")
+                if len(parts) != 6:
+                    raise GatewayError("room_id required")
+                room_id = parts[4]
+                session = self._require_auth()
+                payload = self._parse_body()
+                body = payload.get("body")
+                if not isinstance(body, str) or not body:
+                    raise GatewayError("body required")
+                conn = create_connection(_db_path())
+                try:
+                    message_fields, receipt = portal.post_message(
+                        conn, room_id=room_id, sender_account_id=session.account_id, body=body
+                    )
+                finally:
+                    conn.close()
+                self._send_json({"message": message_fields, "receipt": receipt})
+                return
+            if self.path == "/wallet/v1/faucet":
+                session = self._require_auth()
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                faucet_payload = payload.get("payload")
+                if faucet_payload is None:
+                    faucet_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result, balance, fee_record = gateway.execute_wallet_faucet_v1(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=faucet_payload,
+                    account_id=session.account_id,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                        "address": faucet_payload.get("address"),
+                        "balance": balance,
+                        "fee_total": fee_record.total_paid,
+                        "fee_breakdown": {
+                            "protocol_fee_total": fee_record.protocol_fee_total,
+                            "platform_fee_amount": fee_record.platform_fee_amount,
+                        },
+                        "payer": session.account_id,
+                        "treasury_address": fee_record.fee_address,
+                    }
+                )
+                return
+            if self.path == "/wallet/v1/transfer":
+                session = self._require_auth()
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                transfer_payload = payload.get("payload")
+                if transfer_payload is None:
+                    transfer_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result, balances, fee_record = execute_wallet_transfer(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=transfer_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                        "from_address": transfer_payload.get("from_address"),
+                        "to_address": transfer_payload.get("to_address"),
+                        "amount": transfer_payload.get("amount"),
+                        "fee_total": fee_record.total_paid,
+                        "fee_breakdown": {
+                            "protocol_fee_total": fee_record.protocol_fee_total,
+                            "platform_fee_amount": fee_record.platform_fee_amount,
+                        },
+                        "payer": session.account_id,
+                        "treasury_address": fee_record.fee_address,
+                        "from_balance": balances["from_balance"],
+                        "to_balance": balances["to_balance"],
+                        "treasury_balance": balances["treasury_balance"],
+                    }
+                )
                 return
             if self.path == "/exchange/place_order":
                 payload = self._parse_body()
@@ -456,6 +657,26 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if path == "/capabilities":
             self._send_json(_capabilities())
             return
+        if path == "/portal/v1/me":
+            try:
+                session = self._require_auth()
+                conn = create_connection(_db_path())
+                account = portal.load_account(conn, session.account_id)
+                conn.close()
+                if account is None:
+                    raise GatewayError("account not found")
+                self._send_json(
+                    {
+                        "account_id": account.account_id,
+                        "handle": account.handle,
+                        "pubkey": account.public_key,
+                        "created_at": account.created_at,
+                        "status": account.status,
+                    }
+                )
+            except GatewayError as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/status":
             try:
                 run_id = self._require_query_run_id(query)
@@ -566,6 +787,35 @@ class GatewayHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
+        if path == "/chat/v1/rooms":
+            try:
+                _ = self._require_auth()
+                conn = create_connection(_db_path())
+                rooms = portal.list_rooms(conn)
+                conn.close()
+                self._send_json({"rooms": rooms})
+            except GatewayError as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path.startswith("/chat/v1/rooms/") and path.endswith("/messages"):
+            parts = path.split("/")
+            if len(parts) != 6:
+                self._send_text("not found", HTTPStatus.NOT_FOUND)
+                return
+            room_id = parts[4]
+            try:
+                _ = self._require_auth()
+                after_raw = (query.get("after") or [\"\"])[0] or None
+                limit_raw = (query.get("limit") or [\"\"])[0] or None
+                after = int(after_raw) if after_raw else None
+                limit = int(limit_raw) if limit_raw else 50
+                conn = create_connection(_db_path())
+                messages = portal.list_messages(conn, room_id=room_id, after=after, limit=limit)
+                conn.close()
+                self._send_json({\"messages\": messages})
+            except Exception as exc:
+                self._send_json({\"error\": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/marketplace/listings":
             try:
                 conn = create_connection(_db_path())
@@ -611,6 +861,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
 def run_server(host: str = "0.0.0.0", port: int = 8091) -> None:
     server = ThreadingHTTPServer((host, port), GatewayHandler)
     server.rate_limiter = RequestLimiter(_RATE_LIMIT, _RATE_WINDOW_SECONDS)
+    server.account_limiter = RequestLimiter(_ACCOUNT_RATE_LIMIT, _RATE_WINDOW_SECONDS)
     server.serve_forever()
 
 
