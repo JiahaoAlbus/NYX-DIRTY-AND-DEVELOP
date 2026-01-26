@@ -18,11 +18,16 @@ struct GatewayError: Error {
 
 final class GatewayClient {
     private let baseURL: URL
-    private let maxRetries = 1
+    private let maxRetries = 0
     private var evidenceCache: [String: EvidenceBundle] = [:]
+    private let session: URLSession
 
-    init(baseURL: URL = URL(string: "http://localhost:8091")!) {
+    init(baseURL: URL = GatewayClient.resolvedBaseURL()) {
         self.baseURL = baseURL
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 5
+        self.session = URLSession(configuration: config)
     }
 
     private func requestData(_ request: URLRequest) async throws -> Data {
@@ -30,7 +35,7 @@ final class GatewayClient {
         var lastError: Error?
         while attempts <= maxRetries {
             do {
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await session.data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw GatewayError(message: "invalid response")
                 }
@@ -44,7 +49,23 @@ final class GatewayClient {
                 attempts += 1
             }
         }
-        throw lastError ?? GatewayError(message: "request failed")
+        throw lastError ?? GatewayError(message: "backend unavailable")
+    }
+
+    private static func resolvedBaseURL() -> URL {
+        if let raw = UserDefaults.standard.string(forKey: "nyx_backend_url"),
+           let url = URL(string: raw) {
+            return url
+        }
+        return URL(string: "http://127.0.0.1:8091") ?? URL(string: "http://localhost:8091")!
+    }
+
+    func checkHealth() async throws -> Bool {
+        let url = baseURL.appendingPathComponent("healthz")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: Bool].self, from: data)
+        return payload["ok"] == true
     }
 
     func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {

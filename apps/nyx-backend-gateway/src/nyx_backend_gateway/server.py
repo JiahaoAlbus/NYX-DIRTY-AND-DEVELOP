@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import subprocess
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +36,75 @@ from nyx_backend_gateway.storage import (
 _MAX_BODY = 4096
 _RATE_LIMIT = 120
 _RATE_WINDOW_SECONDS = 60
+
+
+def _version_info() -> dict[str, str]:
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        commit = "unknown"
+    try:
+        describe = subprocess.check_output(["git", "describe", "--tags", "--always"], text=True).strip()
+    except Exception:
+        describe = "unknown"
+    return {"commit": commit, "describe": describe, "build": "testnet"}
+
+
+def _capabilities() -> dict[str, object]:
+    return {
+        "modules": [
+            "wallet",
+            "exchange",
+            "chat",
+            "marketplace",
+            "entertainment",
+            "evidence",
+        ],
+        "endpoints": [
+            "GET /healthz",
+            "GET /version",
+            "GET /capabilities",
+            "POST /run",
+            "GET /status",
+            "GET /evidence",
+            "GET /artifact",
+            "GET /export.zip",
+            "GET /list",
+            "GET /wallet/balance",
+            "POST /wallet/faucet",
+            "POST /wallet/transfer",
+            "GET /exchange/orderbook",
+            "GET /exchange/orders",
+            "GET /exchange/trades",
+            "POST /exchange/place_order",
+            "POST /exchange/cancel_order",
+            "GET /chat/messages",
+            "POST /chat/send",
+            "GET /marketplace/listings",
+            "GET /marketplace/purchases",
+            "POST /marketplace/listing",
+            "POST /marketplace/purchase",
+            "GET /entertainment/items",
+            "GET /entertainment/events",
+            "POST /entertainment/step",
+        ],
+        "notes": "Testnet Beta. No live mainnet data.",
+    }
+
+
+def _fee_summary(module: str, action: str, payload: dict, run_id: str) -> dict[str, object]:
+    from nyx_backend_gateway.fees import route_fee
+
+    record = route_fee(module, action, payload, run_id)
+    return {
+        "fee_total": record.total_paid,
+        "fee_breakdown": {
+            "protocol_fee_total": record.protocol_fee_total,
+            "platform_fee_amount": record.platform_fee_amount,
+        },
+        "payer": "testnet-payer",
+        "treasury_address": record.fee_address,
+    }
 
 
 class RequestLimiter:
@@ -140,15 +210,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     action=action,
                     payload=extra,
                 )
-                self._send_json(
-                    {
-                        "run_id": result.run_id,
-                        "status": "complete",
-                        "state_hash": result.state_hash,
-                        "receipt_hashes": result.receipt_hashes,
-                        "replay_ok": result.replay_ok,
-                    }
-                )
+                response = {
+                    "run_id": result.run_id,
+                    "status": "complete",
+                    "state_hash": result.state_hash,
+                    "receipt_hashes": result.receipt_hashes,
+                    "replay_ok": result.replay_ok,
+                }
+                if isinstance(module, str) and isinstance(action, str) and isinstance(extra, dict):
+                    if (module, action) in {
+                        ("exchange", "route_swap"),
+                        ("exchange", "place_order"),
+                        ("exchange", "cancel_order"),
+                        ("marketplace", "order_intent"),
+                        ("marketplace", "listing_publish"),
+                        ("marketplace", "purchase_listing"),
+                    }:
+                        response.update(_fee_summary(module, action, extra, result.run_id))
+                self._send_json(response)
                 return
             if self.path == "/exchange/place_order":
                 payload = self._parse_body()
@@ -164,15 +243,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     action="place_order",
                     payload=order_payload,
                 )
-                self._send_json(
-                    {
-                        "run_id": result.run_id,
-                        "status": "complete",
-                        "state_hash": result.state_hash,
-                        "receipt_hashes": result.receipt_hashes,
-                        "replay_ok": result.replay_ok,
-                    }
-                )
+                response = {
+                    "run_id": result.run_id,
+                    "status": "complete",
+                    "state_hash": result.state_hash,
+                    "receipt_hashes": result.receipt_hashes,
+                    "replay_ok": result.replay_ok,
+                }
+                if isinstance(order_payload, dict):
+                    response.update(_fee_summary("exchange", "place_order", order_payload, result.run_id))
+                self._send_json(response)
                 return
             if self.path == "/exchange/cancel_order":
                 payload = self._parse_body()
@@ -188,15 +268,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     action="cancel_order",
                     payload=cancel_payload,
                 )
-                self._send_json(
-                    {
-                        "run_id": result.run_id,
-                        "status": "complete",
-                        "state_hash": result.state_hash,
-                        "receipt_hashes": result.receipt_hashes,
-                        "replay_ok": result.replay_ok,
-                    }
-                )
+                response = {
+                    "run_id": result.run_id,
+                    "status": "complete",
+                    "state_hash": result.state_hash,
+                    "receipt_hashes": result.receipt_hashes,
+                    "replay_ok": result.replay_ok,
+                }
+                if isinstance(cancel_payload, dict):
+                    response.update(_fee_summary("exchange", "cancel_order", cancel_payload, result.run_id))
+                self._send_json(response)
                 return
             if self.path == "/chat/send":
                 payload = self._parse_body()
@@ -269,6 +350,11 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "to_address": transfer_payload.get("to_address"),
                         "amount": transfer_payload.get("amount"),
                         "fee_total": fee_record.total_paid,
+                        "fee_breakdown": {
+                            "protocol_fee_total": fee_record.protocol_fee_total,
+                            "platform_fee_amount": fee_record.platform_fee_amount,
+                        },
+                        "payer": transfer_payload.get("from_address"),
                         "treasury_address": fee_record.fee_address,
                         "from_balance": balances["from_balance"],
                         "to_balance": balances["to_balance"],
@@ -290,15 +376,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     action="listing_publish",
                     payload=listing_payload,
                 )
-                self._send_json(
-                    {
-                        "run_id": result.run_id,
-                        "status": "complete",
-                        "state_hash": result.state_hash,
-                        "receipt_hashes": result.receipt_hashes,
-                        "replay_ok": result.replay_ok,
-                    }
-                )
+                response = {
+                    "run_id": result.run_id,
+                    "status": "complete",
+                    "state_hash": result.state_hash,
+                    "receipt_hashes": result.receipt_hashes,
+                    "replay_ok": result.replay_ok,
+                }
+                if isinstance(listing_payload, dict):
+                    response.update(_fee_summary("marketplace", "listing_publish", listing_payload, result.run_id))
+                self._send_json(response)
                 return
             if self.path == "/marketplace/purchase":
                 payload = self._parse_body()
@@ -314,15 +401,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     action="purchase_listing",
                     payload=purchase_payload,
                 )
-                self._send_json(
-                    {
-                        "run_id": result.run_id,
-                        "status": "complete",
-                        "state_hash": result.state_hash,
-                        "receipt_hashes": result.receipt_hashes,
-                        "replay_ok": result.replay_ok,
-                    }
-                )
+                response = {
+                    "run_id": result.run_id,
+                    "status": "complete",
+                    "state_hash": result.state_hash,
+                    "receipt_hashes": result.receipt_hashes,
+                    "replay_ok": result.replay_ok,
+                }
+                if isinstance(purchase_payload, dict):
+                    response.update(_fee_summary("marketplace", "purchase_listing", purchase_payload, result.run_id))
+                self._send_json(response)
                 return
             if self.path == "/entertainment/step":
                 payload = self._parse_body()
@@ -359,6 +447,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+        if path == "/healthz":
+            self._send_json({"ok": True})
+            return
+        if path == "/version":
+            self._send_json(_version_info())
+            return
+        if path == "/capabilities":
+            self._send_json(_capabilities())
+            return
         if path == "/status":
             try:
                 run_id = self._require_query_run_id(query)

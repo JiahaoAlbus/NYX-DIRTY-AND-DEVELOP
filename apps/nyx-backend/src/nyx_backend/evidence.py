@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -215,7 +216,7 @@ def _platform_fee_for_marketplace(payload: object) -> dict[str, object]:
     )
     engine = FeeEngineV0()
     payer = "platform-payer"
-    platform_amount = 1
+    platform_amount = _platform_fee_amount(payload)
     quote = quote_platform_fee(
         engine,
         action,
@@ -235,6 +236,76 @@ def _platform_fee_for_marketplace(payload: object) -> dict[str, object]:
         "total_due": quote.total_due,
         "total_paid": receipt.total_paid,
         "payer": quote.payer,
+        "treasury_address": _treasury_address(),
+    }
+
+
+def _treasury_address() -> str:
+    address = os.environ.get("NYX_TESTNET_TREASURY_ADDRESS", "").strip()
+    if not address:
+        address = os.environ.get("NYX_TESTNET_FEE_ADDRESS", "").strip()
+    if not address:
+        return "testnet-treasury-unconfigured"
+    return address
+
+
+def _platform_fee_amount(payload: object) -> int:
+    raw = os.environ.get("NYX_PLATFORM_FEE_BPS", "").strip()
+    if not raw:
+        return 1
+    try:
+        bps = int(raw)
+    except ValueError as exc:
+        raise EvidenceError("NYX_PLATFORM_FEE_BPS must be int") from exc
+    if bps < 0 or bps > 10_000:
+        raise EvidenceError("NYX_PLATFORM_FEE_BPS out of bounds")
+    if bps == 0:
+        return 0
+    base = 1
+    if isinstance(payload, dict):
+        for key in ("amount", "price", "qty"):
+            value = payload.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                base = value
+                break
+    amount = (base * bps) // 10_000
+    return amount if amount > 0 else 1
+
+
+def _fee_summary(module: str, action: str, payload: object) -> dict[str, object]:
+    from action import ActionDescriptor, ActionKind
+    from engine import FeeEngineV0
+    from l2_platform_fee.fee_hook import enforce_platform_fee, quote_platform_fee
+
+    platform_amount = _platform_fee_amount(payload)
+    payer = "testnet-payer"
+    if isinstance(payload, dict):
+        candidate = payload.get("from_address")
+        if isinstance(candidate, str) and candidate:
+            payer = candidate
+    descriptor = ActionDescriptor(
+        kind=ActionKind.STATE_MUTATION,
+        module=module,
+        action=action,
+        payload=payload,
+    )
+    engine = FeeEngineV0()
+    quote = quote_platform_fee(engine, descriptor, payer=payer, platform_fee_amount=platform_amount)
+    receipt = enforce_platform_fee(
+        engine,
+        quote,
+        paid_protocol_vector=quote.protocol_quote.fee_vector,
+        paid_platform_amount=quote.platform_fee_amount,
+        payer=quote.payer,
+    )
+    return {
+        "fee_total": receipt.total_paid,
+        "fee_breakdown": {
+            "protocol_fee_total": quote.protocol_quote.fee_vector.total(),
+            "platform_fee_amount": quote.platform_fee_amount,
+        },
+        "payer": quote.payer,
+        "treasury_address": _treasury_address(),
     }
 
 
@@ -301,6 +372,16 @@ def run_evidence(
         "receipt_hashes": receipt_hashes,
         "replay_ok": replay_ok,
     }
+    if (mod, act) in {
+        ("exchange", "route_swap"),
+        ("exchange", "place_order"),
+        ("exchange", "cancel_order"),
+        ("marketplace", "order_intent"),
+        ("marketplace", "listing_publish"),
+        ("marketplace", "purchase_listing"),
+        ("wallet", "transfer"),
+    }:
+        outputs.update(_fee_summary(mod, act, payload))
     if mod == "marketplace" and act == "order_intent":
         outputs["platform_fee"] = _platform_fee_for_marketplace(payload)
     if mod == "entertainment" and act == "state_step":

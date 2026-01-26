@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 import sys
 
-from nyx_backend_gateway.env import get_fee_address
+from nyx_backend_gateway.env import get_fee_address, get_platform_fee_bps
 from nyx_backend_gateway.storage import FeeLedger
 
 
@@ -36,6 +36,27 @@ def _fee_id(run_id: str) -> str:
     return f"fee-{digest[:16]}"
 
 
+def _payload_amount(payload: dict[str, object]) -> int:
+    if not isinstance(payload, dict):
+        return 1
+    for key in ("amount", "price", "qty"):
+        value = payload.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return 1
+
+
+def _platform_fee_amount(payload: dict[str, object]) -> int:
+    bps = get_platform_fee_bps()
+    if bps is None:
+        return 1
+    if bps == 0:
+        return 0
+    base = _payload_amount(payload)
+    amount = (base * bps) // 10_000
+    return amount if amount > 0 else 1
+
+
 def route_fee(module: str, action: str, payload: dict[str, object], run_id: str) -> FeeLedger:
     _ensure_fee_paths()
     from action import ActionDescriptor, ActionKind
@@ -50,7 +71,7 @@ def route_fee(module: str, action: str, payload: dict[str, object], run_id: str)
     )
     engine = FeeEngineV0()
     payer = "testnet-payer"
-    platform_amount = 1
+    platform_amount = _platform_fee_amount(payload)
     quote = quote_platform_fee(engine, action_desc, payer, platform_fee_amount=platform_amount)
     receipt = enforce_platform_fee(
         engine,
