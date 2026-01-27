@@ -278,7 +278,7 @@ final class EvidenceViewModel: ObservableObject {
 
     @MainActor
     func sendChatMessage(roomId: String, body: String) async {
-        guard let seedInt = Int(seed) else {
+        guard Int(seed) != nil else {
             status = "Seed must be an integer"
             return
         }
@@ -360,7 +360,7 @@ final class EvidenceViewModel: ObservableObject {
         guard let token = requirePortalToken() else { return }
         status = "Requesting testnet funds..."
         do {
-            let response = try await client.faucetV1(token: token, seed: seedInt, runId: runId, address: walletAddress, amount: amount)
+            _ = try await client.faucetV1(token: token, seed: seedInt, runId: runId, address: walletAddress, amount: amount)
             let bundle = try await client.fetchEvidence(runId: runId)
             evidence = bundle
             stateHash = bundle.stateHash
