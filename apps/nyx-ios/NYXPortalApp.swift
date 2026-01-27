@@ -4,7 +4,7 @@ import SwiftUI
 struct NYXPortalApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppShellView()
         }
     }
 }

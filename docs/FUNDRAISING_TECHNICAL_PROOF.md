@@ -20,6 +20,8 @@ Run:
 Expected outputs:
 - `docs/evidence/fundraising/latest/` contains evidence and export artifacts.
 - `docs/evidence/fundraising/latest/logs/` contains logs for smoke, compile, unit tests, and conformance.
+- `apps/nyx-ios/WebBundle/` is refreshed from the nyx-world build.
+- iOS build logs are captured when `xcodebuild` is available.
 
 ## Evidence Artifacts
 - Evidence bundles are written by the backend, exported verbatim, and must include:
@@ -30,6 +32,10 @@ Expected outputs:
   - `state_hash`
   - `replay_ok`
   - `stdout`
+
+## UI Wiring Evidence
+- The web UI is bundled into the iOS app and reads backend base URL from runtime injection.
+- Native Evidence Center lists runs and exports `export.zip` without modifying evidence fields.
 
 ## Security and Integrity
 - Deterministic outputs for the same seed/run_id and payloads.

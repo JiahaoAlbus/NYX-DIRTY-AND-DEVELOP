@@ -22,3 +22,6 @@ __pycache__/
 *.pyc
 .venv/
 nyx_conformance_report.json
+nyx-world/node_modules/
+nyx-world/dist/
+nyx-world/.env.local

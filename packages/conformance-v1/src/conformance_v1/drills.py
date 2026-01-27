@@ -347,7 +347,9 @@ def drill_ui_copy_guard() -> DrillResult:
         repo_root / "apps" / "reference-ui-backend",
         repo_root / "apps" / "nyx-web",
         repo_root / "apps" / "nyx-ios",
+        repo_root / "nyx-world",
     ]
+    skip_dirs = {"WebBundle", "node_modules", "dist"}
     tokens = [
         "login",
         "sign up",
@@ -371,7 +373,9 @@ def drill_ui_copy_guard() -> DrillResult:
         for path in root.rglob("*"):
             if path.is_dir():
                 continue
-            if path.suffix not in {".html", ".js", ".css", ".md", ".py"}:
+            if any(part in skip_dirs for part in path.parts):
+                continue
+            if path.suffix not in {".html", ".js", ".jsx", ".ts", ".tsx", ".css", ".md", ".py"}:
                 continue
             try:
                 content = path.read_text(encoding="utf-8", errors="ignore")

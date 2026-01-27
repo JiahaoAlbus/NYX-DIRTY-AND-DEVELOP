@@ -16,9 +16,11 @@ Non-Scope
 Run (local)
 1) Start backend:
    - `scripts/nyx_backend_dev.sh`
-2) Open `apps/nyx-ios/NYXPortal.xcodeproj` in Xcode.
-3) Select an iPhone Simulator and Run.
-4) Optional backend override:
+2) Build the WebBundle (only when updating nyx-world UI):
+   - `scripts/build_nyx_world.sh`
+3) Open `apps/nyx-ios/NYXPortal.xcodeproj` in Xcode.
+4) Select an iPhone Simulator and Run.
+5) Optional backend override:
    - In Settings, set the backend URL (stored under `nyx_backend_url`).
 
 Xcode build (CLI)

@@ -77,9 +77,18 @@ SERVER_PID=$!
 import socket
 import sys
 import time
+import urllib.request
 
 host = "${HOST}"
 port = int("${PORT}")
+
+def check_health():
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/healthz", timeout=0.5) as resp:
+            body = resp.read().decode("utf-8", errors="ignore")
+        return '\"ok\":true' in body.replace(" ", "")
+    except Exception:
+        return False
 
 deadline = time.time() + 10
 while time.time() < deadline:
@@ -88,15 +97,17 @@ while time.time() < deadline:
         sock.settimeout(0.2)
         sock.connect((host, port))
         sock.close()
-        sys.exit(0)
+        if check_health():
+            sys.exit(0)
     except OSError:
         time.sleep(0.2)
+    time.sleep(0.2)
 
 sys.exit(1)
 PY
 
 if [ $? -ne 0 ]; then
-  echo "Backend failed to bind to ${HOST}:${PORT}" >&2
+  echo "Backend failed to become healthy on ${HOST}:${PORT}" >&2
   kill "$SERVER_PID" >/dev/null 2>&1 || true
   exit 1
 fi

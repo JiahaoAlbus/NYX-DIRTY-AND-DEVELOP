@@ -100,6 +100,25 @@ final class GatewayClient {
         }
     }
 
+    func listRuns() async throws -> [EvidenceRunSummary] {
+        let url = baseURL.appendingPathComponent("list")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode(EvidenceRunList.self, from: data)
+        return payload.runs
+    }
+
+    func fetchEvidenceRaw(runId: String) async throws -> String {
+        var components = URLComponents(url: baseURL.appendingPathComponent("evidence"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "run_id", value: runId)]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
     func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("run")
         var request = URLRequest(url: url)

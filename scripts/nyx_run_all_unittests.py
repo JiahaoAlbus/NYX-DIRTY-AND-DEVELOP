@@ -136,6 +136,16 @@ def _run_ios_fake_gate(repo_root: Path) -> int:
     return result.returncode
 
 
+def _run_web_fake_gate(repo_root: Path) -> int:
+    gate = repo_root / "scripts" / "no_fake_gate_web.py"
+    if not gate.exists():
+        return 0
+    result = subprocess.run([sys.executable, str(gate)], capture_output=True, text=True)
+    output = (result.stdout or "") + (result.stderr or "")
+    print(output, end="")
+    return result.returncode
+
+
 def main() -> int:
     test_dirs = _collect_test_dirs()
     if not test_dirs:
@@ -149,6 +159,9 @@ def main() -> int:
         if code != 0:
             return code
     gate_code = _run_ios_fake_gate(_repo_root())
+    if gate_code != 0:
+        return gate_code
+    gate_code = _run_web_fake_gate(_repo_root())
     if gate_code != 0:
         return gate_code
     print(f"TOTAL_TESTS={total_tests}")

@@ -20,6 +20,14 @@
 		A1B2C3D4E5F6000000000011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000111 /* Assets.xcassets */; };
 		A1B2C3D4E5F6000000000012 /* PortalModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000113 /* PortalModels.swift */; };
 		A1B2C3D4E5F6000000000013 /* PortalKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000114 /* PortalKeyStore.swift */; };
+		A1B2C3D4E5F6000000000202 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000201 /* AppShellView.swift */; };
+		A1B2C3D4E5F6000000000204 /* WebPortalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000203 /* WebPortalView.swift */; };
+		A1B2C3D4E5F6000000000206 /* EvidenceCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000205 /* EvidenceCenterView.swift */; };
+		A1B2C3D4E5F6000000000208 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000207 /* SettingsView.swift */; };
+		A1B2C3D4E5F600000000020A /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000209 /* ShareSheet.swift */; };
+		A1B2C3D4E5F600000000020C /* BackendSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000020B /* BackendSettings.swift */; };
+		A1B2C3D4E5F600000000020E /* EvidenceRunModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000020D /* EvidenceRunModels.swift */; };
+		A1B2C3D4E5F6000000000210 /* WebBundle in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000020F /* WebBundle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +45,14 @@
 		A1B2C3D4E5F6000000000112 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000113 /* PortalModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalModels.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000114 /* PortalKeyStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalKeyStore.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000201 /* AppShellView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000203 /* WebPortalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WebPortalView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000205 /* EvidenceCenterView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EvidenceCenterView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000207 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000209 /* ShareSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000020B /* BackendSettings.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BackendSettings.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000020D /* EvidenceRunModels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EvidenceRunModels.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000020F /* WebBundle */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebBundle; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000801 /* NYXPortal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = NYXPortal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -56,6 +72,7 @@
 				A1B2C3D4E5F6000000000403 /* Network */,
 				A1B2C3D4E5F6000000000101 /* NYXPortalApp.swift */,
 				A1B2C3D4E5F6000000000111 /* Assets.xcassets */,
+				A1B2C3D4E5F600000000020F /* WebBundle */,
 				A1B2C3D4E5F6000000000112 /* Info.plist */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +82,11 @@
 			children = (
 				A1B2C3D4E5F6000000000102 /* ContentView.swift */,
 				A1B2C3D4E5F6000000000103 /* ModuleViews.swift */,
+				A1B2C3D4E5F6000000000201 /* AppShellView.swift */,
+				A1B2C3D4E5F6000000000203 /* WebPortalView.swift */,
+				A1B2C3D4E5F6000000000205 /* EvidenceCenterView.swift */,
+				A1B2C3D4E5F6000000000207 /* SettingsView.swift */,
+				A1B2C3D4E5F6000000000209 /* ShareSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -80,6 +102,7 @@
 				A1B2C3D4E5F6000000000109 /* WalletModels.swift */,
 				A1B2C3D4E5F6000000000113 /* PortalModels.swift */,
 				A1B2C3D4E5F6000000000114 /* PortalKeyStore.swift */,
+				A1B2C3D4E5F600000000020D /* EvidenceRunModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -88,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F6000000000110 /* GatewayClient.swift */,
+				A1B2C3D4E5F600000000020B /* BackendSettings.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -158,6 +182,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F6000000000011 /* Assets.xcassets in Resources */,
+				A1B2C3D4E5F6000000000210 /* WebBundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,6 +196,11 @@
 				A1B2C3D4E5F6000000000001 /* NYXPortalApp.swift in Sources */,
 				A1B2C3D4E5F6000000000002 /* ContentView.swift in Sources */,
 				A1B2C3D4E5F6000000000003 /* ModuleViews.swift in Sources */,
+				A1B2C3D4E5F6000000000202 /* AppShellView.swift in Sources */,
+				A1B2C3D4E5F6000000000204 /* WebPortalView.swift in Sources */,
+				A1B2C3D4E5F6000000000206 /* EvidenceCenterView.swift in Sources */,
+				A1B2C3D4E5F6000000000208 /* SettingsView.swift in Sources */,
+				A1B2C3D4E5F600000000020A /* ShareSheet.swift in Sources */,
 				A1B2C3D4E5F6000000000004 /* EvidenceBundle.swift in Sources */,
 				A1B2C3D4E5F6000000000005 /* ExchangeModels.swift in Sources */,
 				A1B2C3D4E5F6000000000006 /* MarketplaceModels.swift in Sources */,
@@ -179,7 +209,9 @@
 				A1B2C3D4E5F6000000000009 /* WalletModels.swift in Sources */,
 				A1B2C3D4E5F6000000000012 /* PortalModels.swift in Sources */,
 				A1B2C3D4E5F6000000000013 /* PortalKeyStore.swift in Sources */,
+				A1B2C3D4E5F600000000020E /* EvidenceRunModels.swift in Sources */,
 				A1B2C3D4E5F6000000000010 /* GatewayClient.swift in Sources */,
+				A1B2C3D4E5F600000000020C /* BackendSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -197,6 +229,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nyx.NYXPortal;
 				PRODUCT_NAME = NYXPortal;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -212,6 +245,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nyx.NYXPortal;
 				PRODUCT_NAME = NYXPortal;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

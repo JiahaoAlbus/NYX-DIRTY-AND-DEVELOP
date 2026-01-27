@@ -56,6 +56,18 @@ def _post_json(url: str, payload: dict) -> tuple[bytes, dict]:
     return raw, json.loads(raw.decode("utf-8"))
 
 
+def _run_exists(base_url: str, run_id: str) -> bool:
+    try:
+        _, payload = _get_json(f"{base_url}/list")
+        runs = payload.get("runs") or []
+        for item in runs:
+            if isinstance(item, dict) and item.get("run_id") == run_id:
+                return True
+        return False
+    except Exception:
+        return False
+
+
 def _health_ok(base_url: str) -> bool:
     try:
         raw, payload = _get_json(f"{base_url}/healthz")
@@ -171,13 +183,20 @@ def main() -> int:
         seed = args.seed
         run_id = args.run_id
 
-        _post_json(
+        def maybe_post(run_id_value: str, url: str, payload: dict) -> None:
+            if _run_exists(args.base_url, run_id_value):
+                return
+            _post_json(url, payload)
+
+        maybe_post(
+            f"{run_id}-wallet-faucet",
             f"{args.base_url}/wallet/faucet",
             {"seed": seed, "run_id": f"{run_id}-wallet-faucet", "payload": {"address": "wallet-alpha", "amount": 1000}},
         )
         _record_evidence(args.base_url, f"{run_id}-wallet-faucet", out_dir)
 
-        _post_json(
+        maybe_post(
+            f"{run_id}-wallet-transfer",
             f"{args.base_url}/wallet/transfer",
             {
                 "seed": seed,
@@ -187,7 +206,8 @@ def main() -> int:
         )
         _record_evidence(args.base_url, f"{run_id}-wallet-transfer", out_dir)
 
-        _post_json(
+        maybe_post(
+            f"{run_id}-exchange-order",
             f"{args.base_url}/exchange/place_order",
             {
                 "seed": seed,
@@ -203,7 +223,8 @@ def main() -> int:
         )
         _record_evidence(args.base_url, f"{run_id}-exchange-order", out_dir)
 
-        _post_json(
+        maybe_post(
+            f"{run_id}-chat",
             f"{args.base_url}/chat/send",
             {
                 "seed": seed,
@@ -213,14 +234,17 @@ def main() -> int:
         )
         _record_evidence(args.base_url, f"{run_id}-chat", out_dir)
 
-        listing_resp_raw, listing_resp = _post_json(
-            f"{args.base_url}/marketplace/listing",
-            {
-                "seed": seed,
-                "run_id": f"{run_id}-market-list",
-                "payload": {"sku": "kit-01", "title": "Testnet Kit", "price": 12},
-            },
-        )
+        if _run_exists(args.base_url, f"{run_id}-market-list"):
+            _, listing_resp = _get_json(f"{args.base_url}/marketplace/listings")
+        else:
+            _, listing_resp = _post_json(
+                f"{args.base_url}/marketplace/listing",
+                {
+                    "seed": seed,
+                    "run_id": f"{run_id}-market-list",
+                    "payload": {"sku": "kit-01", "title": "Testnet Kit", "price": 12},
+                },
+            )
         _record_evidence(args.base_url, f"{run_id}-market-list", out_dir)
 
         _, listings = _get_json(f"{args.base_url}/marketplace/listings")
@@ -228,7 +252,8 @@ def main() -> int:
         if not listing_id:
             raise RuntimeError("listing_id missing")
 
-        _post_json(
+        maybe_post(
+            f"{run_id}-market-buy",
             f"{args.base_url}/marketplace/purchase",
             {
                 "seed": seed,
@@ -238,7 +263,8 @@ def main() -> int:
         )
         _record_evidence(args.base_url, f"{run_id}-market-buy", out_dir)
 
-        _post_json(
+        maybe_post(
+            f"{run_id}-ent",
             f"{args.base_url}/entertainment/step",
             {
                 "seed": seed,
