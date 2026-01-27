@@ -17,7 +17,7 @@ struct GatewayError: Error {
 }
 
 final class GatewayClient {
-    private let baseURL: URL
+    private var baseURL: URL
     private let maxRetries = 0
     private var evidenceCache: [String: EvidenceBundle] = [:]
     private let session: URLSession
@@ -60,12 +60,31 @@ final class GatewayClient {
         return URL(string: "http://127.0.0.1:8091") ?? URL(string: "http://localhost:8091")!
     }
 
+    static func defaultBaseURLString() -> String {
+        return resolvedBaseURL().absoluteString
+    }
+
+    func setBaseURL(_ url: URL) {
+        baseURL = url
+    }
+
+    func currentBaseURL() -> URL {
+        return baseURL
+    }
+
     func checkHealth() async throws -> Bool {
         let url = baseURL.appendingPathComponent("healthz")
         let request = URLRequest(url: url)
         let data = try await requestData(request)
         let payload = try JSONDecoder().decode([String: Bool].self, from: data)
         return payload["ok"] == true
+    }
+
+    func fetchCapabilities() async throws -> GatewayCapabilities {
+        let url = baseURL.appendingPathComponent("capabilities")
+        let request = URLRequest(url: url)
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(GatewayCapabilities.self, from: data)
     }
 
     func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {
@@ -198,12 +217,33 @@ final class GatewayClient {
         return try JSONDecoder().decode(PortalAuthToken.self, from: data)
     }
 
+    func logoutPortal(token: String) async throws {
+        let url = baseURL.appendingPathComponent("portal/v1/auth/logout")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        _ = try await requestData(request)
+    }
+
     func fetchPortalMe(token: String) async throws -> PortalAccount {
         let url = baseURL.appendingPathComponent("portal/v1/me")
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let data = try await requestData(request)
         return try JSONDecoder().decode(PortalAccount.self, from: data)
+    }
+
+    func fetchPortalActivity(token: String, limit: Int) async throws -> [PortalReceiptRow] {
+        var components = URLComponents(url: baseURL.appendingPathComponent("portal/v1/activity"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        let payload = try JSONDecoder().decode([String: [PortalReceiptRow]].self, from: data)
+        return payload["receipts"] ?? []
     }
 
     func createChatRoom(token: String, name: String) async throws -> ChatRoomV1 {
@@ -260,6 +300,22 @@ final class GatewayClient {
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
         let data = try await requestData(request)
         return try JSONDecoder().decode(FaucetV1Response.self, from: data)
+    }
+
+    func transferV1(token: String, seed: Int, runId: String, from: String, to: String, amount: Int) async throws -> WalletTransferV1Response {
+        let url = baseURL.appendingPathComponent("wallet/v1/transfer")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let body: [String: Any] = [
+            "seed": seed,
+            "run_id": runId,
+            "payload": ["from_address": from, "to_address": to, "amount": amount],
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(WalletTransferV1Response.self, from: data)
     }
 
     func publishListing(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {

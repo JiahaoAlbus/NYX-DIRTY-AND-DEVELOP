@@ -16,19 +16,125 @@ final class EvidenceViewModel: ObservableObject {
     @Published var buyOrders: [OrderRow] = []
     @Published var sellOrders: [OrderRow] = []
     @Published var trades: [TradeRow] = []
-    @Published var messages: [ChatMessage] = []
+    @Published var chatMessages: [ChatMessageV1] = []
+    @Published var chatRooms: [ChatRoomV1] = []
     @Published var listings: [ListingRow] = []
     @Published var purchases: [PurchaseRow] = []
     @Published var entertainmentItems: [EntertainmentItemRow] = []
     @Published var entertainmentEvents: [EntertainmentEventRow] = []
     @Published var walletAddress: String = "—"
     @Published var walletBalance: String = "0"
+    @Published var portalHandle: String = "portal-user"
+    @Published var portalAccountId: String = ""
+    @Published var portalStatus: String = "Not signed in"
+    @Published var portalToken: String = ""
+    @Published var activityReceipts: [PortalReceiptRow] = []
+    @Published var backendUrl: String = GatewayClient.defaultBaseURLString()
+    @Published var availableEndpoints: Set<String> = []
+    @Published var capabilityNotes: String = ""
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
     @Published var backendStatus: BackendStatus = .unknown
 
     private let client = GatewayClient()
     private let walletStore = WalletStore()
+    private let portalKeyStore = PortalKeyStore.shared
+
+    @MainActor
+    func applyBackendUrl() async {
+        let trimmed = backendUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), !trimmed.isEmpty else {
+            status = "Backend URL invalid"
+            return
+        }
+        UserDefaults.standard.set(trimmed, forKey: "nyx_backend_url")
+        client.setBaseURL(url)
+        backendUrl = trimmed
+        status = "Backend URL updated"
+        await refreshBackendStatus()
+    }
+
+    @MainActor
+    func createPortalAccount() async {
+        let handle = portalHandle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if handle.isEmpty {
+            status = "Handle required"
+            return
+        }
+        status = "Creating portal account..."
+        do {
+            let pubkey = portalKeyStore.publicKeyBase64()
+            let account = try await client.createPortalAccount(handle: handle, pubkey: pubkey)
+            portalAccountId = account.accountId
+            portalStatus = "Account created"
+            status = "Portal account ready"
+        } catch {
+            portalStatus = "Account creation failed"
+            status = "Backend unavailable"
+            backendStatus = .unavailable
+        }
+    }
+
+    @MainActor
+    func signInPortal() async {
+        let accountId = portalAccountId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if accountId.isEmpty {
+            status = "Account ID required"
+            return
+        }
+        status = "Signing in..."
+        do {
+            let challenge = try await client.requestPortalChallenge(accountId: accountId)
+            let signature = portalKeyStore.sign(nonce: challenge.nonce)
+            let token = try await client.verifyPortalChallenge(accountId: accountId, nonce: challenge.nonce, signature: signature)
+            portalToken = token.accessToken
+            portalStatus = "Signed in"
+            status = "Portal session active"
+        } catch {
+            portalStatus = "Sign-in failed"
+            status = "Backend unavailable"
+            backendStatus = .unavailable
+        }
+    }
+
+    @MainActor
+    func signOutPortal() async {
+        if portalToken.isEmpty {
+            portalStatus = "Not signed in"
+            return
+        }
+        do {
+            try await client.logoutPortal(token: portalToken)
+        } catch {
+            // Best-effort logout.
+        }
+        portalToken = ""
+        portalStatus = "Signed out"
+        status = "Portal session ended"
+    }
+
+    private func requirePortalToken() -> String? {
+        if portalToken.isEmpty {
+            status = "Sign in required"
+            return nil
+        }
+        return portalToken
+    }
+
+    func hasEndpoint(_ entry: String) -> Bool {
+        return availableEndpoints.contains(entry)
+    }
+
+    @MainActor
+    func refreshPortalActivity() async {
+        guard let token = requirePortalToken() else { return }
+        do {
+            activityReceipts = try await client.fetchPortalActivity(token: token, limit: 50)
+        } catch {
+            backendStatus = .unavailable
+            status = "Backend unavailable"
+        }
+    }
 
     @MainActor
     func run(module: String, action: String, payload: [String: Any]) async {
@@ -138,7 +244,37 @@ final class EvidenceViewModel: ObservableObject {
     }
 
     @MainActor
-    func sendMessage(channel: String, body: String) async {
+    func refreshChatRooms() async {
+        guard let token = requirePortalToken() else { return }
+        do {
+            chatRooms = try await client.listChatRooms(token: token)
+        } catch {
+            backendStatus = .unavailable
+            status = "Backend unavailable"
+        }
+    }
+
+    @MainActor
+    func createChatRoom(name: String) async {
+        guard let token = requirePortalToken() else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            status = "Room name required"
+            return
+        }
+        status = "Creating room..."
+        do {
+            _ = try await client.createChatRoom(token: token, name: trimmed)
+            await refreshChatRooms()
+            status = "Room ready"
+        } catch {
+            backendStatus = .unavailable
+            status = "Backend unavailable"
+        }
+    }
+
+    @MainActor
+    func sendChatMessage(roomId: String, body: String) async {
         guard let seedInt = Int(seed) else {
             status = "Seed must be an integer"
             return
@@ -147,15 +283,21 @@ final class EvidenceViewModel: ObservableObject {
             status = "Run ID required"
             return
         }
+        guard let token = requirePortalToken() else { return }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            status = "Message required"
+            return
+        }
         status = "Sending message..."
         do {
-            _ = try await client.sendMessage(seed: seedInt, runId: runId, payload: ["channel": channel, "message": body])
+            _ = try await client.sendChatMessage(token: token, roomId: roomId, body: trimmed)
             let bundle = try await client.fetchEvidence(runId: runId)
             evidence = bundle
             stateHash = bundle.stateHash
             receiptHashes = bundle.receiptHashes
             replayOk = bundle.replayOk
-            await refreshMessages(channel: channel)
+            await refreshChatMessages(roomId: roomId)
             status = "Message sent. Evidence ready."
         } catch {
             backendStatus = .unavailable
@@ -164,9 +306,10 @@ final class EvidenceViewModel: ObservableObject {
     }
 
     @MainActor
-    func refreshMessages(channel: String) async {
+    func refreshChatMessages(roomId: String) async {
+        guard let token = requirePortalToken() else { return }
         do {
-            messages = try await client.fetchMessages(channel: channel)
+            chatMessages = try await client.listChatMessages(token: token, roomId: roomId)
         } catch {
             backendStatus = .unavailable
             status = "Backend unavailable"
@@ -214,9 +357,10 @@ final class EvidenceViewModel: ObservableObject {
             status = "Wallet address required"
             return
         }
+        guard let token = requirePortalToken() else { return }
         status = "Requesting testnet funds..."
         do {
-            _ = try await client.walletFaucet(seed: seedInt, runId: runId, address: walletAddress, amount: amount)
+            let response = try await client.faucetV1(token: token, seed: seedInt, runId: runId, address: walletAddress, amount: amount)
             let bundle = try await client.fetchEvidence(runId: runId)
             evidence = bundle
             stateHash = bundle.stateHash
@@ -244,9 +388,11 @@ final class EvidenceViewModel: ObservableObject {
             status = "Wallet address required"
             return
         }
+        guard let token = requirePortalToken() else { return }
         status = "Submitting transfer..."
         do {
-            _ = try await client.walletTransfer(
+            _ = try await client.transferV1(
+                token: token,
                 seed: seedInt,
                 runId: runId,
                 from: walletAddress,
@@ -407,8 +553,18 @@ final class EvidenceViewModel: ObservableObject {
         do {
             let ok = try await client.checkHealth()
             backendStatus = ok ? .available : .unavailable
+            if ok {
+                let caps = try await client.fetchCapabilities()
+                availableEndpoints = Set(caps.endpoints)
+                capabilityNotes = caps.notes ?? ""
+            } else {
+                availableEndpoints = []
+                capabilityNotes = ""
+            }
         } catch {
             backendStatus = .unavailable
+            availableEndpoints = []
+            capabilityNotes = ""
         }
     }
 }
@@ -444,6 +600,14 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             AppShellHeader(status: model.backendStatus)
+            if model.backendStatus == .unavailable {
+                OfflineBanner {
+                    Task {
+                        await model.refreshBackendStatus()
+                    }
+                }
+                .padding([.leading, .trailing, .bottom])
+            }
             TabView {
                 HomeView(model: model)
                     .tabItem { Label("Home", systemImage: "house") }
@@ -461,6 +625,8 @@ struct ContentView: View {
                     .tabItem { Label("Trust", systemImage: "shield") }
                 EvidenceInspectorView(model: model)
                     .tabItem { Label("Evidence", systemImage: "doc.plaintext") }
+                SettingsView(model: model)
+                    .tabItem { Label("Settings", systemImage: "gearshape") }
             }
         }
         .accentColor(SolsticePalette.accent)

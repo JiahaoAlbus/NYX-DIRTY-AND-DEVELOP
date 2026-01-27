@@ -2,15 +2,25 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHON_BIN="${PYTHON:-python3}"
+PYTHON_BIN="${PYTHON:-python}"
 VENV_DIR="$ROOT/.venv"
 
 if [ ! -d "$VENV_DIR" ]; then
+  set +e
   "$PYTHON_BIN" -m venv "$VENV_DIR"
+  VENV_STATUS=$?
+  set -e
+  if [ $VENV_STATUS -ne 0 ]; then
+    echo "WARN: venv creation failed; continuing with system python"
+    VENV_DIR=""
+  fi
 fi
 
-# shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
+if [ -n "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/activate" ]; then
+  # shellcheck disable=SC1091
+  source "$VENV_DIR/bin/activate"
+  PYTHON_BIN="$VENV_DIR/bin/python"
+fi
 
 export PYTHONPATH="$ROOT/apps/nyx-backend-gateway/src:$ROOT/apps/nyx-backend/src"
 
@@ -36,9 +46,13 @@ sys.exit(1)
 PY
 }
 
+FORCE_RESTART="${NYX_FORCE_RESTART:-0}"
 if check_health; then
-  echo "READY http://127.0.0.1:8091 (already running)"
-  exit 0
+  if [ "$FORCE_RESTART" != "1" ]; then
+    echo "READY http://127.0.0.1:8091 (already running)"
+    exit 0
+  fi
+  echo "Healthy backend detected; restarting due to NYX_FORCE_RESTART=1"
 fi
 
 LISTENER_PID=""

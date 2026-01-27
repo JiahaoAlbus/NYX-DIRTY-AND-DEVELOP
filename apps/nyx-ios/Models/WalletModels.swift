@@ -7,6 +7,38 @@ struct WalletSignature: Codable {
     let signatureHex: String
 }
 
+struct WalletTransferV1Response: Codable {
+    let runId: String
+    let status: String
+    let stateHash: String
+    let receiptHashes: [String]
+    let replayOk: Bool
+    let fromAddress: String
+    let toAddress: String
+    let amount: Int
+    let feeTotal: Int
+    let treasuryAddress: String
+    let fromBalance: Int
+    let toBalance: Int
+    let treasuryBalance: Int
+
+    enum CodingKeys: String, CodingKey {
+        case runId = "run_id"
+        case status
+        case stateHash = "state_hash"
+        case receiptHashes = "receipt_hashes"
+        case replayOk = "replay_ok"
+        case fromAddress = "from_address"
+        case toAddress = "to_address"
+        case amount
+        case feeTotal = "fee_total"
+        case treasuryAddress = "treasury_address"
+        case fromBalance = "from_balance"
+        case toBalance = "to_balance"
+        case treasuryBalance = "treasury_balance"
+    }
+}
+
 final class WalletStore: ObservableObject {
     @Published var address: String = "—"
     @Published var status: String = "No wallet loaded"

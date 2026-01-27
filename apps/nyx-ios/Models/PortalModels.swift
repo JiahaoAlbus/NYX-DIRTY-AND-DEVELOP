@@ -1,5 +1,11 @@
 import Foundation
 
+struct GatewayCapabilities: Codable {
+    let modules: [String]
+    let endpoints: [String]
+    let notes: String?
+}
+
 struct PortalAccount: Codable, Identifiable {
     let accountId: String
     let handle: String
@@ -87,6 +93,28 @@ struct ChatReceipt: Codable {
 struct ChatMessageResponse: Codable {
     let message: ChatMessageV1
     let receipt: ChatReceipt
+}
+
+struct PortalReceiptRow: Codable, Identifiable {
+    let receiptId: String
+    let module: String
+    let action: String
+    let stateHash: String
+    let receiptHashes: [String]
+    let replayOk: Bool
+    let runId: String
+
+    var id: String { receiptId }
+
+    enum CodingKeys: String, CodingKey {
+        case receiptId = "receipt_id"
+        case module
+        case action
+        case stateHash = "state_hash"
+        case receiptHashes = "receipt_hashes"
+        case replayOk = "replay_ok"
+        case runId = "run_id"
+    }
 }
 
 struct FaucetV1Response: Codable {

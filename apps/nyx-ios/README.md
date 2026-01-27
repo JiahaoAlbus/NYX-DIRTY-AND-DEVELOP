@@ -1,23 +1,30 @@
-# NYX iOS Reference Client (Testnet Beta)
+# NYX iOS Client (Testnet Beta)
 
 Purpose
-- Provide a SwiftUI reference client that mirrors deterministic flows and renders evidence verbatim.
+- Provide a SwiftUI client that calls the backend gateway and renders evidence verbatim.
 
 Scope
-- Connects to the NYX backend gateway API to run deterministic flows and fetch evidence bundles.
-- Displays evidence fields verbatim and exports bundles without modification.
+- Portal account and chat flows (testnet only).
+- Wallet faucet and transfer (testnet only).
+- Exchange, marketplace, entertainment flows backed by the gateway.
+- Evidence export via backend endpoints.
 
 Non-Scope
-- No user access flows, no identity model, no credential handoff, no real-money claims.
-- No live market data, no trading claims, no protocol semantics.
+- No mainnet claims or external wallet linking.
+- No KYC or personal identity binding.
 
 Run (local)
-- Start the backend gateway on http://127.0.0.1:8091.
-- Open NYXPortal.xcodeproj in Xcode.
-- Select an iPhone Simulator and Run.
- - Optional: set a custom backend URL in UserDefaults with key `nyx_backend_url`.
+1) Start backend:
+   - `scripts/nyx_backend_dev.sh`
+2) Open `apps/nyx-ios/NYXPortal.xcodeproj` in Xcode.
+3) Select an iPhone Simulator and Run.
+4) Optional backend override:
+   - In Settings, set the backend URL (stored under `nyx_backend_url`).
+
+Xcode build (CLI)
+- `xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj -scheme NYXPortal -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build`
 
 Rules
-- Seed and run_id are required inputs.
-- Evidence is read-only and is not computed or modified in the client.
+- Seed and run_id are required for evidence flows.
+- Evidence fields are rendered and exported verbatim from the backend.
 - All outputs are deterministic for the same inputs.

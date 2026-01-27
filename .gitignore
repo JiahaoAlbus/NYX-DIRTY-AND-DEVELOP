@@ -11,3 +11,8 @@ Thumbs.db
 cswdz.env
 .env
 *.env
+docs/evidence/fundraising/latest/
+__pycache__/
+*.pyc
+.venv/
+nyx_conformance_report.json

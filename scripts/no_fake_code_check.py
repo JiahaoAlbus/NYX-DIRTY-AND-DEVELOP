@@ -6,6 +6,7 @@ from pathlib import Path
 RUNTIME_DIRS = [
     Path("apps/nyx-backend-gateway/src/nyx_backend_gateway"),
     Path("apps/nyx-backend/src/nyx_backend"),
+    Path("apps/nyx-ios"),
 ]
 
 PATTERNS = [
@@ -23,7 +24,7 @@ def main() -> int:
     for root in RUNTIME_DIRS:
         if not root.exists():
             continue
-        for path in root.rglob("*.py"):
+        for path in list(root.rglob("*.py")) + list(root.rglob("*.swift")):
             text = path.read_text(encoding="utf-8", errors="ignore")
             for pattern in PATTERNS:
                 for match in pattern.finditer(text):

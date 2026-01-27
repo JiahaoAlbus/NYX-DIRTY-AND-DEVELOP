@@ -20,6 +20,26 @@ struct PreviewBanner: View {
     }
 }
 
+struct OfflineBanner: View {
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("Backend Offline")
+                .font(.footnote)
+            Spacer()
+            Button("Retry") {
+                action()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(Color.orange.opacity(0.2))
+        .cornerRadius(8)
+    }
+}
+
 private extension View {
     func nyxInputStyle() -> some View {
         padding(8)
@@ -59,9 +79,40 @@ struct HomeView: View {
                 PreviewBanner(text: "Testnet Beta. No external accounts. No live data.")
                 Text("NYX Portal")
                     .font(.largeTitle)
-                Text("Deterministic evidence flows only.")
+                Text("Deterministic evidence flows. Portal access is pseudonymous.")
                     .foregroundColor(.secondary)
                 RunInputsView(model: model)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Portal Account")
+                        .font(.headline)
+                    TextField("Handle (lowercase)", text: $model.portalHandle)
+                        .nyxInputStyle()
+                    TextField("Account ID", text: $model.portalAccountId)
+                        .nyxInputStyle()
+                    HStack {
+                        Button("Create Account") {
+                            Task {
+                                await model.createPortalAccount()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button("Sign In") {
+                            Task {
+                                await model.signInPortal()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        Button("Sign Out") {
+                            Task {
+                                await model.signOutPortal()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Text(model.portalStatus)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
             }
             .padding()
@@ -82,6 +133,13 @@ struct WalletView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Beta. Local wallet only. No external account linkage.")
                 RunInputsView(model: model)
+                let faucetAvailable = model.hasEndpoint("POST /wallet/v1/faucet")
+                let transferAvailable = model.hasEndpoint("POST /wallet/v1/transfer")
+                if !faucetAvailable || !transferAvailable {
+                    Text("Not available yet (testnet). Backend capability missing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Button("Load Wallet from Seed") {
                     Task {
                         await model.loadWallet()
@@ -121,6 +179,7 @@ struct WalletView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(!faucetAvailable)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -139,6 +198,7 @@ struct WalletView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(!transferAvailable)
                 }
                 EvidenceSummary(model: model)
                 Spacer()
@@ -164,6 +224,14 @@ struct ExchangeView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Beta. No live market data.")
                 RunInputsView(model: model)
+                let placeAvailable = model.hasEndpoint("POST /exchange/place_order")
+                let cancelAvailable = model.hasEndpoint("POST /exchange/cancel_order")
+                let bookAvailable = model.hasEndpoint("GET /exchange/orderbook")
+                if !placeAvailable || !bookAvailable {
+                    Text("Not available yet (testnet). Backend capability missing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Wallet Context")
                         .font(.headline)
@@ -221,6 +289,7 @@ struct ExchangeView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!placeAvailable)
 
                 TextField("Cancel Order ID", text: $cancelOrderId)
                     .nyxInputStyle()
@@ -230,6 +299,7 @@ struct ExchangeView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!cancelAvailable)
 
                 Button("Refresh Orderbook") {
                     Task {
@@ -238,6 +308,7 @@ struct ExchangeView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!bookAvailable)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Orderbook (Buy)")
@@ -273,35 +344,75 @@ struct ExchangeView: View {
 
 struct ChatView: View {
     @ObservedObject var model: EvidenceViewModel
-    @State private var channel = "general"
+    @State private var roomName = "general"
+    @State private var selectedRoomId = ""
     @State private var message = "Hello"
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. No external accounts or live chat history.")
+                PreviewBanner(text: "Testnet Beta. Portal auth required. No external accounts.")
                 RunInputsView(model: model)
-                TextField("Channel", text: $channel)
+                let roomsAvailable = model.hasEndpoint("POST /chat/v1/rooms")
+                let messagesAvailable = model.hasEndpoint("POST /chat/v1/rooms/{room_id}/messages")
+                if !roomsAvailable || !messagesAvailable {
+                    Text("Not available yet (testnet). Backend capability missing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                TextField("Room Name", text: $roomName)
                     .nyxInputStyle()
+                HStack {
+                    Button("Create Room") {
+                        Task {
+                            await model.createChatRoom(name: roomName)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!roomsAvailable)
+                    Button("Refresh Rooms") {
+                        Task {
+                            await model.refreshChatRooms()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!roomsAvailable)
+                }
+                if !model.chatRooms.isEmpty {
+                    Picker("Room", selection: $selectedRoomId) {
+                        ForEach(model.chatRooms) { room in
+                            Text(room.name).tag(room.roomId)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
                 TextField("Message", text: $message)
                     .nyxInputStyle()
                 Button("Send Message") {
                     Task {
-                        await model.sendMessage(channel: channel, body: message)
+                        if selectedRoomId.isEmpty, let first = model.chatRooms.first {
+                            selectedRoomId = first.roomId
+                        }
+                        await model.sendChatMessage(roomId: selectedRoomId, body: message)
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!messagesAvailable)
                 Button("Refresh Messages") {
                     Task {
-                        await model.refreshMessages(channel: channel)
+                        if selectedRoomId.isEmpty, let first = model.chatRooms.first {
+                            selectedRoomId = first.roomId
+                        }
+                        await model.refreshChatMessages(roomId: selectedRoomId)
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!messagesAvailable)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recent Messages")
                         .font(.headline)
-                    ForEach(model.messages.prefix(6)) { item in
-                        Text("[\(item.channel)] \(item.body)")
+                    ForEach(model.chatMessages.prefix(6)) { item in
+                        Text("[\(item.roomId)] \(item.body)")
                             .font(.footnote)
                     }
                 }
@@ -311,6 +422,11 @@ struct ChatView: View {
             .padding()
             .navigationTitle("Chat")
             .background(SolsticePalette.background)
+            .onAppear {
+                Task {
+                    await model.refreshChatRooms()
+                }
+            }
         }
     }
 }
@@ -328,6 +444,14 @@ struct MarketplaceView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Beta. Listings are testnet-only.")
                 RunInputsView(model: model)
+                let listAvailable = model.hasEndpoint("GET /marketplace/listings")
+                let publishAvailable = model.hasEndpoint("POST /marketplace/listing")
+                let purchaseAvailable = model.hasEndpoint("POST /marketplace/purchase")
+                if !listAvailable || !publishAvailable || !purchaseAvailable {
+                    Text("Not available yet (testnet). Backend capability missing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 TextField("SKU", text: $sku)
                     .nyxInputStyle()
                 TextField("Title", text: $title)
@@ -343,6 +467,7 @@ struct MarketplaceView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!publishAvailable)
 
                 Button("Refresh Listings") {
                     Task {
@@ -350,6 +475,7 @@ struct MarketplaceView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!listAvailable)
 
                 if !model.listings.isEmpty {
                     Picker("Listing", selection: $selectedListingId) {
@@ -373,6 +499,7 @@ struct MarketplaceView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!purchaseAvailable)
                 if !model.purchases.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Purchases")
@@ -404,12 +531,20 @@ struct EntertainmentView: View {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Testnet Beta. Deterministic steps.")
                 RunInputsView(model: model)
+                let itemsAvailable = model.hasEndpoint("GET /entertainment/items")
+                let stepAvailable = model.hasEndpoint("POST /entertainment/step")
+                if !itemsAvailable || !stepAvailable {
+                    Text("Not available yet (testnet). Backend capability missing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Button("Refresh Items") {
                     Task {
                         await model.refreshEntertainmentItems()
                     }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!itemsAvailable)
 
                 if !model.entertainmentItems.isEmpty {
                     Picker("Item", selection: $selectedItemId) {
@@ -440,6 +575,7 @@ struct EntertainmentView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!stepAvailable)
                 if !model.entertainmentEvents.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Recent Events")
@@ -483,6 +619,41 @@ struct TrustView: View {
     }
 }
 
+struct SettingsView: View {
+    @ObservedObject var model: EvidenceViewModel
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                PreviewBanner(text: "Testnet Beta. Backend URL can be overridden.")
+                Text("Settings")
+                    .font(.title2)
+                TextField("Backend URL", text: $model.backendUrl)
+                    .nyxInputStyle()
+                Button("Apply Backend URL") {
+                    Task {
+                        await model.applyBackendUrl()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Check Backend Status") {
+                    Task {
+                        await model.refreshBackendStatus()
+                    }
+                }
+                .buttonStyle(.bordered)
+                Text("Current: \(model.backendUrl)")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Settings")
+            .background(SolsticePalette.background)
+        }
+    }
+}
+
 struct EvidenceSummary: View {
     @ObservedObject var model: EvidenceViewModel
 
@@ -509,6 +680,26 @@ struct EvidenceInspectorView: View {
         NavigationStack {
             VStack(spacing: 16) {
                 PreviewBanner(text: "Evidence is rendered verbatim from the backend.")
+                Button("Refresh Activity") {
+                    Task {
+                        await model.refreshPortalActivity()
+                    }
+                }
+                .buttonStyle(.bordered)
+                if !model.activityReceipts.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent Receipts")
+                            .font(.headline)
+                        ForEach(model.activityReceipts.prefix(8)) { receipt in
+                            Text("\(receipt.module) • \(receipt.action) • \(receipt.runId)")
+                                .font(.footnote)
+                        }
+                    }
+                } else {
+                    Text("No receipts loaded.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Button("Fetch Export Bundle") {
                     Task {
                         await model.fetchExport()

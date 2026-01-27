@@ -46,6 +46,7 @@ class StorageRoundtripTests(unittest.TestCase):
             replay_ok=True,
         )
         insert_evidence_run(self.conn, run)
+        insert_evidence_run(self.conn, run)
         record = load_by_id(self.conn, "evidence_runs", "run_id", "run-001")
         self.assertIsNotNone(record)
 
