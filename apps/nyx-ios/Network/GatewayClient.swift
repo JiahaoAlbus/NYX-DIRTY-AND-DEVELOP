@@ -87,6 +87,19 @@ final class GatewayClient {
         return try JSONDecoder().decode(GatewayCapabilities.self, from: data)
     }
 
+    func checkBackendAvailability(timeoutSeconds: Double = 3.0) async -> Bool {
+        let url = baseURL.appendingPathComponent("list")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutSeconds
+        do {
+            _ = try await requestData(request)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("run")
         var request = URLRequest(url: url)

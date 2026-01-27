@@ -1,11 +1,5 @@
 import SwiftUI
 
-enum BackendStatus: String {
-    case unknown = "Backend: checking"
-    case available = "Backend: available"
-    case unavailable = "Backend: unavailable"
-}
-
 final class EvidenceViewModel: ObservableObject {
     @Published var seed: String = "123"
     @Published var runId: String = "ios-demo"
@@ -34,7 +28,8 @@ final class EvidenceViewModel: ObservableObject {
     @Published var capabilityNotes: String = ""
     @Published var evidence: EvidenceBundle?
     @Published var exportURL: URL?
-    @Published var backendStatus: BackendStatus = .unknown
+    @Published var backendAvailable: Bool = false
+    @Published var backendStatus: String = "Backend: unavailable"
 
     private let client = GatewayClient()
     private let walletStore = WalletStore()
@@ -71,7 +66,8 @@ final class EvidenceViewModel: ObservableObject {
         } catch {
             portalStatus = "Account creation failed"
             status = "Backend unavailable"
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
         }
     }
 
@@ -93,7 +89,8 @@ final class EvidenceViewModel: ObservableObject {
         } catch {
             portalStatus = "Sign-in failed"
             status = "Backend unavailable"
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
         }
     }
 
@@ -131,9 +128,18 @@ final class EvidenceViewModel: ObservableObject {
         do {
             activityReceipts = try await client.fetchPortalActivity(token: token, limit: 50)
         } catch {
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
             status = "Backend unavailable"
         }
+    }
+
+    @MainActor
+    func checkBackend() async {
+        backendStatus = "Backend: checking..."
+        let ok = await client.checkBackendAvailability(timeoutSeconds: 3.0)
+        backendAvailable = ok
+        backendStatus = ok ? "Backend: available" : "Backend: unavailable"
     }
 
     @MainActor
@@ -162,8 +168,7 @@ final class EvidenceViewModel: ObservableObject {
             replayOk = bundle.replayOk
             status = "Evidence ready. Testnet Beta. Provided by backend."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -189,8 +194,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshTrades()
             status = "Order placed. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -216,8 +220,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshTrades()
             status = "Order cancelled. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -228,8 +231,7 @@ final class EvidenceViewModel: ObservableObject {
             buyOrders = book.buy
             sellOrders = book.sell
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -238,8 +240,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             trades = try await client.fetchTrades()
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -249,7 +250,8 @@ final class EvidenceViewModel: ObservableObject {
         do {
             chatRooms = try await client.listChatRooms(token: token)
         } catch {
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
             status = "Backend unavailable"
         }
     }
@@ -268,7 +270,8 @@ final class EvidenceViewModel: ObservableObject {
             await refreshChatRooms()
             status = "Room ready"
         } catch {
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
             status = "Backend unavailable"
         }
     }
@@ -300,8 +303,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshChatMessages(roomId: roomId)
             status = "Message sent. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -311,8 +313,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             chatMessages = try await client.listChatMessages(token: token, roomId: roomId)
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -338,8 +339,7 @@ final class EvidenceViewModel: ObservableObject {
             let balance = try await client.fetchWalletBalance(address: walletAddress)
             walletBalance = String(balance)
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -369,8 +369,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshWalletBalance()
             status = "Testnet funds credited. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -407,8 +406,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshWalletBalance()
             status = "Transfer complete. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -433,8 +431,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshListings()
             status = "Listing published. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -459,8 +456,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshPurchases(listingId: listingId)
             status = "Purchase recorded. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -469,8 +465,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             listings = try await client.fetchListings()
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -479,8 +474,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             purchases = try await client.fetchPurchases(listingId: listingId)
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -489,8 +483,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             entertainmentItems = try await client.fetchEntertainmentItems()
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -499,8 +492,7 @@ final class EvidenceViewModel: ObservableObject {
         do {
             entertainmentEvents = try await client.fetchEntertainmentEvents(itemId: itemId)
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -525,8 +517,7 @@ final class EvidenceViewModel: ObservableObject {
             await refreshEntertainmentEvents(itemId: itemId)
             status = "Step recorded. Evidence ready."
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
 
@@ -543,16 +534,15 @@ final class EvidenceViewModel: ObservableObject {
             exportURL = url
             status = "Export bundle ready"
         } catch {
-            backendStatus = .unavailable
-            status = "Backend unavailable"
+            status = "Error: \(error)"
         }
     }
-
     @MainActor
     func refreshBackendStatus() async {
         do {
             let ok = try await client.checkHealth()
-            backendStatus = ok ? .available : .unavailable
+            backendAvailable = ok
+            backendStatus = ok ? "Backend: available" : "Backend: unavailable"
             if ok {
                 let caps = try await client.fetchCapabilities()
                 availableEndpoints = Set(caps.endpoints)
@@ -562,7 +552,8 @@ final class EvidenceViewModel: ObservableObject {
                 capabilityNotes = ""
             }
         } catch {
-            backendStatus = .unavailable
+            backendStatus = "Backend: unavailable"
+            backendAvailable = false
             availableEndpoints = []
             capabilityNotes = ""
         }
@@ -570,7 +561,8 @@ final class EvidenceViewModel: ObservableObject {
 }
 
 struct AppShellHeader: View {
-    let status: BackendStatus
+    let statusText: String
+    let isAvailable: Bool
 
     var body: some View {
         HStack {
@@ -582,11 +574,11 @@ struct AppShellHeader: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Text(status.rawValue)
+            Text(statusText)
                 .font(.caption)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(status == .available ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                .background(isAvailable ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
                 .cornerRadius(8)
         }
         .padding()
@@ -598,9 +590,17 @@ struct ContentView: View {
     @StateObject private var model = EvidenceViewModel()
 
     var body: some View {
+        AppShell(model: model)
+    }
+}
+
+struct AppShell: View {
+    @ObservedObject var model: EvidenceViewModel
+
+    var body: some View {
         VStack(spacing: 0) {
-            AppShellHeader(status: model.backendStatus)
-            if model.backendStatus == .unavailable {
+            AppShellHeader(statusText: model.backendStatus, isAvailable: model.backendAvailable)
+            if !model.backendAvailable {
                 OfflineBanner {
                     Task {
                         await model.refreshBackendStatus()
@@ -628,10 +628,10 @@ struct ContentView: View {
                 SettingsView(model: model)
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
+            .accentColor(SolsticePalette.accent)
         }
-        .accentColor(SolsticePalette.accent)
         .task {
-            await model.refreshBackendStatus()
+            await model.checkBackend()
         }
     }
 }

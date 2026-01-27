@@ -10,6 +10,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+import http.client
 from urllib.error import URLError, HTTPError
 from urllib.request import Request, urlopen
 
@@ -32,8 +33,17 @@ def _request_json(method: str, url: str, payload: dict | None = None) -> bytes:
     req = Request(url, data=data, method=method)
     if payload is not None:
         req.add_header("Content-Type", "application/json")
-    with urlopen(req, timeout=5) as resp:
-        return resp.read()
+    try:
+        with urlopen(req, timeout=5) as resp:
+            return resp.read()
+    except (HTTPError, URLError, http.client.RemoteDisconnected) as exc:
+        detail = {
+            "method": method,
+            "url": url,
+            "payload": payload or {},
+            "error": str(exc),
+        }
+        raise RuntimeError(json.dumps(detail, separators=(",", ":"))) from exc
 
 
 def _get_json(url: str) -> tuple[bytes, dict]:
@@ -114,6 +124,24 @@ def _record_evidence(base_url: str, run_id: str, out_dir: Path) -> None:
     _write_bytes(out_dir / run_id / "export.zip", zip_raw_1)
 
 
+def _resolve_out_dir(repo_root: Path, out_dir_arg: str) -> Path:
+    if out_dir_arg:
+        out_dir = Path(out_dir_arg).expanduser()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+    out_dir = repo_root / "docs" / "evidence" / "smoke" / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
+def _write_failure(out_dir: Path, error: str) -> None:
+    payload = {"error": error}
+    _write_bytes(
+        out_dir / "failure.json",
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=123)
@@ -124,21 +152,10 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    if args.out_dir:
-        out_dir = Path(args.out_dir)
-    else:
-        out_dir = repo_root / "docs" / "evidence" / "smoke" / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = _resolve_out_dir(repo_root, args.out_dir)
+
     if args.dry_run:
-        manifest = {
-            "seed": args.seed,
-            "run_id": args.run_id,
-            "runs": [],
-        }
-        _write_bytes(
-            out_dir / "manifest.json",
-            json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8"),
-        )
+        _write_bytes(out_dir / "dry_run.txt", b"dry-run")
         print(f"Smoke artifacts: {out_dir}")
         return 0
 
@@ -237,6 +254,11 @@ def main() -> int:
             "runs": sorted([p.name for p in out_dir.iterdir() if p.is_dir()]),
         }
         _write_bytes(out_dir / "manifest.json", json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    except Exception as exc:
+        _write_failure(out_dir, str(exc))
+        print("Smoke failed; check backend logs.", file=sys.stderr)
+        print(str(exc), file=sys.stderr)
+        return 1
     finally:
         if proc:
             proc.terminate()

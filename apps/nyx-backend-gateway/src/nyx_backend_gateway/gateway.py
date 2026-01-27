@@ -83,7 +83,7 @@ def _ensure_entertainment_items(conn) -> None:
 
 def _repo_root() -> Path:
     path = Path(__file__).resolve()
-    for _ in range(4):
+    for _ in range(5):
         path = path.parent
     return path
 
@@ -525,6 +525,9 @@ def execute_wallet_faucet(
 ) -> tuple[GatewayResult, int]:
     validated = _validate_wallet_faucet(payload)
     conn = create_connection(db_path or _db_path())
+    existing = load_by_id(conn, "evidence_runs", "run_id", run_id)
+    if existing is not None:
+        raise GatewayError("run_id already exists")
 
     backend_src = _backend_src()
     if str(backend_src) not in __import__("sys").path:
@@ -596,6 +599,9 @@ def execute_wallet_faucet_v1(
     validated = _validate_wallet_faucet(payload)
     _require_token(payload)
     conn = create_connection(db_path or _db_path())
+    existing = load_by_id(conn, "evidence_runs", "run_id", run_id)
+    if existing is not None:
+        raise GatewayError("run_id already exists")
 
     backend_src = _backend_src()
     if str(backend_src) not in __import__("sys").path:
