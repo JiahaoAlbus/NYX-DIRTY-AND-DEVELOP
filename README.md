@@ -1,8 +1,21 @@
-# NYX Testnet 0.1
+# NYX Testnet
+Deterministic, verifiable portal infrastructure.
 
-NYX is an identity-first protocol with sealed Week1–Week8 foundations. Testnet 0.1 ships the first end-to-end path from identity proof to fee enforcement and chain receipt.
+## Proof Run (~15min)
+Verify the entire project state (tests, conformance, smoke runs, builds) with one command:
+```bash
+bash scripts/nyx_verify_all.sh
+```
 
-## Quick Start (Testnet 0.1)
+## Demo (~10min)
+See the guided demo script: [docs/proof/DEMO_SCRIPT.md](docs/proof/DEMO_SCRIPT.md).
+
+## Documentation
+- **Technical Overview**: [docs/proof/NYX_TECHNICAL_OVERVIEW.md](docs/proof/NYX_TECHNICAL_OVERVIEW.md)
+- **Reproducibility**: [docs/proof/REPRODUCIBILITY.md](docs/proof/REPRODUCIBILITY.md)
+- **Funding & Grants**: [docs/funding/README.md](docs/funding/README.md)
+
+## Quick Start (Dev)
 ```bash
 git checkout testnet-0.1
 python -m compileall packages/l0-identity/src

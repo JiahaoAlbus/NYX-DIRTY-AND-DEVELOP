@@ -12,16 +12,28 @@ cswdz.env
 .env
 *.env
 docs/evidence/fundraising/latest/
-docs/evidence/smoke/
-docs/evidence/20260126_192407/
-apps/nyx-backend-gateway/data/
-apps/nyx-backend-gateway/runs/
-apps/nyx-ios/NYXPortal.xcodeproj/project.xcworkspace/
-apps/nyx-ios/NYXPortal.xcodeproj/xcuserdata/
+# Local IDEs
+.idea/
+.vscode/
+
+# Build artifacts
 __pycache__/
 *.pyc
 .venv/
+.env
+*.env
+.DS_Store
+
+# NYX Artifacts
+docs/evidence/smoke/
+docs/evidence/verify-*/
+docs/evidence/*_proof_package/
 nyx_conformance_report.json
-nyx-world/node_modules/
-nyx-world/dist/
-nyx-world/.env.local
+
+# Web & Mobile
+apps/nyx-world/node_modules/
+apps/nyx-world/dist/
+apps/nyx-ios/NYXPortal.xcodeproj/project.xcworkspace/
+apps/nyx-ios/NYXPortal.xcodeproj/xcuserdata/
+apps/nyx-backend-gateway/data/
+apps/nyx-backend-gateway/runs/
