@@ -2,13 +2,18 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="$ROOT/nyx-world"
-OUT_DIR="$ROOT/apps/nyx-ios/WebBundle"
 
-if [ ! -f "$APP_DIR/package.json" ]; then
-  echo "nyx-world package.json not found" >&2
-  exit 1
+# Prefer root-level nyx-world, fallback to apps/nyx-world
+if [ -d "$ROOT/nyx-world" ]; then
+  APP_DIR="$ROOT/nyx-world"
+elif [ -d "$ROOT/apps/nyx-world" ]; then
+  APP_DIR="$ROOT/apps/nyx-world"
+else
+  echo "WARN: nyx-world not found in . or ./apps. Skipping web build." >&2
+  exit 0
 fi
+
+OUT_DIR="$ROOT/apps/nyx-ios/WebBundle"
 
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm is required to build nyx-world" >&2
