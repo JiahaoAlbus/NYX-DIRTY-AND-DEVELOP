@@ -29,6 +29,7 @@ docs/evidence/smoke/
 docs/evidence/verify-*/
 docs/evidence/*_proof_package/
 nyx_conformance_report.json
+*.zip
 
 # Web & Mobile
 apps/nyx-world/node_modules/

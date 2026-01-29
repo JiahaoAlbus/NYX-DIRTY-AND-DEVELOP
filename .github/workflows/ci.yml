@@ -272,33 +272,45 @@ jobs:
         with:
           sarif_file: .artifacts/deps.sarif
 
-  conformance:
-    name: Conformance (Frozen Rules Gate)
+  proof-package-verify:
+    name: Proof Package Verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
 
-      - name: Verify Week 12 deliverables exist
-        shell: bash
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies (Minimal)
         run: |
-          set -euo pipefail
-          echo "Listing top-level directories:"
-          ls -la
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Install nyx-world deps if package.json exists
+          if [ -f apps/nyx-world/package.json ]; then
+            cd apps/nyx-world && npm install && cd ../..
+          fi
 
-          echo "Finding Week 12 deliverables..."
-          EG=$(find . -maxdepth 4 -type f -name "Engineering_Guidelines.md" | head -n 1)
-          Q2=$(find . -maxdepth 4 -type f -name "Q2_Implementation_Plan.md" | head -n 1)
-
-          test -n "$EG"
-          test -n "$Q2"
-
-          echo "Found:"
-          echo "$EG"
-          echo "$Q2"
-
-      - name: Frozen rules conformance gate
-        shell: bash
+      - name: Run Full Verification Suite
         run: |
-          bash conformance/run.sh
+          # This runs unit tests, conformance, smoke tests, and web build.
+          # It skips iOS build gracefully on Linux.
+          bash scripts/nyx_verify_all.sh --run-id ci-${{ github.sha }}
+
+      - name: Upload Proof Artifacts
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: proof-evidence-ci
+          path: docs/evidence/
+          retention-days: 5
