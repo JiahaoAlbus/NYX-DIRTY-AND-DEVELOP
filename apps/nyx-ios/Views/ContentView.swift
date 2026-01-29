@@ -596,6 +596,7 @@ struct ContentView: View {
 
 struct AppShell: View {
     @ObservedObject var model: EvidenceViewModel
+    @StateObject private var backendSettings = BackendSettings()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -625,7 +626,7 @@ struct AppShell: View {
                     .tabItem { Label("Trust", systemImage: "shield") }
                 EvidenceInspectorView(model: model)
                     .tabItem { Label("Evidence", systemImage: "doc.plaintext") }
-                SettingsView(model: model)
+                SettingsView(settings: backendSettings)
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
             .accentColor(SolsticePalette.accent)
