@@ -27,7 +27,8 @@ def get_treasury_address() -> str:
     if not address:
         address = os.environ.get("NYX_TESTNET_FEE_ADDRESS", "").strip()
     if not address:
-        return "testnet-treasury-unconfigured"
+        # Default Testnet Treasury Address as per mission requirement
+        return "0x0Aa313fCE773786C8425a13B96DB64205c5edCBc"
     if len(address) < 8:
         raise StorageError("NYX_TESTNET_TREASURY_ADDRESS too short")
     return address
@@ -37,10 +38,11 @@ def get_fee_address() -> str:
     return get_treasury_address()
 
 
-def get_platform_fee_bps() -> int | None:
+def get_platform_fee_bps() -> int:
     raw = os.environ.get("NYX_PLATFORM_FEE_BPS", "").strip()
     if not raw:
-        return None
+        # Default 10 BPS (0.1%) matching Binance standard fee
+        return 10
     try:
         value = int(raw)
     except ValueError as exc:

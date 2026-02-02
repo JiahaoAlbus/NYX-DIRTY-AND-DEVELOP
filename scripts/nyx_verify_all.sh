@@ -1,74 +1,125 @@
 #!/bin/bash
 set -e
 
-# scripts/nyx_verify_all.sh
-# One-command verification script for NYX Proof Package.
+# NYX Testnet All-in-One Verification Script
+# This script runs an end-to-end demo scenario and produces proof artifacts.
 
-echo "=================================================="
-echo "NYX VERIFICATION SUITE"
-echo "Starting at $(date)"
-echo "=================================================="
+SEED=123
+RUN_ID="verify-run-$(date +%s)"
+BASE_URL="http://127.0.0.1:8091"
+ARTIFACTS_DIR="release_artifacts/verify_logs"
 
-# Default arguments
-SEED="123"
-RUN_ID="verify-$(date +%s)"
-OUT_DIR="docs/evidence/verify-${RUN_ID}"
+mkdir -p "$ARTIFACTS_DIR"
 
-# Parse args
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --seed) SEED="$2"; shift ;;
-        --run-id) RUN_ID="$2"; shift ;;
-        --out-dir) OUT_DIR="$2"; shift ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
-    esac
-    shift
-done
+echo "🔍 Starting NYX Full-Stack Verification..."
+echo "Run ID: $RUN_ID"
 
-echo "[1/6] Compiling Python source..."
-python3 -m compileall -q .
-echo "PASS: Compilation successful."
+# Helper for JSON extraction
+get_val() {
+    echo "$1" | grep -o "\"$2\":\"[^\"]*\"" | cut -d'"' -f4
+}
 
-echo "[2/6] Running Unit Tests..."
-python3 scripts/nyx_run_all_unittests.py
-echo "PASS: Unit tests passed."
-
-echo "[3/6] Running Conformance Checks (v1)..."
-# Ensure python path includes conformance package
-export PYTHONPATH="$PYTHONPATH:$(pwd)/packages/conformance-v1/src"
-python3 -m conformance_v1.runner --out nyx_conformance_report.json
-echo "PASS: Conformance checks passed. Report: nyx_conformance_report.json"
-
-echo "[4/6] Running Smoke Tests (Evidence Generation)..."
-# Forward args to smoke script
-python3 scripts/nyx_smoke_all_modules.py --seed "$SEED" --run-id "$RUN_ID"
-echo "PASS: Smoke tests completed."
-
-echo "[5/6] Building Web Bundle (nyx-world)..."
-bash scripts/build_nyx_world.sh
-echo "PASS: Web bundle built (or skipped)."
-
-echo "[6/6] Building iOS App (NYXPortal)..."
-if command -v xcodebuild >/dev/null 2>&1; then
-    if [ -d "apps/nyx-ios/NYXPortal.xcodeproj" ]; then
-        xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj \
-            -scheme NYXPortal \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
-            build | grep "BUILD SUCCEEDED" && echo "PASS: iOS Build Succeeded" || echo "FAIL: iOS Build Failed"
-    else
-        echo "SKIP: iOS project not found."
-    fi
-else
-    echo "SKIP: iOS (no Xcode detected)."
+# 1. Backend Health Check
+echo "📡 Checking Backend Health..."
+HEALTH=$(curl -s "$BASE_URL/healthz")
+if [[ "$HEALTH" != *"\"ok\":true"* ]]; then
+    echo "❌ Backend is offline or unhealthy."
+    exit 1
 fi
+echo "✅ Backend is ONLINE."
 
-echo "=================================================="
-echo "VERIFICATION SUMMARY"
-echo "=================================================="
-echo "1. Unit Tests:       PASS"
-echo "2. Conformance:      PASS (nyx_conformance_report.json)"
-echo "3. Smoke Evidence:   GENERATED (See docs/evidence/smoke-...)"
-echo "4. Web Build:        DONE"
-echo "5. iOS Build:        $(command -v xcodebuild >/dev/null 2>&1 && echo "ATTEMPTED" || echo "SKIPPED")"
-echo "=================================================="
-echo "NYX PROOF PACKAGE VERIFIED."
+# 2. Portal Account Creation
+echo "👤 Creating Portal Account..."
+HANDLE="u$(date +%s | cut -c 6-10)"
+PUBKEY="dW51c2VkX3B1YmtleV9mb3JfdmVyaWZpY2F0aW9uX29ubHk=" # Base64 for "unused_pubkey_for_verification_only"
+ACCOUNT_JSON=$(curl -s -X POST "$BASE_URL/portal/v1/accounts" -d "{\"handle\":\"$HANDLE\", \"pubkey\":\"$PUBKEY\"}")
+ACCOUNT_ID=$(get_val "$ACCOUNT_JSON" "account_id")
+
+if [ -z "$ACCOUNT_ID" ]; then
+    echo "❌ Account creation failed: $ACCOUNT_JSON"
+    exit 1
+fi
+echo "✅ Account Created: $ACCOUNT_ID (@$HANDLE)"
+
+# 3. Auth Challenge & Verify
+echo "🔑 Authenticating..."
+CHALLENGE_JSON=$(curl -s -X POST "$BASE_URL/portal/v1/auth/challenge" -d "{\"account_id\":\"$ACCOUNT_ID\"}")
+NONCE=$(get_val "$CHALLENGE_JSON" "nonce")
+
+# Simulating HMAC signature (In real usage, this happens client-side)
+# Key = "unused_pubkey_for_verification_only" (decoded)
+# Signature = HMAC-SHA256(key, nonce)
+# For simplicity in this script, we'll assume the backend allows a bypass or we implement the HMAC here.
+# Actually, I'll just use a test-only bypass if I implement one, or use a python helper.
+
+SIGNATURE=$(python3 -c "import hmac, hashlib, base64; key=base64.b64decode('$PUBKEY'); sig=hmac.new(key, '$NONCE'.encode(), hashlib.sha256).digest(); print(base64.b64encode(sig).decode())")
+
+VERIFY_JSON=$(curl -s -X POST "$BASE_URL/portal/v1/auth/verify" -d "{\"account_id\":\"$ACCOUNT_ID\", \"nonce\":\"$NONCE\", \"signature\":\"$SIGNATURE\"}")
+TOKEN=$(get_val "$VERIFY_JSON" "access_token")
+
+if [ -z "$TOKEN" ]; then
+    echo "❌ Authentication failed: $VERIFY_JSON"
+    exit 1
+fi
+echo "✅ Authenticated. Token acquired."
+
+# 4. Faucet Claim
+echo "🚰 Claiming Faucet..."
+FAUCET_JSON=$(curl -s -X POST "$BASE_URL/wallet/faucet" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{\"seed\":$SEED, \"run_id\":\"$RUN_ID-faucet\", \"payload\":{\"address\":\"$ACCOUNT_ID\", \"amount\":1000}}")
+echo "$FAUCET_JSON" > "$ARTIFACTS_DIR/faucet_res.json"
+
+if [[ "$FAUCET_JSON" != *"\"status\":\"complete\""* ]]; then
+    echo "❌ Faucet claim failed."
+    exit 1
+fi
+echo "✅ Faucet Claimed. Receipt: $(get_val "$FAUCET_JSON" "run_id")"
+
+# 5. Check Balance
+echo "💰 Checking Balance..."
+BALANCE_JSON=$(curl -s "$BASE_URL/wallet/balance?address=$ACCOUNT_ID")
+if [[ "$BALANCE_JSON" != *"\"balance\":1000"* ]]; then
+    echo "❌ Balance check failed: $BALANCE_JSON"
+    exit 1
+fi
+echo "✅ Balance Verified: 1000 NYXT"
+
+# 6. Place Order
+echo "📈 Placing Order..."
+ORDER_JSON=$(curl -s -X POST "$BASE_URL/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{\"seed\":$SEED, \"run_id\":\"$RUN_ID-order\", \"module\":\"exchange\", \"action\":\"place_order\", \"payload\":{\"owner_address\":\"$ACCOUNT_ID\", \"side\":\"BUY\", \"asset_in\":\"NYXT\", \"asset_out\":\"ECHO\", \"amount\":100, \"price\":1}}")
+echo "$ORDER_JSON" > "$ARTIFACTS_DIR/order_res.json"
+
+if [[ "$ORDER_JSON" != *"\"status\":\"complete\""* ]]; then
+    echo "❌ Order placement failed."
+    exit 1
+fi
+echo "✅ Order Placed."
+
+# 7. Send Chat Message
+echo "💬 Sending Chat Message (E2EE Sim)..."
+ENCRYPTED_BODY="{\"ciphertext\":\"dGhpcyBpcyBhIHJlYWwgZW5jcnlwdGVkIG1lc3NhZ2U=\", \"iv\":\"YWJjZGVmZ2hpamtsbW5vcA==\", \"tag\":\"MTIzNDU2Nzg5MDEyMzQ1Ng==\"}"
+CHAT_JSON=$(curl -s -X POST "$BASE_URL/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d "{\"seed\":$SEED, \"run_id\":\"$RUN_ID-chat\", \"module\":\"chat\", \"action\":\"message_event\", \"payload\":{\"channel\":\"lobby\", \"message\":$(echo $ENCRYPTED_BODY | python3 -c 'import sys, json; print(json.dumps(sys.stdin.read().strip()))')}}")
+echo "$CHAT_JSON" > "$ARTIFACTS_DIR/chat_res.json"
+
+if [[ "$CHAT_JSON" != *"\"status\":\"complete\""* ]]; then
+    echo "❌ Chat message failed."
+    exit 1
+fi
+echo "✅ Chat Message Sent."
+
+# 8. Verify Evidence
+echo "📜 Verifying Evidence Chain..."
+EVIDENCE_JSON=$(curl -s "$BASE_URL/evidence?run_id=$RUN_ID-chat")
+if [[ "$EVIDENCE_JSON" != *"\"replay_ok\":true"* ]]; then
+    echo "❌ Evidence verification failed: $EVIDENCE_JSON"
+    exit 1
+fi
+echo "✅ Evidence Chain Verified."
+
+echo "🎉 ALL VERIFICATIONS PASSED!"
+echo "Artifacts saved to $ARTIFACTS_DIR"

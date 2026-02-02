@@ -56,56 +56,14 @@ def _version_info() -> dict[str, str]:
 
 def _capabilities() -> dict[str, object]:
     return {
-        "modules": [
-            "wallet",
-            "exchange",
-            "chat",
-            "portal",
-            "marketplace",
-            "entertainment",
-            "evidence",
-        ],
-        "endpoints": [
-            "GET /healthz",
-            "GET /version",
-            "GET /capabilities",
-            "POST /run",
-            "GET /status",
-            "GET /evidence",
-            "GET /artifact",
-            "GET /export.zip",
-            "GET /list?limit=100&offset=0",
-            "POST /portal/v1/accounts",
-            "POST /portal/v1/auth/challenge",
-            "POST /portal/v1/auth/verify",
-            "POST /portal/v1/auth/logout",
-            "GET /portal/v1/me",
-            "GET /portal/v1/activity?limit=50&offset=0",
-            "POST /chat/v1/rooms",
-            "GET /chat/v1/rooms?limit=50&offset=0",
-            "POST /chat/v1/rooms/{room_id}/messages",
-            "GET /chat/v1/rooms/{room_id}/messages?limit=50&after=seq",
-            "POST /wallet/v1/faucet",
-            "POST /wallet/v1/transfer",
-            "GET /wallet/balance",
-            "POST /wallet/faucet",
-            "POST /wallet/transfer",
-            "GET /exchange/orderbook",
-            "GET /exchange/orders?limit=100&offset=0",
-            "GET /exchange/trades?limit=100&offset=0",
-            "POST /exchange/place_order",
-            "POST /exchange/cancel_order",
-            "GET /chat/messages?limit=50&offset=0",
-            "POST /chat/send",
-            "GET /marketplace/listings?limit=100&offset=0",
-            "GET /marketplace/purchases?limit=100&offset=0",
-            "POST /marketplace/listing",
-            "POST /marketplace/purchase",
-            "GET /entertainment/items?limit=100&offset=0",
-            "GET /entertainment/events?limit=100&offset=0",
-            "POST /entertainment/step",
-        ],
-        "notes": "Testnet Beta. No live mainnet data.",
+        "modules": {
+            "portal": {"auth": "mandatory", "profile": "enabled"},
+            "wallet": {"faucet": "enabled", "transfer": "enabled", "airdrop": "enabled"},
+            "exchange": {"trading": "enabled", "orderbook": "enabled"},
+            "marketplace": {"listing": "enabled", "purchase": "enabled"},
+            "chat": {"e2ee": "verified", "rooms": "enabled"},
+            "dapp": {"browser": "disabled"},
+        }
     }
 
 
@@ -257,6 +215,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         try:
             if self.path == "/run":
+                session = self._require_auth()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -269,6 +228,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     module=module,
                     action=action,
                     payload=extra,
+                    caller_account_id=session.account_id,
                 )
                 response = {
                     "run_id": result.run_id,
@@ -344,6 +304,18 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 finally:
                     conn.close()
                 self._send_json({"ok": True})
+                return
+            if self.path == "/portal/v1/profile":
+                session = self._require_auth()
+                payload = self._parse_body()
+                conn = create_connection(_db_path())
+                try:
+                    account = portal.update_profile(
+                        conn, session.account_id, handle=payload.get("handle"), bio=payload.get("bio")
+                    )
+                finally:
+                    conn.close()
+                self._send_json({"account": account})
                 return
             if self.path == "/chat/v1/rooms":
                 _ = self._require_auth()
@@ -526,14 +498,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     }
                 )
                 return
-            if self.path == "/wallet/faucet":
+            if self.path in {"/wallet/faucet", "/wallet/v1/faucet"}:
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
                 faucet_payload = payload.get("payload")
                 if faucet_payload is None:
                     faucet_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
-                result, balance = execute_wallet_faucet(
+                result, balances, fee_record = execute_wallet_faucet(
                     seed=seed,
                     run_id=run_id,
                     payload=faucet_payload,
@@ -546,11 +518,37 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "receipt_hashes": result.receipt_hashes,
                         "replay_ok": result.replay_ok,
                         "address": faucet_payload.get("address"),
-                        "balance": balance,
+                        "balance": balances["balance"],
                     }
                 )
                 return
-            if self.path == "/wallet/transfer":
+            if self.path in {"/wallet/airdrop/claim", "/wallet/v1/airdrop/claim"}:
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                claim_payload = payload.get("payload")
+                if claim_payload is None:
+                    claim_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                result, balances, fee_record = execute_airdrop_claim(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=claim_payload,
+                )
+                self._send_json(
+                    {
+                        "run_id": result.run_id,
+                        "status": "complete",
+                        "state_hash": result.state_hash,
+                        "receipt_hashes": result.receipt_hashes,
+                        "replay_ok": result.replay_ok,
+                        "address": claim_payload.get("address"),
+                        "task_id": claim_payload.get("task_id"),
+                        "balance": balances["balance"],
+                        "fee_total": fee_record.total_paid,
+                    }
+                )
+                return
+            if self.path in {"/wallet/transfer", "/wallet/v1/transfer"}:
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -670,6 +668,23 @@ class GatewayHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+        if path == "/discovery/feed":
+            try:
+                conn = create_connection(_db_path())
+                # Mix of rooms and listings
+                rooms = portal.list_rooms(conn, limit=5)
+                listings = gateway.marketplace_list_active_listings(conn, limit=5)
+                conn.close()
+                self._send_json({
+                    "feed": [
+                        {"type": "room", "data": r} for r in rooms
+                    ] + [
+                        {"type": "listing", "data": l} for l in listings
+                    ]
+                })
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/healthz":
             self._send_json({"ok": True})
             return
@@ -710,7 +725,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     raise GatewayError("limit or offset invalid")
                 conn = create_connection(_db_path())
-                receipts = list_receipts(conn, limit=limit, offset=offset)
+                receipts = portal.list_account_activity(conn, session.account_id, limit=limit, offset=offset)
                 conn.close()
                 self._send_json({"account_id": session.account_id, "receipts": receipts, "limit": limit, "offset": offset})
             except (GatewayError, portal.PortalError, StorageError) as exc:
@@ -844,6 +859,17 @@ class GatewayHandler(BaseHTTPRequestHandler):
             except GatewayError as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
+        if path == "/portal/v1/rooms/search":
+            try:
+                _ = self._require_auth()
+                q = (query.get("q") or [""])[0]
+                conn = create_connection(_db_path())
+                rooms = portal.search_rooms(conn, q)
+                conn.close()
+                self._send_json({"rooms": rooms})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
         if path.startswith("/chat/v1/rooms/") and path.endswith("/messages"):
             parts = path.split("/")
             if len(parts) != 6:
@@ -866,11 +892,19 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if path == "/marketplace/listings":
             try:
                 conn = create_connection(_db_path())
-                limit = int((query.get("limit") or ["100"])[0])
-                offset = int((query.get("offset") or ["0"])[0])
-                listings = list_listings(conn, limit=limit, offset=offset)
+                listings = gateway.marketplace_list_active_listings(conn)
                 conn.close()
-                self._send_json({"listings": listings, "limit": limit, "offset": offset})
+                self._send_json({"listings": listings})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/marketplace/listings/search":
+            try:
+                q = (query.get("q") or [""])[0]
+                conn = create_connection(_db_path())
+                listings = gateway.marketplace_search_listings(conn, q)
+                conn.close()
+                self._send_json({"listings": listings})
             except Exception as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return

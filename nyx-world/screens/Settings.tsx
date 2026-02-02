@@ -30,13 +30,13 @@ export const Settings: React.FC<SettingsProps> = ({ session, seed, runId, onSeed
           </div>
         </section>
 
-        <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm">
+        <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm glass">
           <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">Deterministic Run</h3>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Global Seed</span>
+              <span className="text-xs font-medium">Global Seed (Testnet)</span>
               <input 
-                className="h-9 rounded-lg border border-primary/20 bg-white px-3 text-sm"
+                className="h-9 rounded-lg border border-primary/20 bg-white/50 px-3 text-sm outline-none focus:border-primary transition-all"
                 value={seed}
                 onChange={(e) => onSeedChange(e.target.value)}
               />
@@ -44,11 +44,27 @@ export const Settings: React.FC<SettingsProps> = ({ session, seed, runId, onSeed
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">Run ID</span>
               <input 
-                className="h-9 rounded-lg border border-primary/20 bg-white px-3 text-sm"
+                className="h-9 rounded-lg border border-primary/20 bg-white/50 px-3 text-sm outline-none focus:border-primary transition-all"
                 value={runId}
                 onChange={(e) => onRunIdChange(e.target.value)}
               />
             </label>
+          </div>
+          <div className="mt-4 p-3 rounded-xl bg-primary/5 border border-primary/10 text-[10px] text-text-subtle leading-relaxed italic">
+            Changing these values will reset the deterministic evidence chain for your next session.
+          </div>
+        </section>
+
+        <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm glass">
+          <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">Treasury Configuration</h3>
+          <div className="flex flex-col gap-2">
+            <div className="text-[10px] font-bold text-text-subtle uppercase">Testnet Treasury Address</div>
+            <div className="p-2 rounded-lg bg-surface-light dark:bg-surface-dark/5 text-[10px] font-mono break-all text-primary">
+              0x0Aa313fCE773786C8425a13B96DB64205c5edCBc
+            </div>
+            <div className="text-[9px] text-text-subtle mt-1">
+              *All transaction fees are automatically routed to this treasury for ecosystem growth.
+            </div>
           </div>
         </section>
 

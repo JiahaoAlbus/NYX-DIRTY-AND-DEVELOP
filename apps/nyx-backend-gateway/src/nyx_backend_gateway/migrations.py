@@ -37,6 +37,7 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS orders (
             order_id TEXT PRIMARY KEY,
+            owner_address TEXT NOT NULL DEFAULT '0x0',
             side TEXT NOT NULL,
             amount INTEGER NOT NULL,
             price INTEGER NOT NULL,
@@ -46,6 +47,11 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # Simple migration for owner_address
+    cursor.execute("PRAGMA table_info(orders)")
+    order_columns = [row[1] for row in cursor.fetchall()]
+    if "owner_address" not in order_columns:
+        cursor.execute("ALTER TABLE orders ADD COLUMN owner_address TEXT NOT NULL DEFAULT '0x0'")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS trades (
@@ -74,10 +80,16 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
             handle TEXT UNIQUE NOT NULL,
             public_key TEXT NOT NULL,
             created_at INTEGER NOT NULL,
-            status TEXT NOT NULL
+            status TEXT NOT NULL,
+            bio TEXT
         )
         """
     )
+    # Check if bio column exists, if not add it (simple migration for existing db)
+    cursor.execute("PRAGMA table_info(portal_accounts)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if "bio" not in columns:
+        cursor.execute("ALTER TABLE portal_accounts ADD COLUMN bio TEXT")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS portal_challenges (
@@ -127,23 +139,38 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS listings (
             listing_id TEXT PRIMARY KEY,
+            publisher_id TEXT NOT NULL DEFAULT 'unknown',
             sku TEXT NOT NULL,
             title TEXT NOT NULL,
             price INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
             run_id TEXT NOT NULL
         )
         """
     )
+    # Simple migration for listings
+    cursor.execute("PRAGMA table_info(listings)")
+    listing_columns = [row[1] for row in cursor.fetchall()]
+    if "publisher_id" not in listing_columns:
+        cursor.execute("ALTER TABLE listings ADD COLUMN publisher_id TEXT NOT NULL DEFAULT 'unknown'")
+    if "status" not in listing_columns:
+        cursor.execute("ALTER TABLE listings ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS purchases (
             purchase_id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
+            buyer_id TEXT NOT NULL DEFAULT 'unknown',
             qty INTEGER NOT NULL,
             run_id TEXT NOT NULL
         )
         """
     )
+    # Simple migration for purchases
+    cursor.execute("PRAGMA table_info(purchases)")
+    purchase_columns = [row[1] for row in cursor.fetchall()]
+    if "buyer_id" not in purchase_columns:
+        cursor.execute("ALTER TABLE purchases ADD COLUMN buyer_id TEXT NOT NULL DEFAULT 'unknown'")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS receipts (
@@ -174,17 +201,29 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS wallet_accounts (
-            address TEXT PRIMARY KEY,
-            balance INTEGER NOT NULL
+            address TEXT NOT NULL,
+            asset_id TEXT NOT NULL DEFAULT 'NYXT',
+            balance INTEGER NOT NULL,
+            PRIMARY KEY (address, asset_id)
         )
         """
     )
+    # Migration for asset_id
+    cursor.execute("PRAGMA table_info(wallet_accounts)")
+    wallet_columns = [row[1] for row in cursor.fetchall()]
+    if "asset_id" not in wallet_columns:
+        # Move existing balances to NYXT
+        cursor.execute("CREATE TABLE wallet_accounts_new (address TEXT NOT NULL, asset_id TEXT NOT NULL DEFAULT 'NYXT', balance INTEGER NOT NULL, PRIMARY KEY (address, asset_id))")
+        cursor.execute("INSERT INTO wallet_accounts_new (address, balance) SELECT address, balance FROM wallet_accounts")
+        cursor.execute("DROP TABLE wallet_accounts")
+        cursor.execute("ALTER TABLE wallet_accounts_new RENAME TO wallet_accounts")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS wallet_transfers (
             transfer_id TEXT PRIMARY KEY,
             from_address TEXT NOT NULL,
             to_address TEXT NOT NULL,
+            asset_id TEXT NOT NULL DEFAULT 'NYXT',
             amount INTEGER NOT NULL,
             fee_total INTEGER NOT NULL,
             treasury_address TEXT NOT NULL,
@@ -192,6 +231,11 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # Migration for asset_id in wallet_transfers
+    cursor.execute("PRAGMA table_info(wallet_transfers)")
+    transfer_columns = [row[1] for row in cursor.fetchall()]
+    if "asset_id" not in transfer_columns:
+        cursor.execute("ALTER TABLE wallet_transfers ADD COLUMN asset_id TEXT NOT NULL DEFAULT 'NYXT'")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS entertainment_items (

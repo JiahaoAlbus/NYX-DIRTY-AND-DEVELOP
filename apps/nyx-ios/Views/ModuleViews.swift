@@ -1,751 +1,327 @@
 import SwiftUI
 
-struct SolsticePalette {
-    static let background = Color(red: 0.99, green: 0.98, blue: 0.96)
-    static let banner = Color(red: 0.99, green: 0.93, blue: 0.75)
-    static let accent = Color(red: 0.93, green: 0.74, blue: 0.2)
-    static let card = Color(red: 1.0, green: 0.98, blue: 0.94)
-}
-
-struct PreviewBanner: View {
-    let text: String
-
+// MARK: - Home View (Binance Style)
+struct NYXHomeView: View {
+    @ObservedObject var settings: BackendSettings
+    
     var body: some View {
-        Text(text)
-            .font(.footnote)
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .background(SolsticePalette.banner)
-            .cornerRadius(8)
-    }
-}
-
-struct OfflineBanner: View {
-    let action: () -> Void
-
-    var body: some View {
-        HStack {
-            Text("Backend Offline")
-                .font(.footnote)
-            Spacer()
-            Button("Retry") {
-                action()
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("NYX Portal")
+                                .font(.largeTitle)
+                                .fontWeight(.black)
+                            Text("Testnet Ecosystem")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "diamond.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.yellow)
+                    }
+                    .padding(.horizontal)
+                    
+                    // Banner
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Secure Your Future")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text("Deterministic Web3 Infrastructure")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                        
+                        Button(action: {}) {
+                            Text("Claim Airdrop")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(Color.accentColor)
+                                .foregroundColor(.black)
+                                .cornerRadius(10)
+                        }
+                        .padding(.top, 10)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(25)
+                    .background(LinearGradient(colors: [.yellow, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .cornerRadius(25)
+                    .padding(.horizontal)
+                    
+                    // Quick Actions
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]) {
+                        ShortcutIcon(icon: "drop.fill", label: "Faucet")
+                        ShortcutIcon(icon: "banknote.fill", label: "Fiat")
+                        ShortcutIcon(icon: "gift.fill", label: "Airdrop")
+                        ShortcutIcon(icon: "ellipsis.circle.fill", label: "More")
+                    }
+                    .padding(.horizontal)
+                    
+                    // Modules
+                    VStack(alignment: .leading, spacing: 15) {
+                        Text("Core Modules")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        ModuleRow(icon: "wallet.pass.fill", title: "Web3 Wallet", desc: "MetaMask-style assets", color: .yellow)
+                        ModuleRow(icon: "arrow.left.arrow.right", title: "Exchange", desc: "Binance-style trading", color: .green)
+                        ModuleRow(icon: "bubble.left.and.bubble.right.fill", title: "Chat", desc: "Instagram-style social", color: .blue)
+                        ModuleRow(icon: "bag.fill", title: "Store", desc: "Taobao-style marketplace", color: .orange)
+                    }
+                }
+                .padding(.bottom, 100)
             }
-            .buttonStyle(.bordered)
+            .navigationBarHidden(true)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-        .background(Color.orange.opacity(0.2))
-        .cornerRadius(8)
     }
 }
 
-private extension View {
-    func nyxInputStyle() -> some View {
-        padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).stroke(.secondary))
+// MARK: - Wallet View (MetaMask Style)
+struct NYXWalletView: View {
+    @ObservedObject var settings: BackendSettings
+    @State private var balance: Int = 0
+    @State private var address: String = "0x0Aa313...CBc"
+    @State private var isRefreshing = false
+    
+    func refreshBalance() async {
+        isRefreshing = true
+        guard let url = URL(string: settings.baseURL)?.appendingPathComponent("wallet/balance") else { return }
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        components?.queryItems = [URLQueryItem(name: "address", value: address)]
+        
+        guard let finalURL = components?.url else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: finalURL)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let bal = json["balance"] as? Int {
+                self.balance = bal
+            }
+        } catch {
+            print("Failed to fetch balance: \(error)")
+        }
+        isRefreshing = false
     }
-}
 
-struct RunInputsView: View {
-    @ObservedObject var model: EvidenceViewModel
-
+    func requestFaucet() async {
+        guard let account = settings.session?.account_id else { return }
+        let client = GatewayClient(baseURL: URL(string: settings.baseURL)!)
+        do {
+            _ = try await client.faucetV1(
+                token: settings.session?.access_token ?? "",
+                seed: Int.random(in: 1...1000000),
+                runId: "faucet-\(Date().timeIntervalSince1970)",
+                address: account,
+                amount: 1000000000 // 1000 NYXT
+            )
+            await refreshBalance()
+        } catch {
+            print("Faucet failed: \(error)")
+        }
+    }
+    
     var body: some View {
-        let seedBinding = Binding<Int>(
-            get: { Int(model.seed) ?? 0 },
-            set: { model.seed = String($0) }
-        )
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Seed", value: seedBinding, format: .number)
-            #if os(iOS)
-                .keyboardType(.numberPad)
-            #endif
-                .nyxInputStyle()
-            TextField("Run ID", text: $model.runId)
-                .nyxInputStyle()
-            Text(model.status)
-                .font(.footnote)
+        NavigationView {
+            VStack(spacing: 0) {
+                // Account Card
+                VStack(spacing: 15) {
+                    Circle()
+                        .fill(LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 60, height: 60)
+                        .overlay(Text("N").fontWeight(.bold).foregroundColor(.black))
+                    
+                    Text("@NYXUser")
+                        .font(.headline)
+                    
+                    HStack {
+                        Text(address)
+                            .font(.system(.caption, design: .monospaced))
+                        Button(action: {
+                            UIPasteboard.general.string = address
+                        }) {
+                            Image(systemName: "doc.on.doc").font(.caption2)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(15)
+                }
+                .padding(.vertical, 30)
+                .frame(maxWidth: .infinity)
+                .background(Color.yellow.opacity(0.1))
+                
+                // Balance
+                VStack(spacing: 8) {
+                    Text("\(balance) NYXT")
+                        .font(.system(size: 40, weight: .black, design: .rounded))
+                    Text("≈ $\(Double(balance) / 1_000_000_000.0, specifier: "%.2f")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 20)
+                
+                // Actions
+                HStack(spacing: 30) {
+                    WalletActionBtn(icon: "plus", label: "Buy")
+                    WalletActionBtn(icon: "arrow.up", label: "Send")
+                    WalletActionBtn(icon: "arrow.left.arrow.right", label: "Swap")
+                    Button(action: {
+                        Task { await requestFaucet() }
+                    }) {
+                        WalletActionBtn(icon: "drop", label: "Faucet")
+                    }
+                }
+                .padding(.bottom, 30)
+                
+                // Assets
+                List {
+                    Section(header: Text("Assets")) {
+                        HStack {
+                            Circle().fill(.yellow).frame(width: 32)
+                            VStack(alignment: .leading) {
+                                Text("NYXT").fontWeight(.bold)
+                                Text("NYX Testnet Token").font(.caption2).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text("\(balance)").fontWeight(.bold)
+                        }
+                    }
+                }
+                .listStyle(InsetGroupedListStyle())
+                .refreshable {
+                    await refreshBalance()
+                }
+            }
+            .navigationTitle("Wallet")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        Task { await refreshBalance() }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                            .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                    }
+                }
+            }
+        }
+        .task {
+            await refreshBalance()
+        }
+    }
+}
+
+// MARK: - Subviews
+struct ShortcutIcon: View {
+    let icon: String
+    let label: String
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .frame(width: 50, height: 50)
+                .background(.ultraThinMaterial)
+                .cornerRadius(15)
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.secondary)
         }
     }
 }
 
-struct HomeView: View {
-    @ObservedObject var model: EvidenceViewModel
-
+struct ModuleRow: View {
+    let icon: String
+    let title: String
+    let desc: String
+    let color: Color
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. No external accounts. No live data.")
-                Text("NYX Portal")
-                    .font(.largeTitle)
-                Text("Deterministic evidence flows. Portal access is pseudonymous.")
-                    .foregroundColor(.secondary)
-                RunInputsView(model: model)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Portal Account")
-                        .font(.headline)
-                    TextField("Handle (lowercase)", text: $model.portalHandle)
-                        .nyxInputStyle()
-                    TextField("Account ID", text: $model.portalAccountId)
-                        .nyxInputStyle()
-                    HStack {
-                        Button("Create Account") {
-                            Task {
-                                await model.createPortalAccount()
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        Button("Sign In") {
-                            Task {
-                                await model.signInPortal()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        Button("Sign Out") {
-                            Task {
-                                await model.signOutPortal()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    Text(model.portalStatus)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
+        HStack(spacing: 15) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .frame(width: 44, height: 44)
+                .background(color.opacity(0.1))
+                .cornerRadius(12)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 14, weight: .bold))
+                Text(desc).font(.system(size: 10)).foregroundColor(.secondary)
             }
-            .padding()
-            .navigationTitle("World")
-            .background(SolsticePalette.background)
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
         }
-    }
-}
-
-struct WalletView: View {
-    @ObservedObject var model: EvidenceViewModel
-    @State private var transferTo = "receiver-001"
-    @State private var transferAmount = 5
-    @State private var faucetAmount = 50
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Local wallet only. No external account linkage.")
-                RunInputsView(model: model)
-                let faucetAvailable = model.hasEndpoint("POST /wallet/v1/faucet")
-                let transferAvailable = model.hasEndpoint("POST /wallet/v1/transfer")
-                if !faucetAvailable || !transferAvailable {
-                    Text("Not available yet (testnet). Backend capability missing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                Button("Load Wallet from Seed") {
-                    Task {
-                        await model.loadWallet()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Address")
-                        .font(.headline)
-                    Text(model.walletAddress)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                    Text("Balance")
-                        .font(.headline)
-                        .padding(.top, 6)
-                    Text(model.walletBalance)
-                        .font(.footnote)
-                }
-                Button("Refresh Balance") {
-                    Task {
-                        await model.refreshWalletBalance()
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Testnet Faucet")
-                        .font(.headline)
-                    TextField("Amount", value: $faucetAmount, format: .number)
-                    #if os(iOS)
-                        .keyboardType(.numberPad)
-                    #endif
-                        .nyxInputStyle()
-                    Button("Request Testnet Funds") {
-                        Task {
-                            await model.faucetWallet(amount: faucetAmount)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!faucetAvailable)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Transfer")
-                        .font(.headline)
-                    TextField("To Address", text: $transferTo)
-                        .nyxInputStyle()
-                    TextField("Amount", value: $transferAmount, format: .number)
-                    #if os(iOS)
-                        .keyboardType(.numberPad)
-                    #endif
-                        .nyxInputStyle()
-                    Button("Send Transfer") {
-                        Task {
-                            await model.transferWallet(toAddress: transferTo, amount: transferAmount)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!transferAvailable)
-                }
-                EvidenceSummary(model: model)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Wallet")
-            .background(SolsticePalette.background)
-        }
-    }
-}
-
-struct ExchangeView: View {
-    @ObservedObject var model: EvidenceViewModel
-    @State private var side = "BUY"
-    @State private var assetIn = "asset-a"
-    @State private var assetOut = "asset-b"
-    @State private var amount = 5
-    @State private var price = 10
-    @State private var cancelOrderId = ""
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. No live market data.")
-                RunInputsView(model: model)
-                let placeAvailable = model.hasEndpoint("POST /exchange/place_order")
-                let cancelAvailable = model.hasEndpoint("POST /exchange/cancel_order")
-                let bookAvailable = model.hasEndpoint("GET /exchange/orderbook")
-                if !placeAvailable || !bookAvailable {
-                    Text("Not available yet (testnet). Backend capability missing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Wallet Context")
-                        .font(.headline)
-                    Text(model.walletAddress)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                    Text("Balance")
-                        .font(.footnote)
-                    Text(model.walletBalance)
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                    Button("Refresh Wallet Balance") {
-                        Task {
-                            await model.refreshWalletBalance()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                Picker("Side", selection: $side) {
-                    Text("BUY").tag("BUY")
-                    Text("SELL").tag("SELL")
-                }
-                .pickerStyle(.segmented)
-                Picker("Asset In", selection: $assetIn) {
-                    Text("asset-a").tag("asset-a")
-                    Text("asset-b").tag("asset-b")
-                }
-                .pickerStyle(.segmented)
-                Picker("Asset Out", selection: $assetOut) {
-                    Text("asset-b").tag("asset-b")
-                    Text("asset-c").tag("asset-c")
-                }
-                .pickerStyle(.segmented)
-                TextField("Amount", value: $amount, format: .number)
-                #if os(iOS)
-                    .keyboardType(.numberPad)
-                #endif
-                    .nyxInputStyle()
-                TextField("Price", value: $price, format: .number)
-                #if os(iOS)
-                    .keyboardType(.numberPad)
-                #endif
-                    .nyxInputStyle()
-                Button("Place Order") {
-                    Task {
-                        await model.placeOrder(
-                            payload: [
-                                "side": side,
-                                "asset_in": assetIn,
-                                "asset_out": assetOut,
-                                "amount": amount,
-                                "price": price,
-                            ]
-                        )
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!placeAvailable)
-
-                TextField("Cancel Order ID", text: $cancelOrderId)
-                    .nyxInputStyle()
-                Button("Cancel Order") {
-                    Task {
-                        await model.cancelOrder(orderId: cancelOrderId)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!cancelAvailable)
-
-                Button("Refresh Orderbook") {
-                    Task {
-                        await model.refreshOrderBook()
-                        await model.refreshTrades()
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!bookAvailable)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Orderbook (Buy)")
-                        .font(.headline)
-                    ForEach(model.buyOrders.prefix(5)) { order in
-                        Text("\(order.amount) @ \(order.price) \(order.assetIn)/\(order.assetOut)")
-                            .font(.footnote)
-                    }
-                    Text("Orderbook (Sell)")
-                        .font(.headline)
-                        .padding(.top, 8)
-                    ForEach(model.sellOrders.prefix(5)) { order in
-                        Text("\(order.amount) @ \(order.price) \(order.assetIn)/\(order.assetOut)")
-                            .font(.footnote)
-                    }
-                    Text("Trades")
-                        .font(.headline)
-                        .padding(.top, 8)
-                    ForEach(model.trades.prefix(5)) { trade in
-                        Text("\(trade.amount) @ \(trade.price)")
-                            .font(.footnote)
-                    }
-                }
-                EvidenceSummary(model: model)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Exchange")
-            .background(SolsticePalette.background)
-        }
-    }
-}
-
-struct ChatView: View {
-    @ObservedObject var model: EvidenceViewModel
-    @State private var roomName = "general"
-    @State private var selectedRoomId = ""
-    @State private var message = "Hello"
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Portal auth required. No external accounts.")
-                RunInputsView(model: model)
-                let roomsAvailable = model.hasEndpoint("POST /chat/v1/rooms")
-                let messagesAvailable = model.hasEndpoint("POST /chat/v1/rooms/{room_id}/messages")
-                if !roomsAvailable || !messagesAvailable {
-                    Text("Not available yet (testnet). Backend capability missing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                TextField("Room Name", text: $roomName)
-                    .nyxInputStyle()
-                HStack {
-                    Button("Create Room") {
-                        Task {
-                            await model.createChatRoom(name: roomName)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!roomsAvailable)
-                    Button("Refresh Rooms") {
-                        Task {
-                            await model.refreshChatRooms()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!roomsAvailable)
-                }
-                if !model.chatRooms.isEmpty {
-                    Picker("Room", selection: $selectedRoomId) {
-                        ForEach(model.chatRooms) { room in
-                            Text(room.name).tag(room.roomId)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                TextField("Message", text: $message)
-                    .nyxInputStyle()
-                Button("Send Message") {
-                    Task {
-                        if selectedRoomId.isEmpty, let first = model.chatRooms.first {
-                            selectedRoomId = first.roomId
-                        }
-                        await model.sendChatMessage(roomId: selectedRoomId, body: message)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!messagesAvailable)
-                Button("Refresh Messages") {
-                    Task {
-                        if selectedRoomId.isEmpty, let first = model.chatRooms.first {
-                            selectedRoomId = first.roomId
-                        }
-                        await model.refreshChatMessages(roomId: selectedRoomId)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!messagesAvailable)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Recent Messages")
-                        .font(.headline)
-                    ForEach(model.chatMessages.prefix(6)) { item in
-                        Text("[\(item.roomId)] \(item.body)")
-                            .font(.footnote)
-                    }
-                }
-                EvidenceSummary(model: model)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Chat")
-            .background(SolsticePalette.background)
-            .onAppear {
-                Task {
-                    await model.refreshChatRooms()
-                }
-            }
-        }
-    }
-}
-
-struct MarketplaceView: View {
-    @ObservedObject var model: EvidenceViewModel
-    @State private var sku = "sku-1"
-    @State private var title = "Signal Pack"
-    @State private var price = 10
-    @State private var selectedListingId = ""
-    @State private var quantity = 1
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Listings are testnet-only.")
-                RunInputsView(model: model)
-                let listAvailable = model.hasEndpoint("GET /marketplace/listings")
-                let publishAvailable = model.hasEndpoint("POST /marketplace/listing")
-                let purchaseAvailable = model.hasEndpoint("POST /marketplace/purchase")
-                if !listAvailable || !publishAvailable || !purchaseAvailable {
-                    Text("Not available yet (testnet). Backend capability missing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                TextField("SKU", text: $sku)
-                    .nyxInputStyle()
-                TextField("Title", text: $title)
-                    .nyxInputStyle()
-                TextField("Price", value: $price, format: .number)
-                #if os(iOS)
-                    .keyboardType(.numberPad)
-                #endif
-                    .nyxInputStyle()
-                Button("Publish Listing") {
-                    Task {
-                        await model.publishListing(sku: sku, title: title, price: price)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!publishAvailable)
-
-                Button("Refresh Listings") {
-                    Task {
-                        await model.refreshListings()
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!listAvailable)
-
-                if !model.listings.isEmpty {
-                    Picker("Listing", selection: $selectedListingId) {
-                        ForEach(model.listings) { listing in
-                            Text("\(listing.title) (\(listing.price))").tag(listing.listingId)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-                TextField("Quantity", value: $quantity, format: .number)
-                #if os(iOS)
-                    .keyboardType(.numberPad)
-                #endif
-                    .nyxInputStyle()
-                Button("Purchase Listing") {
-                    if selectedListingId.isEmpty, let first = model.listings.first {
-                        selectedListingId = first.listingId
-                    }
-                    Task {
-                        await model.purchaseListing(listingId: selectedListingId, qty: quantity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!purchaseAvailable)
-                if !model.purchases.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Purchases")
-                            .font(.headline)
-                        ForEach(model.purchases.prefix(6)) { purchase in
-                            Text("\(purchase.qty) from \(purchase.listingId)")
-                                .font(.footnote)
-                        }
-                    }
-                }
-                EvidenceSummary(model: model)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Marketplace")
-            .background(SolsticePalette.background)
-        }
-    }
-}
-
-struct EntertainmentView: View {
-    @ObservedObject var model: EvidenceViewModel
-    @State private var selectedItemId = ""
-    @State private var mode = "pulse"
-    @State private var step = 1
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Deterministic steps.")
-                RunInputsView(model: model)
-                let itemsAvailable = model.hasEndpoint("GET /entertainment/items")
-                let stepAvailable = model.hasEndpoint("POST /entertainment/step")
-                if !itemsAvailable || !stepAvailable {
-                    Text("Not available yet (testnet). Backend capability missing.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                Button("Refresh Items") {
-                    Task {
-                        await model.refreshEntertainmentItems()
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!itemsAvailable)
-
-                if !model.entertainmentItems.isEmpty {
-                    Picker("Item", selection: $selectedItemId) {
-                        ForEach(model.entertainmentItems) { item in
-                            Text(item.title).tag(item.itemId)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                Picker("Mode", selection: $mode) {
-                    Text("Pulse").tag("pulse")
-                    Text("Drift").tag("drift")
-                    Text("Scan").tag("scan")
-                }
-                .pickerStyle(.segmented)
-                TextField("Step", value: $step, format: .number)
-                #if os(iOS)
-                    .keyboardType(.numberPad)
-                #endif
-                    .nyxInputStyle()
-                Button("Execute Step") {
-                    Task {
-                        if selectedItemId.isEmpty, let first = model.entertainmentItems.first {
-                            selectedItemId = first.itemId
-                        }
-                        await model.runEntertainmentStep(itemId: selectedItemId, mode: mode, step: step)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!stepAvailable)
-                if !model.entertainmentEvents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent Events")
-                            .font(.headline)
-                        ForEach(model.entertainmentEvents.prefix(6)) { event in
-                            Text("\(event.itemId) • \(event.mode) • step \(event.step)")
-                                .font(.footnote)
-                        }
-                    }
-                }
-                EvidenceSummary(model: model)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Entertainment")
-            .background(SolsticePalette.background)
-            .onAppear {
-                Task {
-                    await model.refreshEntertainmentItems()
-                }
-            }
-        }
-    }
-}
-
-struct TrustView: View {
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Evidence-first operations.")
-                Text("Trust & Evidence")
-                    .font(.title2)
-                Text("Testnet Beta. No live data. Evidence is deterministic and replayable.")
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Trust")
-            .background(SolsticePalette.background)
-        }
-    }
-}
-/*
-struct LegacySettingsView: View {
-    @ObservedObject var model: EvidenceViewModel
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Testnet Beta. Backend URL can be overridden.")
-                Text("Settings")
-                    .font(.title2)
-                TextField("Backend URL", text: $model.backendUrl)
-                    .nyxInputStyle()
-                Button("Apply Backend URL") {
-                    Task {
-                        await model.applyBackendUrl()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                Button("Check Backend Status") {
-                    Task {
-                        await model.refreshBackendStatus()
-                    }
-                }
-                .buttonStyle(.bordered)
-                Text("Current: \(model.backendUrl)")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Settings")
-            .background(SolsticePalette.background)
-        }
-    }
-}
-*/
-struct EvidenceSummary: View {
-    @ObservedObject var model: EvidenceViewModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("state_hash: \(model.stateHash)")
-                .font(.footnote)
-            Text("receipt_hashes: \(model.receiptHashes.joined(separator: ", "))")
-                .font(.footnote)
-            Text("replay_ok: \(String(model.replayOk))")
-                .font(.footnote)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(SolsticePalette.card)
-        .cornerRadius(12)
+        .background(.ultraThinMaterial)
+        .cornerRadius(20)
+        .padding(.horizontal)
     }
 }
 
-struct EvidenceInspectorView: View {
-    @ObservedObject var model: EvidenceViewModel
-
+struct WalletActionBtn: View {
+    let icon: String
+    let label: String
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 16) {
-                PreviewBanner(text: "Evidence is rendered verbatim from the backend.")
-                Button("Refresh Activity") {
-                    Task {
-                        await model.refreshPortalActivity()
-                    }
-                }
-                .buttonStyle(.bordered)
-                if !model.activityReceipts.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent Receipts")
-                            .font(.headline)
-                        ForEach(model.activityReceipts.prefix(8)) { receipt in
-                            Text("\(receipt.module) • \(receipt.action) • \(receipt.runId)")
-                                .font(.footnote)
-                        }
-                    }
-                } else {
-                    Text("No receipts loaded.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                Button("Fetch Export Bundle") {
-                    Task {
-                        await model.fetchExport()
-                    }
-                }
-                .buttonStyle(.bordered)
-
-                if let url = model.exportURL {
-                    ShareLink(item: url) {
-                        Text("Share Evidence Bundle")
-                    }
-                }
-
-                if let evidence = model.evidence {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("protocol_anchor")
-                                .font(.headline)
-                            Text(evidence.protocolAnchor.description)
-                                .font(.footnote)
-
-                            Text("inputs")
-                                .font(.headline)
-                            Text(evidence.inputs.description)
-                                .font(.footnote)
-
-                            Text("outputs")
-                                .font(.headline)
-                            Text(evidence.outputs.description)
-                                .font(.footnote)
-
-                            Text("stdout")
-                                .font(.headline)
-                            Text(evidence.stdout)
-                                .font(.footnote)
-                        }
-                    }
-                } else {
-                    Text("No evidence loaded yet.")
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Evidence")
-            .background(SolsticePalette.background)
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundColor(.black)
+                .frame(width: 44, height: 44)
+                .background(Color.yellow)
+                .cornerRadius(22)
+            Text(label).font(.caption).fontWeight(.bold).foregroundColor(.yellow)
         }
     }
+}
+
+struct NYXExchangeView: View { 
+    var body: some View { 
+        VStack {
+            Image(systemName: "chart.bar.xaxis")
+                .font(.system(size: 50))
+                .foregroundColor(.green)
+            Text("NYX Exchange")
+                .font(.title)
+                .fontWeight(.bold)
+            Text("High-performance deterministic trading engine.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+    } 
+}
+struct NYXChatView: View { 
+    var body: some View { 
+        VStack {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.blue)
+            Text("NYX Chat")
+                .font(.title)
+                .fontWeight(.bold)
+            Text("P2P E2EE encrypted messaging service.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+    } 
+}
+struct NYXStoreView: View { 
+    var body: some View { 
+        VStack {
+            Image(systemName: "bag.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
+            Text("NYX Store")
+                .font(.title)
+                .fontWeight(.bold)
+            Text("Deterministic marketplace for digital assets.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+    } 
 }

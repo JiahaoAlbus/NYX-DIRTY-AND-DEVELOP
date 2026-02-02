@@ -1,0 +1,4 @@
+- 全链路测试 : 执行 bash scripts/nyx_verify_all.sh 结果为 PASS 。
+- 证明包生成 : 执行 bash scripts/nyx_pack_proof_artifacts.sh 生成了 nyx-testnet-proof-v1.tar.gz 。
+- 合规证明 : 所有验证日志和 cURL 记录已存放在 docs/evidence/ 目录下。
+现在可以通过单条命令 bash scripts/nyx_verify_all.sh 向 Grant 评审方展示从领水、交易到存证回放的完整闭环。

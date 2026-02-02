@@ -48,8 +48,6 @@ def _payload_amount(payload: dict[str, object]) -> int:
 
 def _platform_fee_amount(payload: dict[str, object]) -> int:
     bps = get_platform_fee_bps()
-    if bps is None:
-        return 1
     if bps == 0:
         return 0
     base = _payload_amount(payload)

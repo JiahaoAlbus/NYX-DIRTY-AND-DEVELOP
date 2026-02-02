@@ -8,7 +8,11 @@ export enum Screen {
   ACTIVITY = 'ACTIVITY',
   EVIDENCE = 'EVIDENCE',
   SETTINGS = 'SETTINGS',
-  DAPP_BROWSER = 'DAPP_BROWSER'
+  DAPP_BROWSER = 'DAPP_BROWSER',
+  AIRDROP = 'AIRDROP',
+  FAUCET = 'FAUCET',
+  FIAT = 'FIAT',
+  WEB2_ACCESS = 'WEB2_ACCESS'
 }
 
 export interface EvidenceRun {

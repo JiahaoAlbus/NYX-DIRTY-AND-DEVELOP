@@ -161,6 +161,31 @@ def logout_session(conn, token: str) -> None:
     delete_portal_session(conn, token)
 
 
+def update_profile(conn, account_id: str, handle: str | None = None, bio: str | None = None) -> PortalAccount:
+    account = load_account(conn, account_id)
+    if account is None:
+        raise PortalError("account not found")
+    
+    new_handle = account.handle
+    if handle is not None:
+        new_handle = _validate_handle(handle)
+        if new_handle != account.handle:
+            existing = load_portal_account_by_handle(conn, new_handle)
+            if existing is not None:
+                raise PortalError("handle unavailable")
+    
+    new_bio = bio if bio is not None else account.bio
+    if new_bio is not None and len(new_bio) > 256:
+        raise PortalError("bio too long")
+    
+    conn.execute(
+        "UPDATE portal_accounts SET handle = ?, bio = ? WHERE account_id = ?",
+        (new_handle, new_bio, account_id),
+    )
+    conn.commit()
+    return load_account(conn, account_id) # type: ignore
+
+
 def create_room(conn, name: str, is_public: bool = True) -> ChatRoom:
     if not isinstance(name, str) or not name or len(name) > 48:
         raise PortalError("room name invalid")
@@ -178,6 +203,16 @@ def list_rooms(conn, limit: int = 50, offset: int = 0) -> list[dict[str, object]
     rows = conn.execute(
         "SELECT room_id, name, created_at, is_public FROM chat_rooms ORDER BY created_at ASC, room_id ASC LIMIT ? OFFSET ?",
         (lim, off),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]
+
+
+def search_rooms(conn, query: str, limit: int = 50) -> list[dict[str, object]]:
+    from nyx_backend_gateway.storage import _validate_int
+    lim = _validate_int(limit, "limit", 1, 500)
+    rows = conn.execute(
+        "SELECT room_id, name, created_at, is_public FROM chat_rooms WHERE name LIKE ? ORDER BY created_at ASC LIMIT ?",
+        (f"%{query}%", lim),
     ).fetchall()
     return [{col: row[col] for col in row.keys()} for row in rows]
 
@@ -228,3 +263,34 @@ def post_message(conn, room_id: str, sender_account_id: str, body: str) -> tuple
 
 def list_messages(conn, room_id: str, after: int | None, limit: int) -> list[dict[str, object]]:
     return list_chat_messages(conn, room_id=room_id, after=after, limit=limit)
+
+
+def list_account_activity(conn, account_id: str, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+    # Search across receipts linked to this account
+    # For now, we'll return receipts that have a run_id matching transactions/orders for this account
+    # In a real system, we'd have a join table or account_id on receipts
+    rows = conn.execute(
+        """
+        SELECT r.* FROM receipts r
+        WHERE r.run_id IN (
+            SELECT run_id FROM wallet_transfers WHERE from_address = ? OR to_address = ?
+            UNION
+            SELECT run_id FROM orders WHERE owner_address = ?
+            UNION
+            SELECT run_id FROM chat_messages WHERE sender_account_id = ?
+        )
+        ORDER BY r.receipt_id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (account_id, account_id, account_id, account_id, limit, offset),
+    ).fetchall()
+    
+    results = []
+    for row in rows:
+        record = {col: row[col] for col in row.keys()}
+        try:
+            record["receipt_hashes"] = json.loads(record.get("receipt_hashes", "[]"))
+        except:
+            record["receipt_hashes"] = []
+        results.append(record)
+    return results

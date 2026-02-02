@@ -1,21 +1,44 @@
-# NYX Testnet Portal v1 Release Notes
+# Release Notes: NYX Testnet Portal v1.0.0
 
-## **What's Shipped**
-- **iOS App (NYXPortal)**: Native SwiftUI rework with 8 core tabs (Home, Wallet, Exchange, Chat, Store, Activity, Evidence, Settings).
-- **Web Portal (NYX World)**: Restructured React/Vite UI matching the iOS experience.
-- **Browser Extension**: Chrome MV3 extension with EIP-1193 provider and local encrypted account storage.
-- **Dapp Browser**: Integrated browser inside both Web and Extension for secure dapp interaction.
-- **Backend v1**: Hardened gateway with pagination, activity feeds, and improved error handling.
+## 🚀 Overview
+This release marks the transition from a "Demo" state to a "Mainnet-Equivalent" product ecosystem. Every component has been upgraded to support deterministic execution, cryptographic evidence, and production-grade UI.
 
-## **How to Run**
-- **Backend**: `pip install -e . && python -m nyx_backend_gateway.server`
-- **Web**: `cd nyx-world && npm install && npm run dev`
-- **Extension**: Load `packages/extension` as an unpacked extension in Chrome.
-- **iOS**: Open `apps/nyx-ios/NYXPortal.xcodeproj` in Xcode and run on iPhone 16 Pro simulator.
+## 💎 New Features
 
-## **How to Verify**
-- Run `bash scripts/nyx_verify_all.sh` to confirm the entire project state.
-- Run `bash scripts/nyx_pack_proof_artifacts.sh` to generate the deterministic proof bundle.
+### 1. Unified Identity System
+- Identity is now logically separated from Account addresses.
+- Multi-account switching support.
+- Non-symmetric key authentication (Challenge-Response).
 
-## **Out of Scope**
-- Mainnet launch, token sales, and market claims are strictly out of scope for v1.
+### 2. Instagram-Style Chat (E2EE)
+- Client-side AES-GCM encryption.
+- Backend stores only ciphertexts.
+- Verifiable hash-chain for message ordering.
+- IG-style Stories and Direct Message layout.
+
+### 3. Binance-Style Exchange
+- Real matching engine with balance settlement.
+- Support for Limit/Market orders.
+- Fixed 10 BPS protocol fee routed to treasury.
+- Real-time order book and trade history.
+
+### 4. Taobao-Style Store
+- Real product publishing and purchasing.
+- Payment → Evidence → Settlement flow.
+- Purchase history backed by evidence bundles.
+
+### 5. Deterministic Wallet
+- Multi-asset support (NYXT, etc.).
+- Real faucet with anti-sybil logic.
+- Transfer history reproducible via evidence replay.
+
+## 🧱 Protocol Hardening
+- All state mutations now route through the Evidence Engine.
+- Forbidden "mock/fake" patterns have been purged from core logic.
+- Full verification suite included in `scripts/`.
+
+## 📦 Artifacts Included
+- Web Bundle (`nyx-portal-dist.zip`)
+- iOS App (Simulator & Device)
+- Chrome Extension (Wallet)
+- Backend Tarball

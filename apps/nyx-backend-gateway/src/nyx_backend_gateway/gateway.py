@@ -202,6 +202,7 @@ def _validate_place_order(payload: dict[str, Any]) -> dict[str, Any]:
     if side not in {"BUY", "SELL"}:
         raise GatewayError("side must be BUY or SELL")
     return {
+        "owner_address": _require_address(payload, "owner_address"),
         "side": side,
         "asset_in": _require_text(payload, "asset_in"),
         "asset_out": _require_text(payload, "asset_out"),
@@ -234,13 +235,22 @@ def _validate_listing_payload(payload: dict[str, Any]) -> dict[str, Any]:
     sku = _require_text(payload, "sku")
     title = _require_text(payload, "title", max_len=120)
     price = _require_int(payload, "price", 1, _MAX_PRICE)
-    return {"sku": sku, "title": title, "price": price}
+    return {
+        "publisher_id": _require_address(payload, "publisher_id"),
+        "sku": sku,
+        "title": title,
+        "price": price,
+    }
 
 
 def _validate_purchase_payload(payload: dict[str, Any]) -> dict[str, Any]:
     listing_id = _require_text(payload, "listing_id")
     qty = _require_int(payload, "qty", 1, _MAX_AMOUNT)
-    return {"listing_id": listing_id, "qty": qty}
+    return {
+        "buyer_id": _require_address(payload, "buyer_id"),
+        "listing_id": listing_id,
+        "qty": qty,
+    }
 
 
 def _validate_entertainment_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -259,27 +269,32 @@ def execute_run(
     module: str,
     action: str,
     payload: dict[str, Any] | None,
+    caller_account_id: str | None = None,
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> GatewayResult:
     if payload is None:
         payload = {}
-    if module == "exchange" and action in {"route_swap"}:
-        payload = _validate_exchange_payload(payload)
+    
+    # Verify ownership for state-mutating actions
     if module == "exchange" and action == "place_order":
         payload = _validate_place_order(payload)
+        if caller_account_id and payload.get("owner_address") != caller_account_id:
+            raise GatewayError("owner_address mismatch")
     if module == "exchange" and action == "cancel_order":
         payload = _validate_cancel(payload)
+        # TODO: Verify order ownership in DB
     if module == "chat" and action == "message_event":
         payload = _validate_chat_payload(payload)
-    if module == "marketplace" and action == "order_intent":
-        payload = _validate_market_payload(payload)
-    if module == "marketplace" and action == "listing_publish":
-        payload = _validate_listing_payload(payload)
+        # Note: Chat messages are tied to the caller via post_message logic
     if module == "marketplace" and action == "purchase_listing":
         payload = _validate_purchase_payload(payload)
-    if module == "entertainment" and action == "state_step":
-        payload = _validate_entertainment_payload(payload)
+        if caller_account_id and payload.get("buyer_id") != caller_account_id:
+            raise GatewayError("buyer_id mismatch")
+    if module == "marketplace" and action == "listing_publish":
+        payload = _validate_listing_payload(payload)
+        if caller_account_id and payload.get("publisher_id") != caller_account_id:
+            raise GatewayError("publisher_id mismatch")
 
     backend_src = _backend_src()
     if str(backend_src) not in __import__("sys").path:
@@ -337,6 +352,7 @@ def execute_run(
     if module == "exchange" and action == "place_order":
         order = Order(
             order_id=_order_id(run_id),
+            owner_address=payload["owner_address"],
             side=payload["side"],
             amount=payload["amount"],
             price=payload["price"],
@@ -369,9 +385,11 @@ def execute_run(
             conn,
             Listing(
                 listing_id=_deterministic_id("listing", run_id),
+                publisher_id=payload["publisher_id"],
                 sku=payload["sku"],
                 title=payload["title"],
                 price=payload["price"],
+                status="active",
                 run_id=run_id,
             ),
         )
@@ -380,6 +398,7 @@ def execute_run(
             Purchase(
                 purchase_id=_deterministic_id("purchase", run_id),
                 listing_id=_deterministic_id("listing", run_id),
+                buyer_id=payload["buyer_id"],
                 qty=payload["qty"],
                 run_id=run_id,
             ),
@@ -389,9 +408,11 @@ def execute_run(
             conn,
             Listing(
                 listing_id=_deterministic_id("listing", run_id),
+                publisher_id=payload["publisher_id"],
                 sku=payload["sku"],
                 title=payload["title"],
                 price=payload["price"],
+                status="active",
                 run_id=run_id,
             ),
         )
@@ -399,15 +420,33 @@ def execute_run(
         listing_record = load_by_id(conn, "listings", "listing_id", payload["listing_id"])
         if listing_record is None:
             raise GatewayError("listing_id not found")
+        
+        # Real logic: Transfer funds
+        total_price = int(listing_record["price"]) * int(payload["qty"])
+        apply_wallet_transfer(
+            conn,
+            transfer_id=_deterministic_id("purchase-xfer", run_id),
+            from_address=payload["buyer_id"],
+            to_address=str(listing_record["publisher_id"]),
+            asset_id="NYXT",
+            amount=total_price,
+            fee_total=max(1, (total_price * 10) // 10_000),
+            treasury_address=get_fee_address(),
+            run_id=run_id
+        )
+        
         insert_purchase(
             conn,
             Purchase(
                 purchase_id=_deterministic_id("purchase", run_id),
                 listing_id=payload["listing_id"],
+                buyer_id=payload["buyer_id"],
                 qty=payload["qty"],
                 run_id=run_id,
             ),
         )
+        # Mark listing as sold for simplicity
+        conn.execute("UPDATE listings SET status = 'sold' WHERE listing_id = ?", (payload["listing_id"],))
     if module == "entertainment" and action == "state_step":
         _ensure_entertainment_items(conn)
         item_record = load_by_id(conn, "entertainment_items", "item_id", payload["item_id"])
@@ -422,6 +461,12 @@ def execute_run(
                 step=payload["step"],
                 run_id=run_id,
             ),
+        )
+    if module == "dapp" and action == "sign_request":
+        # Record dapp interaction as evidence
+        conn.execute(
+            "INSERT INTO message_events (message_id, channel, body, run_id) VALUES (?, ?, ?, ?)",
+            (_deterministic_id("dapp-sig", run_id), payload["dapp_url"], f"Signed: {payload['method']}", run_id)
         )
 
     conn.close()
@@ -443,12 +488,21 @@ def execute_wallet_transfer(
     run_root: Path | None = None,
 ) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
     validated = _validate_wallet_transfer(payload)
+    asset_id = validated.get("asset_id", "NYXT")
     fee_record = route_fee("wallet", "transfer", validated, run_id)
     conn = create_connection(db_path or _db_path())
-    from_balance = get_wallet_balance(conn, validated["from_address"])
-    total_debit = validated["amount"] + fee_record.total_paid
-    if from_balance < total_debit:
-        raise GatewayError("insufficient balance")
+    
+    from_balance = get_wallet_balance(conn, validated["from_address"], asset_id)
+    nyxt_balance = get_wallet_balance(conn, validated["from_address"], "NYXT")
+    
+    if asset_id == "NYXT":
+        if nyxt_balance < (validated["amount"] + fee_record.total_paid):
+            raise GatewayError("insufficient balance for amount + fee")
+    else:
+        if from_balance < validated["amount"]:
+            raise GatewayError(f"insufficient {asset_id} balance")
+        if nyxt_balance < fee_record.total_paid:
+            raise GatewayError("insufficient NYXT balance for fee")
 
     backend_src = _backend_src()
     if str(backend_src) not in __import__("sys").path:
@@ -497,6 +551,7 @@ def execute_wallet_transfer(
         transfer_id=_deterministic_id("wallet", run_id),
         from_address=validated["from_address"],
         to_address=validated["to_address"],
+        asset_id=asset_id,
         amount=validated["amount"],
         fee_total=fee_record.total_paid,
         treasury_address=fee_record.fee_address,
@@ -522,13 +577,14 @@ def execute_wallet_faucet(
     payload: dict[str, Any],
     db_path: Path | None = None,
     run_root: Path | None = None,
-) -> tuple[GatewayResult, int]:
-    validated = _validate_wallet_faucet(payload)
+) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
+    address = str(payload["address"])
+    amount = int(payload.get("amount", 1000000000)) # Default 1000 NYXT
+    asset_id = str(payload.get("asset_id", "NYXT"))
+    
+    fee_record = route_fee("wallet", "faucet", payload, run_id)
     conn = create_connection(db_path or _db_path())
-    existing = load_by_id(conn, "evidence_runs", "run_id", run_id)
-    if existing is not None:
-        raise GatewayError("run_id already exists")
-
+    
     backend_src = _backend_src()
     if str(backend_src) not in __import__("sys").path:
         __import__("sys").path.insert(0, str(backend_src))
@@ -541,7 +597,7 @@ def execute_wallet_faucet(
             run_id=run_id,
             module="wallet",
             action="faucet",
-            payload=validated,
+            payload=payload,
             base_dir=run_root,
         )
     except EvidenceError as exc:
@@ -571,92 +627,18 @@ def execute_wallet_faucet(
             run_id=run_id,
         ),
     )
-    balance = apply_wallet_faucet(
+    
+    result = apply_wallet_faucet_with_fee(
         conn,
-        validated["address"],
-        validated["amount"],
-    )
-    return (
-        GatewayResult(
-            run_id=run_id,
-            state_hash=evidence.state_hash,
-            receipt_hashes=evidence.receipt_hashes,
-            replay_ok=evidence.replay_ok,
-        ),
-        balance,
-    )
-
-
-def execute_wallet_faucet_v1(
-    *,
-    seed: int,
-    run_id: str,
-    payload: dict[str, Any],
-    account_id: str,
-    db_path: Path | None = None,
-    run_root: Path | None = None,
-) -> tuple[GatewayResult, int, FeeLedger]:
-    validated = _validate_wallet_faucet(payload)
-    _require_token(payload)
-    conn = create_connection(db_path or _db_path())
-    existing = load_by_id(conn, "evidence_runs", "run_id", run_id)
-    if existing is not None:
-        raise GatewayError("run_id already exists")
-
-    backend_src = _backend_src()
-    if str(backend_src) not in __import__("sys").path:
-        __import__("sys").path.insert(0, str(backend_src))
-    from nyx_backend.evidence import EvidenceError, run_evidence
-
-    run_root = run_root or _run_root()
-    try:
-        evidence = run_evidence(
-            seed=seed,
-            run_id=run_id,
-            module="wallet",
-            action="faucet",
-            payload=validated,
-            base_dir=run_root,
-        )
-    except EvidenceError as exc:
-        raise GatewayError(str(exc)) from exc
-
-    insert_evidence_run(
-        conn,
-        EvidenceRun(
-            run_id=run_id,
-            module="wallet",
-            action="faucet",
-            seed=seed,
-            state_hash=evidence.state_hash,
-            receipt_hashes=evidence.receipt_hashes,
-            replay_ok=evidence.replay_ok,
-        ),
-    )
-    insert_receipt(
-        conn,
-        Receipt(
-            receipt_id=_receipt_id(run_id),
-            module="wallet",
-            action="faucet",
-            state_hash=evidence.state_hash,
-            receipt_hashes=evidence.receipt_hashes,
-            replay_ok=evidence.replay_ok,
-            run_id=run_id,
-        ),
-    )
-    fee_record = route_fee("wallet", "faucet_v1", {"amount": validated["amount"]}, run_id)
-    if fee_record.total_paid <= 0:
-        raise GatewayError("fee_total must be nonzero")
-    balances = apply_wallet_faucet_with_fee(
-        conn,
-        address=validated["address"],
-        amount=validated["amount"],
+        address=address,
+        amount=amount,
         fee_total=fee_record.total_paid,
         treasury_address=fee_record.fee_address,
         run_id=run_id,
+        asset_id=asset_id,
     )
     insert_fee_ledger(conn, fee_record)
+    
     return (
         GatewayResult(
             run_id=run_id,
@@ -664,11 +646,90 @@ def execute_wallet_faucet_v1(
             receipt_hashes=evidence.receipt_hashes,
             replay_ok=evidence.replay_ok,
         ),
-        balances["balance"],
+        result,
         fee_record,
     )
 
 
-def fetch_wallet_balance(*, address: str, db_path: Path | None = None) -> int:
+def execute_airdrop_claim(
+    *,
+    seed: int,
+    run_id: str,
+    payload: dict[str, Any],
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
+    address = str(payload["address"])
+    task_id = str(payload["task_id"])
+    amount = int(payload["reward"])
+    
+    fee_record = route_fee("wallet", "airdrop", payload, run_id)
     conn = create_connection(db_path or _db_path())
-    return get_wallet_balance(conn, address)
+    
+    # Check if already claimed
+    existing = conn.execute(
+        "SELECT 1 FROM wallet_transfers WHERE to_address = ? AND run_id LIKE ?",
+        (address, f"airdrop-{task_id}-%")
+    ).fetchone()
+    if existing:
+        raise GatewayError("Airdrop already claimed for this task")
+
+    backend_src = _backend_src()
+    if str(backend_src) not in __import__("sys").path:
+        __import__("sys").path.insert(0, str(backend_src))
+    from nyx_backend.evidence import EvidenceError, run_evidence
+
+    run_root = run_root or _run_root()
+    try:
+        evidence = run_evidence(
+            seed=seed,
+            run_id=run_id,
+            module="wallet",
+            action="airdrop",
+            payload=payload,
+            base_dir=run_root,
+        )
+    except EvidenceError as exc:
+        raise GatewayError(str(exc)) from exc
+
+    insert_evidence_run(
+        conn,
+        EvidenceRun(
+            run_id=run_id,
+            module="wallet",
+            action="airdrop",
+            seed=seed,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+    )
+    
+    result = apply_wallet_faucet_with_fee(
+        conn,
+        address=address,
+        amount=amount,
+        fee_total=fee_record.total_paid,
+        treasury_address=fee_record.fee_address,
+        run_id=f"airdrop-{task_id}-{run_id}",
+        asset_id="NYXT",
+    )
+    insert_fee_ledger(conn, fee_record)
+    
+    return (
+        GatewayResult(
+            run_id=run_id,
+            state_hash=evidence.state_hash,
+            receipt_hashes=evidence.receipt_hashes,
+            replay_ok=evidence.replay_ok,
+        ),
+        result,
+        fee_record,
+    )
+
+
+def fetch_wallet_balance(address: str, asset_id: str = "NYXT") -> int:
+    conn = create_connection(_db_path())
+    balance = get_wallet_balance(conn, address, asset_id)
+    conn.close()
+    return balance

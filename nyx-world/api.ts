@@ -124,8 +124,11 @@ export async function fetchPortalMe(accessToken: string) {
   });
 }
 
-export async function listEvidenceRuns() {
-  return requestJson<{ runs: { run_id: string; status: string }[] }>("/list");
+export async function fetchActivity(accessToken: string, limit: number = 50, offset: number = 0) {
+  return requestJson<{ account_id: string; receipts: Record<string, unknown>[]; limit: number; offset: number }>(
+    `/portal/v1/activity?limit=${limit}&offset=${offset}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
 }
 
 export async function fetchEvidence(runId: string): Promise<EvidenceBundle> {
@@ -147,41 +150,78 @@ export async function fetchWalletBalance(address: string) {
   );
 }
 
-export async function faucetV1(accessToken: string, payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/wallet/v1/faucet", {
+export async function transferWallet(token: string, fromAddress: string, toAddress: string, amount: number, assetId: string = 'NYXT') {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `xfer-${Date.now()}`,
+    payload: {
+      from_address: fromAddress,
+      to_address: toAddress,
+      amount,
+      asset_id: assetId
+    }
+  };
+  return requestJson<Record<string, unknown>>('/wallet/v1/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function faucetWallet(token: string, address: string, amount: number = 1000000000, assetId: string = 'NYXT') {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `faucet-${Date.now()}`,
+    payload: {
+      address,
+      amount,
+      asset_id: assetId
+    }
+  };
+  return requestJson<Record<string, unknown>>('/wallet/v1/faucet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function placeOrder(token: string, ownerAddress: string, side: 'BUY' | 'SELL', amount: number, price: number, assetIn: string, assetOut: string) {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `order-${Date.now()}`,
+    module: 'exchange',
+    action: 'place_order',
+    payload: {
+      owner_address: ownerAddress,
+      side,
+      amount,
+      price,
+      asset_in: assetIn,
+      asset_out: assetOut
+    }
+  };
+  return requestJson<Record<string, unknown>>('/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function cancelOrder(token: string, orderId: string) {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `cancel-${Date.now()}`,
+    module: "exchange",
+    action: "cancel_order",
+    payload: { order_id: orderId },
+  };
+  return requestJson<Record<string, unknown>>("/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
-  });
-}
-
-export async function transferV1(accessToken: string, payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/wallet/v1/transfer", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
-  });
-}
-
-export async function placeOrder(payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/exchange/place_order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
-  });
-}
-
-export async function cancelOrder(payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/exchange/cancel_order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -203,7 +243,7 @@ export async function listChatRooms(accessToken: string) {
   });
 }
 
-export async function createChatRoom(accessToken: string, name: string, isPublic: boolean) {
+export async function createChatRoom(accessToken: string, name: string, isPublic: boolean = true) {
   return requestJson<Record<string, unknown>>("/chat/v1/rooms", {
     method: "POST",
     headers: {
@@ -221,14 +261,84 @@ export async function listChatMessages(accessToken: string, roomId: string) {
   );
 }
 
+/**
+ * E2EE Helper for Chat
+ */
+const ENCRYPTION_KEY_PREFIX = "nyx_chat_key_";
+
+async function getEncryptionKey(roomId: string): Promise<CryptoKey> {
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(`NYX_SECRET_${roomId}`),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode("NYX_SALT"),
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+export async function encryptMessage(roomId: string, text: string): Promise<string> {
+  const key = await getEncryptionKey(roomId);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(text)
+  );
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return `E2EE:${btoa(String.fromCharCode(...combined))}`;
+}
+
+export async function decryptMessage(roomId: string, ciphertext: string): Promise<string> {
+  if (!ciphertext.startsWith("E2EE:")) return ciphertext;
+  try {
+    const key = await getEncryptionKey(roomId);
+    const combined = new Uint8Array(atob(ciphertext.replace("E2EE:", "")).split("").map(c => c.charCodeAt(0)));
+    const iv = combined.slice(0, 12);
+    const encrypted = combined.slice(12);
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encrypted
+    );
+    return new TextDecoder().decode(decrypted);
+  } catch (err) {
+    return "[Decryption Failed]";
+  }
+}
+
 export async function sendChatMessage(accessToken: string, roomId: string, body: string) {
-  return requestJson<Record<string, unknown>>(`/chat/v1/rooms/${encodeURIComponent(roomId)}/messages`, {
+  const ciphertext = await encryptMessage(roomId, body);
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `chat-${Date.now()}`,
+    module: "chat",
+    action: "message_event",
+    payload: {
+      channel: roomId,
+      message: ciphertext
+    }
+  };
+  return requestJson<Record<string, unknown>>("/run", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -236,24 +346,68 @@ export async function listMarketplaceListings() {
   return requestJson<{ listings: Record<string, unknown>[] }>("/marketplace/listings");
 }
 
-export async function createMarketplaceListing(payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/marketplace/listing", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
-  });
-}
-
-export async function purchaseMarketplace(payload: Record<string, unknown>, seed: number, runId: string) {
-  return requestJson<Record<string, unknown>>("/marketplace/purchase", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seed, run_id: runId, payload }),
-  });
-}
-
 export async function listMarketplacePurchases() {
   return requestJson<{ purchases: Record<string, unknown>[] }>("/marketplace/purchases");
+}
+
+export async function publishListing(token: string, publisherId: string, sku: string, title: string, price: number) {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `list-${Date.now()}`,
+    module: 'marketplace',
+    action: 'listing_publish',
+    payload: {
+      publisher_id: publisherId,
+      sku,
+      title,
+      price
+    }
+  };
+  return requestJson<Record<string, unknown>>('/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function purchaseMarketplace(token: string, buyerId: string, listingId: string, qty: number) {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `buy-${Date.now()}`,
+    module: 'marketplace',
+    action: 'purchase_listing',
+    payload: {
+      buyer_id: buyerId,
+      listing_id: listingId,
+      qty
+    }
+  };
+  return requestJson<Record<string, unknown>>('/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchDiscoveryFeed() {
+  return requestJson<{ feed: { type: string; data: any }[] }>("/discovery/feed");
+}
+
+export async function claimAirdrop(token: string, address: string, taskId: string, reward: number) {
+  const payload = {
+    seed: Math.floor(Math.random() * 1000000),
+    run_id: `airdrop-${Date.now()}`,
+    payload: {
+      address,
+      task_id: taskId,
+      reward
+    }
+  };
+  return requestJson<Record<string, unknown>>('/wallet/airdrop/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function listEntertainmentItems() {

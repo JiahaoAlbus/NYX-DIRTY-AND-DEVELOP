@@ -29,6 +29,7 @@ final class BackendHealthModel: ObservableObject {
 
 struct WebPortalView: View {
     @ObservedObject var settings: BackendSettings
+    var initialScreen: String? = nil
     @StateObject private var health = BackendHealthModel()
 
     var body: some View {
@@ -56,8 +57,8 @@ struct WebPortalView: View {
             }
             .padding()
 
-            WebContainerView(backendURL: settings.baseURL)
-                .id(settings.baseURL)
+            WebContainerView(backendURL: settings.baseURL, sessionToken: settings.session?.access_token, initialScreen: initialScreen)
+                .id("\(settings.baseURL)-\(initialScreen ?? "default")")
                 .edgesIgnoringSafeArea(.bottom)
         }
         .task {
@@ -71,13 +72,28 @@ struct WebPortalView: View {
 
 struct WebContainerView: UIViewRepresentable {
     let backendURL: String
+    let sessionToken: String?
+    let initialScreen: String?
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        let escaped = backendURL
+        
+        let escapedURL = backendURL
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "'", with: "\\'")
-        let scriptSource = "window.__NYX_BACKEND_URL__ = '\(escaped)';"
+        
+        var scriptSource = "window.__NYX_BACKEND_URL__ = '\(escapedURL)';"
+        
+        if let token = sessionToken {
+            let escapedToken = token.replacingOccurrences(of: "'", with: "\\'")
+            scriptSource += "window.__NYX_SESSION_TOKEN__ = '\(escapedToken)';"
+        }
+        
+        if let screen = initialScreen {
+            let escapedScreen = screen.replacingOccurrences(of: "'", with: "\\'")
+            scriptSource += "window.__NYX_INITIAL_SCREEN__ = '\(escapedScreen)';"
+        }
+
         let userScript = WKUserScript(source: scriptSource, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         config.userContentController.addUserScript(userScript)
 

@@ -63,6 +63,7 @@ class EvidenceRun:
 @dataclass(frozen=True)
 class Order:
     order_id: str
+    owner_address: str
     side: str
     amount: int
     price: int
@@ -95,6 +96,7 @@ class PortalAccount:
     public_key: str
     created_at: int
     status: str
+    bio: str | None = None
 
 
 @dataclass(frozen=True)
@@ -136,9 +138,11 @@ class ChatMessage:
 @dataclass(frozen=True)
 class Listing:
     listing_id: str
+    publisher_id: str
     sku: str
     title: str
     price: int
+    status: str
     run_id: str
 
 
@@ -146,6 +150,7 @@ class Listing:
 class Purchase:
     purchase_id: str
     listing_id: str
+    buyer_id: str
     qty: int
     run_id: str
 
@@ -193,6 +198,7 @@ class FeeLedger:
 @dataclass(frozen=True)
 class WalletAccount:
     address: str
+    asset_id: str
     balance: int
 
 
@@ -201,6 +207,7 @@ class WalletTransfer:
     transfer_id: str
     from_address: str
     to_address: str
+    asset_id: str
     amount: int
     fee_total: int
     treasury_address: str
@@ -231,10 +238,13 @@ def insert_portal_account(conn: sqlite3.Connection, account: PortalAccount) -> N
     public_key = _validate_text(account.public_key, "public_key", r"[A-Za-z0-9+/=]{16,256}")
     created_at = _validate_int(account.created_at, "created_at", 1)
     status = _validate_text(account.status, "status", r"[A-Za-z0-9_-]{3,16}")
+    bio = account.bio
+    if bio is not None and len(bio) > 256:
+        raise StorageError("bio too long")
     conn.execute(
-        "INSERT INTO portal_accounts (account_id, handle, public_key, created_at, status) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (account_id, handle, public_key, created_at, status),
+        "INSERT INTO portal_accounts (account_id, handle, public_key, created_at, status, bio) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (account_id, handle, public_key, created_at, status, bio),
     )
     conn.commit()
 
@@ -242,7 +252,7 @@ def insert_portal_account(conn: sqlite3.Connection, account: PortalAccount) -> N
 def load_portal_account(conn: sqlite3.Connection, account_id: str) -> PortalAccount | None:
     aid = _validate_text(account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
     row = conn.execute(
-        "SELECT account_id, handle, public_key, created_at, status FROM portal_accounts WHERE account_id = ?",
+        "SELECT account_id, handle, public_key, created_at, status, bio FROM portal_accounts WHERE account_id = ?",
         (aid,),
     ).fetchone()
     if row is None:
@@ -253,7 +263,7 @@ def load_portal_account(conn: sqlite3.Connection, account_id: str) -> PortalAcco
 def load_portal_account_by_handle(conn: sqlite3.Connection, handle: str) -> PortalAccount | None:
     h = _validate_text(handle, "handle", r"[a-z0-9_-]{3,24}")
     row = conn.execute(
-        "SELECT account_id, handle, public_key, created_at, status FROM portal_accounts WHERE handle = ?",
+        "SELECT account_id, handle, public_key, created_at, status, bio FROM portal_accounts WHERE handle = ?",
         (h,),
     ).fetchone()
     if row is None:
@@ -400,6 +410,7 @@ def list_receipts(conn: sqlite3.Connection, limit: int = 50, offset: int = 0) ->
 
 def insert_order(conn: sqlite3.Connection, order: Order) -> None:
     order_id = _validate_text(order.order_id, "order_id")
+    owner_address = _validate_wallet_address(order.owner_address, "owner_address")
     side = _validate_text(order.side, "side", r"(BUY|SELL)")
     amount = _validate_int(order.amount, "amount", 1)
     price = _validate_int(order.price, "price", 1)
@@ -407,9 +418,9 @@ def insert_order(conn: sqlite3.Connection, order: Order) -> None:
     asset_out = _validate_text(order.asset_out, "asset_out")
     run_id = _validate_text(order.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO orders (order_id, side, amount, price, asset_in, asset_out, run_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (order_id, side, amount, price, asset_in, asset_out, run_id),
+        "INSERT OR REPLACE INTO orders (order_id, owner_address, side, amount, price, asset_in, asset_out, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (order_id, owner_address, side, amount, price, asset_in, asset_out, run_id),
     )
     conn.commit()
 
@@ -513,16 +524,19 @@ def list_messages(conn: sqlite3.Connection, channel: str | None = None, limit: i
 
 def insert_listing(conn: sqlite3.Connection, listing: Listing) -> None:
     listing_id = _validate_text(listing.listing_id, "listing_id")
+    publisher_id = _validate_text(listing.publisher_id, "publisher_id")
     sku = _validate_text(listing.sku, "sku")
     if not isinstance(listing.title, str) or not listing.title or isinstance(listing.title, bool):
         raise StorageError("title required")
     if len(listing.title) > 128:
         raise StorageError("title too long")
     price = _validate_int(listing.price, "price", 1)
+    status = _validate_text(listing.status, "status", r"(active|sold)")
     run_id = _validate_text(listing.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO listings (listing_id, sku, title, price, run_id) VALUES (?, ?, ?, ?, ?)",
-        (listing_id, sku, listing.title, price, run_id),
+        "INSERT OR REPLACE INTO listings (listing_id, publisher_id, sku, title, price, status, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (listing_id, publisher_id, sku, listing.title, price, status, run_id),
     )
     conn.commit()
 
@@ -531,7 +545,7 @@ def list_listings(conn: sqlite3.Connection, limit: int = 100, offset: int = 0) -
     lim = _validate_int(limit, "limit", 1, 1000)
     off = _validate_int(offset, "offset", 0)
     rows = conn.execute(
-        "SELECT * FROM listings ORDER BY listing_id ASC LIMIT ? OFFSET ?",
+        "SELECT * FROM listings WHERE status = 'active' ORDER BY listing_id ASC LIMIT ? OFFSET ?",
         (lim, off),
     ).fetchall()
     return [{col: row[col] for col in row.keys()} for row in rows]
@@ -540,11 +554,12 @@ def list_listings(conn: sqlite3.Connection, limit: int = 100, offset: int = 0) -
 def insert_purchase(conn: sqlite3.Connection, purchase: Purchase) -> None:
     purchase_id = _validate_text(purchase.purchase_id, "purchase_id")
     listing_id = _validate_text(purchase.listing_id, "listing_id")
+    buyer_id = _validate_text(purchase.buyer_id, "buyer_id")
     qty = _validate_int(purchase.qty, "qty", 1)
     run_id = _validate_text(purchase.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO purchases (purchase_id, listing_id, qty, run_id) VALUES (?, ?, ?, ?)",
-        (purchase_id, listing_id, qty, run_id),
+        "INSERT OR REPLACE INTO purchases (purchase_id, listing_id, buyer_id, qty, run_id) VALUES (?, ?, ?, ?, ?)",
+        (purchase_id, listing_id, buyer_id, qty, run_id),
     )
     conn.commit()
 
@@ -662,33 +677,36 @@ def insert_fee_ledger(conn: sqlite3.Connection, record: FeeLedger) -> None:
     conn.commit()
 
 
-def _ensure_wallet_account(conn: sqlite3.Connection, address: str) -> None:
+def _ensure_wallet_account(conn: sqlite3.Connection, address: str, asset_id: str = "NYXT") -> None:
     addr = _validate_wallet_address(address)
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     conn.execute(
-        "INSERT OR IGNORE INTO wallet_accounts (address, balance) VALUES (?, ?)",
-        (addr, 0),
+        "INSERT OR IGNORE INTO wallet_accounts (address, asset_id, balance) VALUES (?, ?, ?)",
+        (addr, asset, 0),
     )
 
 
-def get_wallet_balance(conn: sqlite3.Connection, address: str) -> int:
+def get_wallet_balance(conn: sqlite3.Connection, address: str, asset_id: str = "NYXT") -> int:
     addr = _validate_wallet_address(address)
-    _ensure_wallet_account(conn, addr)
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
+    _ensure_wallet_account(conn, addr, asset)
     row = conn.execute(
-        "SELECT balance FROM wallet_accounts WHERE address = ?",
-        (addr,),
+        "SELECT balance FROM wallet_accounts WHERE address = ? AND asset_id = ?",
+        (addr, asset),
     ).fetchone()
     if row is None:
         return 0
     return int(row[0])
 
 
-def set_wallet_balance(conn: sqlite3.Connection, address: str, balance: int) -> None:
+def set_wallet_balance(conn: sqlite3.Connection, address: str, balance: int, asset_id: str = "NYXT") -> None:
     addr = _validate_wallet_address(address)
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     amount = _validate_int(balance, "balance", 0)
-    _ensure_wallet_account(conn, addr)
+    _ensure_wallet_account(conn, addr, asset)
     conn.execute(
-        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
-        (amount, addr),
+        "UPDATE wallet_accounts SET balance = ? WHERE address = ? AND asset_id = ?",
+        (amount, addr, asset),
     )
 
 
@@ -696,14 +714,15 @@ def insert_wallet_transfer(conn: sqlite3.Connection, transfer: WalletTransfer) -
     transfer_id = _validate_text(transfer.transfer_id, "transfer_id")
     from_address = _validate_wallet_address(transfer.from_address, "from_address")
     to_address = _validate_wallet_address(transfer.to_address, "to_address")
+    asset_id = _validate_text(transfer.asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     amount = _validate_int(transfer.amount, "amount", 1)
     fee_total = _validate_int(transfer.fee_total, "fee_total", 0)
     treasury_address = _validate_wallet_address(transfer.treasury_address, "treasury_address")
     run_id = _validate_text(transfer.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO wallet_transfers (transfer_id, from_address, to_address, amount, fee_total, treasury_address, run_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (transfer_id, from_address, to_address, amount, fee_total, treasury_address, run_id),
+        "INSERT OR REPLACE INTO wallet_transfers (transfer_id, from_address, to_address, asset_id, amount, fee_total, treasury_address, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (transfer_id, from_address, to_address, asset_id, amount, fee_total, treasury_address, run_id),
     )
 
 
@@ -717,47 +736,51 @@ def apply_wallet_transfer(
     fee_total: int,
     treasury_address: str,
     run_id: str,
+    asset_id: str = "NYXT",
 ) -> dict[str, int]:
     transfer_id = _validate_text(transfer_id, "transfer_id")
     from_addr = _validate_wallet_address(from_address, "from_address")
     to_addr = _validate_wallet_address(to_address, "to_address")
     treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     amt = _validate_int(amount, "amount", 1)
     fee = _validate_int(fee_total, "fee_total", 0)
     if from_addr == to_addr:
         raise StorageError("from_address must differ")
-    _ensure_wallet_account(conn, from_addr)
-    _ensure_wallet_account(conn, to_addr)
-    _ensure_wallet_account(conn, treasury_addr)
-    row = conn.execute(
-        "SELECT balance FROM wallet_accounts WHERE address = ?",
-        (from_addr,),
-    ).fetchone()
-    current = int(row[0]) if row else 0
-    total_debit = amt + fee
-    if current < total_debit:
-        raise StorageError("insufficient balance")
-    new_from = current - total_debit
-    new_to = get_wallet_balance(conn, to_addr) + amt
-    new_treasury = get_wallet_balance(conn, treasury_addr) + fee
-    conn.execute(
-        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
-        (new_from, from_addr),
-    )
-    conn.execute(
-        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
-        (new_to, to_addr),
-    )
-    conn.execute(
-        "UPDATE wallet_accounts SET balance = ? WHERE address = ?",
-        (new_treasury, treasury_addr),
-    )
+    _ensure_wallet_account(conn, from_addr, asset)
+    _ensure_wallet_account(conn, to_addr, asset)
+    _ensure_wallet_account(conn, treasury_addr, "NYXT") # Fees always in NYXT
+    
+    current = get_wallet_balance(conn, from_addr, asset)
+    if current < amt:
+        raise StorageError(f"insufficient {asset} balance")
+    
+    # Handle fee separately if it's in NYXT
+    if asset == "NYXT":
+        if current < (amt + fee):
+            raise StorageError("insufficient balance for amount + fee")
+        new_from = current - (amt + fee)
+    else:
+        nyxt_balance = get_wallet_balance(conn, from_addr, "NYXT")
+        if nyxt_balance < fee:
+            raise StorageError("insufficient NYXT for fee")
+        new_from = current - amt
+        set_wallet_balance(conn, from_addr, nyxt_balance - fee, "NYXT")
+
+    new_to = get_wallet_balance(conn, to_addr, asset) + amt
+    new_treasury = get_wallet_balance(conn, treasury_addr, "NYXT") + fee
+    
+    set_wallet_balance(conn, from_addr, new_from, asset)
+    set_wallet_balance(conn, to_addr, new_to, asset)
+    set_wallet_balance(conn, treasury_addr, new_treasury, "NYXT")
+    
     insert_wallet_transfer(
         conn,
         WalletTransfer(
             transfer_id=transfer_id,
             from_address=from_addr,
             to_address=to_addr,
+            asset_id=asset,
             amount=amt,
             fee_total=fee,
             treasury_address=treasury_addr,
@@ -772,13 +795,14 @@ def apply_wallet_transfer(
     }
 
 
-def apply_wallet_faucet(conn: sqlite3.Connection, address: str, amount: int) -> int:
+def apply_wallet_faucet(conn: sqlite3.Connection, address: str, amount: int, asset_id: str = "NYXT") -> int:
     addr = _validate_wallet_address(address)
     amt = _validate_int(amount, "amount", 1)
-    _ensure_wallet_account(conn, addr)
-    current = get_wallet_balance(conn, addr)
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
+    _ensure_wallet_account(conn, addr, asset)
+    current = get_wallet_balance(conn, addr, asset)
     new_balance = current + amt
-    set_wallet_balance(conn, addr, new_balance)
+    set_wallet_balance(conn, addr, new_balance, asset)
     conn.commit()
     return new_balance
 
@@ -791,19 +815,26 @@ def apply_wallet_faucet_with_fee(
     fee_total: int,
     treasury_address: str,
     run_id: str,
+    asset_id: str = "NYXT",
 ) -> dict[str, int]:
     addr = _validate_wallet_address(address)
     amt = _validate_int(amount, "amount", 1)
     fee = _validate_int(fee_total, "fee_total", 0)
+    asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
-    _ensure_wallet_account(conn, addr)
-    _ensure_wallet_account(conn, treasury_addr)
-    current = get_wallet_balance(conn, addr)
-    treasury_current = get_wallet_balance(conn, treasury_addr)
+    
+    _ensure_wallet_account(conn, addr, asset)
+    _ensure_wallet_account(conn, treasury_addr, "NYXT")
+    
+    current = get_wallet_balance(conn, addr, asset)
+    treasury_current = get_wallet_balance(conn, treasury_addr, "NYXT")
+    
     new_balance = current + amt
     new_treasury = treasury_current + fee
-    set_wallet_balance(conn, addr, new_balance)
-    set_wallet_balance(conn, treasury_addr, new_treasury)
+    
+    set_wallet_balance(conn, addr, new_balance, asset)
+    set_wallet_balance(conn, treasury_addr, new_treasury, "NYXT")
+    
     transfer_id = _validate_text(f"faucet-{run_id}", "transfer_id")
     insert_wallet_transfer(
         conn,
@@ -811,6 +842,7 @@ def apply_wallet_faucet_with_fee(
             transfer_id=transfer_id,
             from_address="faucet",
             to_address=addr,
+            asset_id=asset,
             amount=amt,
             fee_total=fee,
             treasury_address=treasury_addr,

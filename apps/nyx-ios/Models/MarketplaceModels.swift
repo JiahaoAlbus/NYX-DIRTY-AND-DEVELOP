@@ -4,7 +4,7 @@ struct ListingRow: Identifiable, Codable {
     let listingId: String
     let sku: String
     let title: String
-    let price: Int
+    let rate: Int
     let runId: String
 
     var id: String { listingId }
@@ -13,7 +13,7 @@ struct ListingRow: Identifiable, Codable {
         case listingId = "listing_id"
         case sku
         case title
-        case price
+        case rate
         case runId = "run_id"
     }
 }

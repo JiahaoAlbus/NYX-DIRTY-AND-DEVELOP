@@ -15,6 +15,17 @@ struct SettingsView: View {
                     .autocorrectionDisabled(true)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).stroke(.secondary))
+                
+                Divider().padding(.vertical, 8)
+                
+                Toggle("Dark Mode", isOn: $settings.isDarkMode)
+                    .font(.headline)
+                    .onChange(of: settings.isDarkMode) { _ in
+                        settings.save()
+                    }
+                
+                Divider().padding(.vertical, 8)
+
                 HStack {
                     Button("Save") {
                         settings.save()

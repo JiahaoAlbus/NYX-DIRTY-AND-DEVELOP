@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Onboarding } from './screens/Onboarding';
+import { Airdrop } from './screens/Airdrop';
+import { Faucet } from './screens/Faucet';
+import { Fiat } from './screens/Fiat';
+import { Web2Access } from './screens/Web2Access';
 import { Home } from './screens/Home';
 import { Wallet } from './screens/Wallet';
 import { Exchange } from './screens/Exchange';
 import { Chat } from './screens/Chat';
 import { Store } from './screens/Store';
 import { Activity } from './screens/Activity';
-import { Evidence } from './screens/Evidence';
 import { Settings } from './screens/Settings';
 import { DappBrowser } from './screens/DappBrowser';
 import { BottomNav } from './components/BottomNav';
@@ -16,6 +19,17 @@ import { checkHealth, fetchCapabilities, PortalSession } from './api';
 const SESSION_KEY = 'nyx_portal_session';
 
 const loadSession = (): PortalSession | null => {
+  // Check for injected session token from iOS
+  const injectedToken = (window as any).__NYX_SESSION_TOKEN__;
+  if (injectedToken) {
+    return { 
+      access_token: injectedToken, 
+      account_id: "injected",
+      handle: "Injected User",
+      pubkey: ""
+    }; 
+  }
+
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -35,14 +49,35 @@ const saveSession = (session: PortalSession | null) => {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 };
 
+const getInitialTab = (): Screen => {
+  const injectedScreen = (window as any).__NYX_INITIAL_SCREEN__;
+  if (injectedScreen === 'exchange') return Screen.EXCHANGE;
+  if (injectedScreen === 'chat') return Screen.CHAT;
+  if (injectedScreen === 'store') return Screen.STORE;
+  return Screen.HOME;
+};
+
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Screen>(Screen.HOME);
+  const [activeTab, setActiveTab] = useState<Screen>(() => getInitialTab());
   const [backendOnline, setBackendOnline] = useState(false);
   const [backendStatus, setBackendStatus] = useState('Backend: unknown');
   const [capabilities, setCapabilities] = useState<Record<string, unknown> | null>(null);
   const [session, setSession] = useState<PortalSession | null>(() => loadSession());
   const [seed, setSeed] = useState('123');
   const [runId, setRunId] = useState('web-run-1');
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('nyx_theme');
+    return saved ? saved === 'dark' : true; // Default to dark
+  });
+
+  useEffect(() => {
+    localStorage.setItem('nyx_theme', isDark ? 'dark' : 'light');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
 
   useEffect(() => {
     saveSession(session);
@@ -77,6 +112,7 @@ const App: React.FC = () => {
             onRefresh={refreshHealth}
             seed={seed}
             runId={runId}
+            onNavigate={setActiveTab}
           />
         );
       case Screen.WALLET:
@@ -97,6 +133,7 @@ const App: React.FC = () => {
             seed={seed}
             runId={runId}
             backendOnline={backendOnline}
+            session={session}
           />
         );
       case Screen.CHAT:
@@ -114,12 +151,13 @@ const App: React.FC = () => {
             seed={seed}
             runId={runId}
             backendOnline={backendOnline}
+            session={session}
           />
         );
       case Screen.ACTIVITY:
-        return <Activity runId={runId} onBack={() => setActiveTab(Screen.HOME)} />;
+        return <Activity runId={runId} onBack={() => setActiveTab(Screen.HOME)} session={session} />;
       case Screen.EVIDENCE:
-        return <Evidence />;
+        return <Activity runId={runId} onBack={() => setActiveTab(Screen.HOME)} session={session} />;
       case Screen.SETTINGS:
         return (
           <Settings 
@@ -133,36 +171,35 @@ const App: React.FC = () => {
         );
       case Screen.DAPP_BROWSER:
         return <DappBrowser />;
+      case Screen.AIRDROP:
+        return (
+          <Airdrop
+            seed={seed}
+            runId={runId}
+            backendOnline={backendOnline}
+            session={session}
+          />
+        );
+      case Screen.FAUCET:
+        return <Faucet seed={seed} runId={runId} backendOnline={backendOnline} session={session} />;
+      case Screen.FIAT:
+        return <Fiat />;
+      case Screen.WEB2_ACCESS:
+        return <Web2Access />;
       default:
-        return <Home backendOnline={backendOnline} backendStatus={backendStatus} capabilities={capabilities} onRefresh={refreshHealth} seed={seed} runId={runId} />;
+        return <Home 
+          backendOnline={backendOnline} 
+          backendStatus={backendStatus} 
+          capabilities={capabilities} 
+          onRefresh={refreshHealth} 
+          seed={seed} 
+          runId={runId}
+          onNavigate={setActiveTab}
+        />;
     }
   };
 
-  const RunConfig = useMemo(() => {
-    return (
-      <div className="mt-3 rounded-xl border border-primary/20 bg-white/70 px-4 py-3 text-xs text-text-main shadow-sm">
-        <div className="font-semibold uppercase tracking-wider text-text-subtle">Deterministic Run Settings</div>
-        <div className="mt-2 grid grid-cols-1 gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium">Seed (int)</span>
-            <input
-              className="h-9 rounded-lg border border-primary/20 bg-white px-3 text-sm"
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium">Run ID</span>
-            <input
-              className="h-9 rounded-lg border border-primary/20 bg-white px-3 text-sm"
-              value={runId}
-              onChange={(e) => setRunId(e.target.value)}
-            />
-          </label>
-        </div>
-      </div>
-    );
-  }, [seed, runId]);
+
 
   if (!session) {
     return (
@@ -178,37 +215,35 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark overflow-hidden group/design-root">
-      <header className="sticky top-0 z-30 flex flex-col gap-2 px-6 pt-safe pb-4 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md">
-        <div className="flex items-center justify-between">
+    <div className="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark text-text-main dark:text-white overflow-hidden group/design-root">
+      <header className="sticky top-0 z-30 flex flex-col gap-2 px-6 pt-safe pb-4 bg-background-light/70 dark:bg-background-dark/70 backdrop-blur-xl border-b border-primary/10">
+        <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center size-8 rounded-full bg-primary text-background-dark">
-              <span className="material-symbols-outlined text-[20px]">diamond</span>
+            <div className="flex items-center justify-center size-8 rounded-full bg-primary text-background-dark shadow-lg">
+              <span className="material-symbols-outlined text-[20px] font-bold">diamond</span>
             </div>
             <div>
-              <div className="text-lg font-bold tracking-tight text-text-main dark:text-primary">NYX</div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-text-subtle">Testnet Beta</div>
+              <div className="text-lg font-bold tracking-tight text-text-main dark:text-primary leading-none">NYX</div>
+              <div className="text-[10px] font-extrabold uppercase tracking-widest text-text-subtle">Ecosystem</div>
             </div>
           </div>
-          <div className="text-xs font-semibold px-2 py-1 rounded-full border border-primary/20 bg-white/80">
-            {backendStatus}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsDark(!isDark)}
+              className="size-8 rounded-full bg-surface-light dark:bg-surface-dark flex items-center justify-center text-text-subtle hover:text-primary transition-all"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {isDark ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
+            <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${backendOnline ? 'border-binance-green/30 bg-binance-green/10 text-binance-green' : 'border-binance-red/30 bg-binance-red/10 text-binance-red'}`}>
+              {backendOnline ? 'ONLINE' : 'OFFLINE'}
+            </div>
           </div>
         </div>
-        {RunConfig}
-        {!backendOnline && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            Backend Offline. Start the gateway at http://127.0.0.1:8091 and tap refresh.
-          </div>
-        )}
-        <button
-          className="text-xs font-semibold text-primary underline"
-          onClick={() => refreshHealth()}
-        >
-          Refresh backend status
-        </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar px-6 pb-20 pt-2">
+      <main className="flex-1 overflow-y-auto no-scrollbar px-6 pb-20 pt-4">
         {renderScreen()}
       </main>
 

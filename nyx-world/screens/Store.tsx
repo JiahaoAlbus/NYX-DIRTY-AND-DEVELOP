@@ -1,35 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { createMarketplaceListing, listMarketplaceListings, listMarketplacePurchases, purchaseMarketplace } from '../api';
+import { PortalSession, publishListing, listMarketplaceListings, listMarketplacePurchases, purchaseMarketplace } from '../api';
+import { ShoppingCart, Search, Filter, Tag, Package, ChevronRight } from 'lucide-react';
 
 interface MarketProps {
   seed: string;
   runId: string;
   backendOnline: boolean;
+  session: PortalSession | null;
 }
 
-export const Store: React.FC<MarketProps> = ({ seed, runId, backendOnline }) => {
-  const [listings, setListings] = useState<Record<string, unknown>[]>([]);
-  const [purchases, setPurchases] = useState<Record<string, unknown>[]>([]);
-  const [sku, setSku] = useState('');
-  const [title, setTitle] = useState('');
-  const [rate, setRate] = useState('');
-  const [listingId, setListingId] = useState('');
-  const [qty, setQty] = useState('1');
+export const Store: React.FC<MarketProps> = ({ seed, runId, backendOnline, session }) => {
+  const [listings, setListings] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setCategory] = useState('All');
   const [status, setStatus] = useState('');
-  const [lastResponse, setLastResponse] = useState<Record<string, unknown> | null>(null);
 
   const refresh = async () => {
-    if (!backendOnline) {
-      setStatus('Backend unavailable');
-      return;
-    }
+    if (!backendOnline) return;
     try {
       const listingResp = await listMarketplaceListings();
       const purchaseResp = await listMarketplacePurchases();
       setListings(listingResp.listings || []);
       setPurchases(purchaseResp.purchases || []);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      console.error(err);
     }
   };
 
@@ -37,127 +32,118 @@ export const Store: React.FC<MarketProps> = ({ seed, runId, backendOnline }) => 
     refresh();
   }, [backendOnline]);
 
-  const actionsDisabled = !backendOnline;
-
-  const publishListing = async () => {
-    if (!backendOnline) {
-      setStatus('Backend unavailable');
-      return;
-    }
-    const seedInt = Number(seed);
-    if (!Number.isInteger(seedInt)) {
-      setStatus('Seed must be an integer');
-      return;
-    }
-    if (!runId.trim()) {
-      setStatus('Run ID required');
-      return;
-    }
-    const rateInt = Number(rate);
-    if (!sku.trim() || !title.trim()) {
-      setStatus('SKU and title required');
-      return;
-    }
-    if (!Number.isInteger(rateInt) || rateInt <= 0) {
-      setStatus('Rate must be a positive integer');
-      return;
-    }
-    setStatus('Publishing listing...');
+  const handlePurchase = async (listingId: string) => {
+    if (!backendOnline || !session) return;
+    setStatus('Processing payment...');
     try {
-      const rateField = "pr" + "ice";
-      const response = await createMarketplaceListing(
-        { sku: sku.trim(), title: title.trim(), [rateField]: rateInt },
-        seedInt,
-        runId.trim()
-      );
-      setLastResponse(response);
-      setStatus('Listing published');
-      await refresh();
+      await purchaseMarketplace(session.access_token, session.account_id, listingId, 1);
+      setStatus('Purchase successful! Evidence recorded.');
+      refresh();
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
     }
   };
 
-  const purchase = async () => {
-    if (!backendOnline) {
-      setStatus('Backend unavailable');
-      return;
-    }
-    const seedInt = Number(seed);
-    if (!Number.isInteger(seedInt)) {
-      setStatus('Seed must be an integer');
-      return;
-    }
-    if (!runId.trim()) {
-      setStatus('Run ID required');
-      return;
-    }
-    const qtyInt = Number(qty);
-    if (!listingId.trim()) {
-      setStatus('Listing ID required');
-      return;
-    }
-    if (!Number.isInteger(qtyInt) || qtyInt <= 0) {
-      setStatus('Quantity must be a positive integer');
-      return;
-    }
-    setStatus('Purchasing listing...');
-    try {
-      const response = await purchaseMarketplace(
-        { listing_id: listingId.trim(), qty: qtyInt },
-        seedInt,
-        runId.trim()
-      );
-      setLastResponse(response);
-      setStatus('Purchase complete');
-      await refresh();
-    } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
-    }
-  };
+  const categories = ['All', 'NFTs', 'Virtual Land', 'In-game Items', 'DeFi Tools'];
 
   return (
-    <div className="flex flex-col gap-6 pb-24">
-      <section className="rounded-xl border border-primary/20 bg-white/70 p-4">
-        <div className="text-sm font-semibold">Publish Listing</div>
-        <div className="mt-2 grid gap-2">
-          <label className="text-xs text-text-subtle">SKU</label>
-          <input className="h-9 rounded-lg border border-primary/20 px-3 text-sm" aria-label="SKU" value={sku} onChange={(e) => setSku(e.target.value)} />
-          <label className="text-xs text-text-subtle">Title</label>
-          <input className="h-9 rounded-lg border border-primary/20 px-3 text-sm" aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <label className="text-xs text-text-subtle">Rate</label>
-          <input className="h-9 rounded-lg border border-primary/20 px-3 text-sm" aria-label="Rate" value={rate} onChange={(e) => setRate(e.target.value)} />
-          <button onClick={publishListing} className="h-10 rounded-lg bg-primary text-background-dark font-semibold" disabled={actionsDisabled}>Publish</button>
+    <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-text-main dark:text-white">
+      {/* Header & Search */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 flex items-center gap-2 px-4 py-2 bg-surface-light dark:bg-surface-dark rounded-2xl border border-primary/10 glass">
+            <Search size={18} className="text-text-subtle" />
+            <input 
+              className="flex-1 bg-transparent outline-none text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <button className="size-10 rounded-2xl bg-primary flex items-center justify-center text-black shadow-lg">
+            <ShoppingCart size={20} />
+          </button>
         </div>
-      </section>
 
-      <section className="rounded-xl border border-primary/20 bg-white/70 p-4">
-        <div className="text-sm font-semibold">Listings</div>
-        <pre className="mt-2 text-[11px] text-text-subtle whitespace-pre-wrap">{JSON.stringify(listings, null, 2)}</pre>
-      </section>
-
-      <section className="rounded-xl border border-primary/20 bg-white/70 p-4">
-        <div className="text-sm font-semibold">Purchase Listing</div>
-        <div className="mt-2 grid gap-2">
-          <label className="text-xs text-text-subtle">Listing ID</label>
-          <input className="h-9 rounded-lg border border-primary/20 px-3 text-sm" aria-label="Listing ID" value={listingId} onChange={(e) => setListingId(e.target.value)} />
-          <label className="text-xs text-text-subtle">Quantity</label>
-          <input className="h-9 rounded-lg border border-primary/20 px-3 text-sm" aria-label="Quantity" value={qty} onChange={(e) => setQty(e.target.value)} />
-          <button onClick={purchase} className="h-10 rounded-lg bg-primary text-background-dark font-semibold" disabled={actionsDisabled}>Purchase</button>
+        {/* Categories */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+          {categories.map(cat => (
+            <button 
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                activeCategory === cat ? 'bg-primary text-black' : 'bg-surface-light dark:bg-surface-dark text-text-subtle'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      </section>
+      </div>
 
-      <section className="rounded-xl border border-primary/20 bg-white/70 p-4">
-        <div className="text-sm font-semibold">Purchases</div>
-        <pre className="mt-2 text-[11px] text-text-subtle whitespace-pre-wrap">{JSON.stringify(purchases, null, 2)}</pre>
-      </section>
+      {/* Main Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        {listings.map((item, i) => (
+          <div key={i} className="flex flex-col rounded-3xl overflow-hidden glass bg-white dark:bg-surface-light dark:bg-surface-dark/40 border border-primary/5 shadow-xl hover:translate-y-[-4px] transition-all group">
+            <div className="aspect-square bg-gradient-to-br from-primary/20 to-primary-dark/40 relative overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center text-primary/40 group-hover:scale-110 transition-transform">
+                <Package size={64} />
+              </div>
+              <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/50 backdrop-blur-md text-[10px] font-bold text-primary">
+                NEW
+              </div>
+            </div>
+            <div className="p-4 flex flex-col gap-2">
+              <div className="text-xs text-text-subtle font-medium uppercase tracking-wider">{item.sku}</div>
+              <div className="font-bold text-sm line-clamp-2 min-h-[40px]">{item.title}</div>
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-text-subtle">Rate</span>
+                  <span className="text-primary font-extrabold text-lg">{item.rate} <span className="text-xs">NYXT</span></span>
+                </div>
+                <button 
+                  onClick={() => handlePurchase(item.listing_id)}
+                  className="size-10 rounded-xl bg-primary text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
+                >
+                  <ShoppingCart size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      <section className="rounded-xl border border-primary/20 bg-white/70 p-4">
-        <div className="text-sm font-semibold">Latest Evidence</div>
-        <pre className="mt-2 text-[11px] text-text-subtle whitespace-pre-wrap">{JSON.stringify(lastResponse ?? {}, null, 2)}</pre>
-      </section>
+      {/* Recent Purchases */}
+      {purchases.length > 0 && (
+        <div className="mt-8 flex flex-col gap-4">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="font-bold flex items-center gap-2"><Tag size={18} className="text-primary" /> Recent Orders</h3>
+            <button className="text-xs text-primary font-bold flex items-center">View All <ChevronRight size={14} /></button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {purchases.slice(0, 3).map((p, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 rounded-3xl glass bg-surface-light dark:bg-surface-dark/20 border border-primary/5">
+                <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Package size={24} />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold truncate">Order #{p.purchase_id.slice(0, 8)}</div>
+                  <div className="text-[10px] text-text-subtle">Qty: {p.qty} ● {new Date(p.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-primary">Success</div>
+                  <div className="text-[10px] text-text-subtle">Evidence OK</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {status && <div className="text-xs text-text-subtle">{status}</div>}
+      {status && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-primary text-black text-sm font-bold shadow-2xl glass-dark animate-in zoom-in">
+          {status}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,44 +1,29 @@
 #!/bin/bash
 set -e
 
-# scripts/nyx_pack_proof_artifacts.sh
-# Collects verified artifacts into a redistributable ZIP.
+# NYX Proof Artifacts Packaging Script
+# Collects all required documentation and verification logs into a single bundle.
 
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-EXPORT_DIR="docs/evidence/${TIMESTAMP}_proof_package"
-ZIP_NAME="nyx_proof_package_${TIMESTAMP}.zip"
+BUNDLE_NAME="nyx-testnet-proof-v1.tar.gz"
+ARTIFACTS_DIR="release_artifacts"
 
-echo "Packing proof artifacts into $EXPORT_DIR..."
+echo "📦 Packaging NYX Proof Artifacts..."
 
-mkdir -p "$EXPORT_DIR"
-
-# 1. Conformance Report
-if [ -f "nyx_conformance_report.json" ]; then
-    cp nyx_conformance_report.json "$EXPORT_DIR/"
-else
-    echo "WARN: nyx_conformance_report.json not found. Run verify script first."
+# 1. Run verification if logs missing
+if [ ! -d "$ARTIFACTS_DIR/verify_logs" ]; then
+    echo "⚠️ Verification logs missing. Running verify script..."
+    bash scripts/nyx_verify_all.sh
 fi
 
-# 2. Latest Smoke Evidence
-# Find the most recent smoke directory
-LATEST_SMOKE=$(ls -td docs/evidence/smoke/*/ | head -1)
-if [ -n "$LATEST_SMOKE" ]; then
-    echo "Including latest smoke evidence: $LATEST_SMOKE"
-    cp -r "$LATEST_SMOKE" "$EXPORT_DIR/smoke_evidence"
-else
-    echo "WARN: No smoke evidence found."
-fi
+# 2. Collect Docs
+cp docs/ENDPOINT_INVENTORY.md "$ARTIFACTS_DIR/"
+cp docs/UI_ACTION_INVENTORY.md "$ARTIFACTS_DIR/"
+cp docs/FUNCTIONALITY_MATRIX_TESTNET_V1.md "$ARTIFACTS_DIR/"
+cp docs/MAINNET_PARITY.md "$ARTIFACTS_DIR/"
 
-# 3. Documentation (The Proof Package itself)
-mkdir -p "$EXPORT_DIR/docs"
-cp -r docs/proof "$EXPORT_DIR/docs/"
-cp -r docs/funding "$EXPORT_DIR/docs/"
+# 3. Create Bundle
+tar -czf "$BUNDLE_NAME" -C "$ARTIFACTS_DIR" .
 
-# 4. Create ZIP
-echo "Zipping..."
-# Use -X to exclude extended attributes for better deterministic behavior on macOS
-zip -r -X "$ZIP_NAME" "$EXPORT_DIR"
-
-echo "=================================================="
-echo "PROOF PACKAGE CREATED: $ZIP_NAME"
-echo "=================================================="
+echo "✅ Proof bundle created: $BUNDLE_NAME"
+echo "Contents:"
+tar -tf "$BUNDLE_NAME"
