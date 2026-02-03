@@ -174,7 +174,8 @@ jobs:
             echo "forced test failure"
             exit 1
           fi
-          # Limit CI to the core L0 identity unit tests; bridge tests pull in unfinished app suites.
+          # Keep CI focused on the core L0 identity unit tests; bridge tests pull in
+          # unfinished app packages and cause unrelated failures in this dirty repo.
           python -m unittest packages.l0-identity.test.identity_test
 
   lint:
