@@ -49,7 +49,7 @@ class ServerWalletV1TransferTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> str:
+    def _auth_token(self) -> tuple[str, str]:
         key = b"portal-key-0005-0005-0005-0005"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "vera", "pubkey": pubkey})
@@ -66,13 +66,13 @@ class ServerWalletV1TransferTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return verified.get("access_token")
+        return account_id, verified.get("access_token")
 
     def test_transfer_requires_auth_and_fee(self) -> None:
-        token = self._auth_token()
+        account_id, token = self._auth_token()
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-faucet-transfer", "address": "wallet-x", "amount": 1000, "token": "NYXT"},
+            {"seed": 123, "run_id": "run-faucet-transfer", "address": account_id, "amount": 1000, "asset_id": "NYXT"},
             token=token,
         )
         self.assertEqual(status, 200)
@@ -82,7 +82,7 @@ class ServerWalletV1TransferTests(unittest.TestCase):
             {
                 "seed": 123,
                 "run_id": "run-transfer-1",
-                "payload": {"from_address": "wallet-x", "to_address": "wallet-y", "amount": 5},
+                "payload": {"from_address": account_id, "to_address": "wallet-y", "amount": 5, "asset_id": "NYXT"},
             },
             token=token,
         )

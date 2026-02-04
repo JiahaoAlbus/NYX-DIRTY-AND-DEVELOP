@@ -1,4 +1,6 @@
 import _bootstrap
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -33,24 +35,58 @@ class ServerChatSmokeTests(unittest.TestCase):
         self.httpd.server_close()
         self.tmp.cleanup()
 
-    def test_chat_send_and_list(self) -> None:
+    def _post(self, path: str, payload: dict, token: str | None = None) -> tuple[int, dict]:
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        payload = {
-            "seed": 123,
-            "run_id": "run-chat-1",
-            "payload": {"channel": "general", "message": "hello"},
-        }
         body = json.dumps(payload, separators=(",", ":"))
-        conn.request("POST", "/chat/send", body=body, headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()
         data = response.read()
-        self.assertEqual(response.status, 200)
-        parsed = json.loads(data.decode("utf-8"))
-        self.assertEqual(parsed.get("status"), "complete")
         conn.close()
+        return response.status, json.loads(data.decode("utf-8"))
+
+    def _auth_token(self) -> tuple[str, str]:
+        key = b"portal-key-chat-0001"
+        pubkey = base64.b64encode(key).decode("utf-8")
+        status, created = self._post("/portal/v1/accounts", {"handle": "chatter", "pubkey": pubkey})
+        self.assertEqual(status, 200)
+        account_id = created.get("account_id")
+        status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
+        self.assertEqual(status, 200)
+        nonce = challenge.get("nonce")
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        status, verified = self._post(
+            "/portal/v1/auth/verify",
+            {"account_id": account_id, "nonce": nonce, "signature": signature},
+        )
+        self.assertEqual(status, 200)
+        return account_id, verified.get("access_token")
+
+    def test_chat_send_and_list(self) -> None:
+        account_id, token = self._auth_token()
+        status, _ = self._post(
+            "/wallet/v1/faucet",
+            {"seed": 1, "run_id": "run-chat-faucet-1", "address": account_id, "amount": 1000, "asset_id": "NYXT"},
+            token=token,
+        )
+        self.assertEqual(status, 200)
+        channel = f"dm/{account_id}/acct-peer"
+        status, parsed = self._post(
+            "/chat/send",
+            {
+                "seed": 123,
+                "run_id": "run-chat-1",
+                "payload": {"channel": channel, "message": json.dumps({"ciphertext": "AA==", "iv": "BB=="})},
+            },
+            token=token,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(parsed.get("status"), "complete")
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        conn.request("GET", "/chat/messages?channel=general")
+        conn.request("GET", f"/chat/messages?channel={channel}", headers={"Authorization": f"Bearer {token}"})
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)

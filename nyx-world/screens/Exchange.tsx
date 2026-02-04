@@ -1,260 +1,587 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType } from 'lightweight-charts';
-import { cancelOrder, fetchOrderBook, fetchOrders, fetchTrades, placeOrder, PortalSession } from '../api';
-import { TrendingUp, TrendingDown, ArrowUpDown, History } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  allocateRunId,
+  ApiError,
+  cancelOrder,
+  fetchMyOrdersV1,
+  fetchMyTradesV1,
+  fetchOrderBook,
+  parseSeed,
+  placeOrder,
+  PortalSession,
+} from "../api";
+import { Screen } from "../types";
 
-interface SwapProps {
+type OrderRow = {
+  order_id: string;
+  owner_address: string;
+  side: "BUY" | "SELL";
+  amount: number;
+  price: number;
+  asset_in: string;
+  asset_out: string;
+  status: "open" | "filled" | "cancelled";
+  run_id: string;
+  state_hash?: string;
+  receipt_hashes?: string[];
+  replay_ok?: boolean;
+};
+
+type TradeRow = {
+  trade_id: string;
+  order_id: string;
+  amount: number;
+  price: number;
+  run_id: string;
+  side: "BUY" | "SELL";
+  asset_in: string;
+  asset_out: string;
+  state_hash?: string;
+  receipt_hashes?: string[];
+  replay_ok?: boolean;
+};
+
+type RunResult = {
+  run_id?: string;
+  state_hash?: string;
+  receipt_hashes?: string[];
+  replay_ok?: boolean;
+  fee_total?: number;
+  treasury_address?: string;
+};
+
+interface ExchangeProps {
   seed: string;
   runId: string;
   backendOnline: boolean;
   session: PortalSession | null;
+  onNavigate: (screen: Screen) => void;
 }
 
-export const Exchange: React.FC<SwapProps> = ({ seed, runId, backendOnline, session }) => {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [side, setSide] = useState('BUY');
-  const [assetIn, setAssetIn] = useState('NYXT');
-  const [assetOut, setAssetOut] = useState('USDX');
-  const [amount, setAmount] = useState('1');
-  const [rate, setRate] = useState('1');
-  const [orderbook, setOrderbook] = useState<{ buy: any[]; sell: any[] }>({ buy: [], sell: [] });
-  const [orders, setOrders] = useState<any[]>([]);
-  const [trades, setTrades] = useState<any[]>([]);
-  const [status, setStatus] = useState('');
+const ORDERBOOK_LIMIT = 25;
+const PAGE_LIMIT = 25;
 
-  const refresh = async () => {
+function formatCompactId(value: string): string {
+  const v = (value || "").trim();
+  if (v.length <= 18) return v;
+  return `${v.slice(0, 10)}…${v.slice(-6)}`;
+}
+
+function renderApiError(err: unknown): string {
+  if (err instanceof ApiError) {
+    const parts = [err.message];
+    if (err.code && !err.message.includes(err.code)) parts.push(`(${err.code})`);
+    const retryAfter = err.details?.retry_after_seconds;
+    if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
+      parts.push(`retry after ${retryAfter}s`);
+    }
+    return parts.join(" ");
+  }
+  return (err as Error)?.message ?? "Unknown error";
+}
+
+export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const token = session?.access_token ?? "";
+  const accountId = session?.account_id ?? "";
+
+  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+  const assetIn = useMemo(() => (side === "BUY" ? "NYXT" : "ECHO"), [side]);
+  const assetOut = useMemo(() => (side === "BUY" ? "ECHO" : "NYXT"), [side]);
+
+  const [amount, setAmount] = useState("100");
+  const [price, setPrice] = useState("10");
+
+  const [orderbook, setOrderbook] = useState<{ buy: OrderRow[]; sell: OrderRow[] }>({ buy: [], sell: [] });
+  const [obLoading, setObLoading] = useState(false);
+  const [obError, setObError] = useState("");
+
+  const [ordersStatus, setOrdersStatus] = useState<"open" | "filled" | "cancelled" | "all">("open");
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [ordersOffset, setOrdersOffset] = useState(0);
+  const [ordersHasMore, setOrdersHasMore] = useState(true);
+
+  const [trades, setTrades] = useState<TradeRow[]>([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
+  const [tradesError, setTradesError] = useState("");
+  const [tradesOffset, setTradesOffset] = useState(0);
+  const [tradesHasMore, setTradesHasMore] = useState(true);
+
+  const [mutating, setMutating] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [toast, setToast] = useState("");
+  const [lastAction, setLastAction] = useState<RunResult | null>(null);
+
+  const loadOrderbook = async () => {
     if (!backendOnline) return;
+    setObLoading(true);
+    setObError("");
     try {
-      const ob = await fetchOrderBook() as any;
-      const orderResp = await fetchOrders();
-      const tradeResp = await fetchTrades();
-      setOrderbook(ob);
-      setOrders(orderResp.orders || []);
-      setTrades(tradeResp.trades || []);
+      const payload = (await fetchOrderBook(ORDERBOOK_LIMIT, 0)) as any;
+      setOrderbook({
+        buy: (payload.buy as OrderRow[]) || [],
+        sell: (payload.sell as OrderRow[]) || [],
+      });
     } catch (err) {
-      console.error(err);
+      setObError(renderApiError(err));
+    } finally {
+      setObLoading(false);
     }
   };
 
-  useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, 5000);
-    return () => clearInterval(timer);
-  }, [backendOnline]);
+  const loadOrders = async (opts?: { reset?: boolean }) => {
+    if (!backendOnline || !session) return;
+    setOrdersLoading(true);
+    setOrdersError("");
+    try {
+      const nextOffset = opts?.reset ? 0 : ordersOffset;
+      const payload = await fetchMyOrdersV1(token, ordersStatus, PAGE_LIMIT, nextOffset);
+      const list = (payload.orders as OrderRow[]) || [];
+      if (opts?.reset) setOrders(list);
+      else setOrders((prev) => [...prev, ...list]);
+      setOrdersHasMore(list.length === PAGE_LIMIT);
+      setOrdersOffset(nextOffset + list.length);
+    } catch (err) {
+      setOrdersError(renderApiError(err));
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const loadTrades = async (opts?: { reset?: boolean }) => {
+    if (!backendOnline || !session) return;
+    setTradesLoading(true);
+    setTradesError("");
+    try {
+      const nextOffset = opts?.reset ? 0 : tradesOffset;
+      const payload = await fetchMyTradesV1(token, PAGE_LIMIT, nextOffset);
+      const list = (payload.trades as TradeRow[]) || [];
+      if (opts?.reset) setTrades(list);
+      else setTrades((prev) => [...prev, ...list]);
+      setTradesHasMore(list.length === PAGE_LIMIT);
+      setTradesOffset(nextOffset + list.length);
+    } catch (err) {
+      setTradesError(renderApiError(err));
+    } finally {
+      setTradesLoading(false);
+    }
+  };
+
+  const refreshAll = async () => {
+    await loadOrderbook();
+    await loadOrders({ reset: true });
+    await loadTrades({ reset: true });
+  };
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    refreshAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendOnline, session?.access_token, session?.account_id]);
 
-    let chart: any = null;
-
-    // Use a small timeout to ensure the container is correctly sized
-    const timer = setTimeout(() => {
-      if (!chartContainerRef.current) return;
-      
-      try {
-        chart = createChart(chartContainerRef.current, {
-          layout: {
-            background: { type: ColorType.Solid, color: 'transparent' },
-            textColor: '#707A8A',
-          },
-          grid: {
-            vertLines: { color: 'rgba(70, 74, 83, 0.1)' },
-            horzLines: { color: 'rgba(70, 74, 83, 0.1)' },
-          },
-          width: chartContainerRef.current.clientWidth || 600,
-          height: 300,
-        });
-
-        if (chart && typeof chart.addCandlestickSeries === 'function') {
-          const candleSeries = chart.addCandlestickSeries({
-            upColor: '#0ECB81',
-            downColor: '#F6465D',
-            borderVisible: false,
-            wickUpColor: '#0ECB81',
-            wickDownColor: '#F6465D',
-          });
-
-          // Chart data
-          const data = [
-            { time: '2024-01-01', open: 10, high: 12, low: 9, close: 11 },
-            { time: '2024-01-02', open: 11, high: 15, low: 10, close: 14 },
-            { time: '2024-01-03', open: 14, high: 16, low: 13, close: 15 },
-            { time: '2024-01-04', open: 15, high: 15, low: 12, close: 13 },
-            { time: '2024-01-05', open: 13, high: 14, low: 11, close: 12 },
-          ];
-          candleSeries.setData(data as any);
-        }
-      } catch (err) {
-        console.error('Error creating chart:', err);
-      }
-    }, 100);
-
-    const handleResize = () => {
-      if (chart && chartContainerRef.current) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
-      if (chart) chart.remove();
-    };
-  }, []);
+  useEffect(() => {
+    if (!session) return;
+    loadOrders({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersStatus]);
 
   const handlePlaceOrder = async () => {
     if (!backendOnline || !session) return;
-    setStatus('Placing order...');
+    setActionError("");
+    setToast("");
+    setLastAction(null);
+
+    let seedInt = 0;
     try {
-      await placeOrder(
-        session.access_token,
-        session.account_id,
-        side as 'BUY' | 'SELL',
-        Number(amount),
-        Number(rate),
+      seedInt = parseSeed(seed);
+    } catch (err) {
+      setActionError(renderApiError(err));
+      return;
+    }
+
+    const amt = Number(amount);
+    const px = Number(price);
+    if (!Number.isInteger(amt) || amt <= 0) {
+      setActionError("Amount must be a positive integer.");
+      return;
+    }
+    if (!Number.isInteger(px) || px <= 0) {
+      setActionError("Price must be a positive integer.");
+      return;
+    }
+
+    const deterministicRunId = allocateRunId(runId, "exchange-place-order");
+    setMutating(true);
+    try {
+      const result = (await placeOrder(
+        token,
+        seedInt,
+        deterministicRunId,
+        accountId,
+        side,
+        amt,
+        px,
         assetIn,
         assetOut
-      );
-      setStatus('Order placed!');
-      refresh();
+      )) as RunResult;
+      setLastAction(result);
+      setToast(`Order placed (run: ${deterministicRunId})`);
+      await refreshAll();
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setActionError(renderApiError(err));
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!backendOnline || !session) return;
+    setActionError("");
+    setToast("");
+    setLastAction(null);
+
+    let seedInt = 0;
+    try {
+      seedInt = parseSeed(seed);
+    } catch (err) {
+      setActionError(renderApiError(err));
+      return;
+    }
+
+    const deterministicRunId = allocateRunId(runId, `exchange-cancel-${orderId}`);
+    setMutating(true);
+    try {
+      const result = (await cancelOrder(token, seedInt, deterministicRunId, orderId)) as RunResult;
+      setLastAction(result);
+      setToast(`Order cancelled (run: ${deterministicRunId})`);
+      await refreshAll();
+    } catch (err) {
+      setActionError(renderApiError(err));
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const copyText = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setToast("Copied.");
+    } catch {
+      // ignore
     }
   };
 
   return (
-    <div className="flex flex-col gap-4 pb-24 text-text-main dark:text-white">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 glass-dark rounded-2xl">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold">{assetIn}/{assetOut}</span>
-            <span className="text-binance-green text-sm">+2.45%</span>
-          </div>
-          <div className="hidden sm:flex gap-4 text-xs text-text-subtle">
-            <div>24h High: <span className="text-text-main dark:text-white">1.24</span></div>
-            <div>24h Low: <span className="text-text-main dark:text-white">0.98</span></div>
-          </div>
+    <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-white">
+      <div className="flex items-center justify-between px-2">
+        <div>
+          <div className="text-xl font-black tracking-tight">Exchange</div>
+          <div className="text-[10px] text-text-subtle uppercase tracking-widest">ECHO / NYXT • Limit Orders</div>
         </div>
+        <button
+          onClick={refreshAll}
+          className="text-[10px] font-bold text-primary uppercase tracking-widest"
+          disabled={!backendOnline}
+        >
+          Refresh
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left: Order Book */}
-        <div className="lg:col-span-3 flex flex-col gap-2 glass-dark p-4 rounded-2xl min-h-[400px]">
-          <div className="text-xs font-bold text-text-subtle uppercase mb-2">Order Book</div>
-          <div className="flex justify-between text-[10px] text-text-subtle mb-1">
-            <span>Rate({assetOut})</span>
-            <span>Amount({assetIn})</span>
-          </div>
-          <div className="flex flex-col gap-1 overflow-hidden">
-            {orderbook.sell.slice(0, 10).reverse().map((o, i) => (
-              <div key={i} className="flex justify-between text-xs py-0.5 relative">
-                <span className="text-binance-red z-10">{o.rate}</span>
-                <span className="z-10">{o.amount}</span>
-                <div className="absolute right-0 top-0 bottom-0 bg-binance-red/10" style={{ width: `${Math.min(o.amount * 10, 100)}%` }} />
-              </div>
-            ))}
-            <div className="py-2 text-center text-lg font-bold border-y border-black/5 dark:border-white/5 my-1">
-              {orderbook.sell[0]?.rate ?? '1.00'}
-            </div>
-            {orderbook.buy.slice(0, 10).map((o, i) => (
-              <div key={i} className="flex justify-between text-xs py-0.5 relative">
-                <span className="text-binance-green z-10">{o.rate}</span>
-                <span className="z-10">{o.amount}</span>
-                <div className="absolute right-0 top-0 bottom-0 bg-binance-green/10" style={{ width: `${Math.min(o.amount * 10, 100)}%` }} />
-              </div>
-            ))}
-          </div>
+      {!session && (
+        <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-sm text-text-subtle">
+          Sign in to trade.
         </div>
+      )}
 
-        {/* Center: Chart */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="glass-dark p-4 rounded-2xl">
-            <div ref={chartContainerRef} className="w-full" />
-          </div>
-          
-          {/* Recent Trades */}
-          <div className="glass-dark p-4 rounded-2xl flex-1">
-            <div className="text-xs font-bold text-text-subtle uppercase mb-4 flex items-center gap-2">
-              <History size={14} /> Market Trades
+      {session && (
+        <>
+          {/* Order book */}
+          <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-text-subtle uppercase">Order Book</div>
+              {obLoading && <div className="text-[10px] text-text-subtle">Loading…</div>}
             </div>
+
+            {obError && (
+              <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
+                {obError}{" "}
+                <button onClick={loadOrderbook} className="underline font-bold">
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {!obError && orderbook.buy.length === 0 && orderbook.sell.length === 0 && !obLoading && (
+              <div className="text-sm text-text-subtle">No orders yet.</div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">SELL (ECHO)</div>
+                <div className="flex flex-col gap-1">
+                  {orderbook.sell.slice(0, 10).map((row) => (
+                    <div key={row.order_id} className="flex justify-between text-xs font-mono">
+                      <span className="text-binance-red">{row.price}</span>
+                      <span>{row.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">BUY (spend NYXT)</div>
+                <div className="flex flex-col gap-1">
+                  {orderbook.buy.slice(0, 10).map((row) => (
+                    <div key={row.order_id} className="flex justify-between text-xs font-mono">
+                      <span className="text-binance-green">{row.price}</span>
+                      <span>{row.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 text-[10px] text-text-subtle">
+              BUY amount is NYXT spend; SELL amount is ECHO sell. Price is NYXT per ECHO.
+            </div>
+          </div>
+
+          {/* Place order */}
+          <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-text-subtle uppercase">Place Order</div>
+              <button
+                onClick={() => onNavigate(Screen.WALLET)}
+                className="text-[10px] font-bold text-primary uppercase tracking-widest"
+              >
+                Wallet
+              </button>
+            </div>
+
+            <div className="flex p-1 bg-surface-light dark:bg-surface-dark rounded-xl border border-black/5 dark:border-white/5">
+              <button
+                onClick={() => setSide("BUY")}
+                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                  side === "BUY" ? "bg-binance-green text-black" : "text-text-subtle"
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setSide("SELL")}
+                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                  side === "SELL" ? "bg-binance-red text-white" : "text-text-subtle"
+                }`}
+              >
+                Sell
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-text-subtle uppercase">Price (NYXT/ECHO)</span>
+                <input
+                  className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  inputMode="numeric"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-text-subtle uppercase">Amount ({assetIn})</span>
+                <input
+                  className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  inputMode="numeric"
+                />
+              </label>
+            </div>
+
+            <button
+              onClick={handlePlaceOrder}
+              disabled={!backendOnline || mutating}
+              className={`mt-4 w-full py-3 rounded-xl font-bold transition-all active:scale-95 ${
+                mutating
+                  ? "bg-surface-light dark:bg-surface-dark text-text-subtle"
+                  : side === "BUY"
+                    ? "bg-binance-green text-black"
+                    : "bg-binance-red text-white"
+              }`}
+              title={!backendOnline ? "Backend offline" : ""}
+            >
+              {mutating ? "Submitting…" : `${side} ${assetOut}`}
+            </button>
+
+            {actionError && (
+              <div className="mt-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
+                {actionError}
+              </div>
+            )}
+
+            {lastAction && (
+              <div className="mt-4 p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
+                <div className="text-[10px] font-mono text-text-subtle break-all">
+                  run_id: {String(lastAction.run_id ?? "")}
+                </div>
+                <div className="text-[10px] font-mono text-text-subtle break-all">
+                  state_hash: {String(lastAction.state_hash ?? "")}
+                </div>
+                <div className="text-[10px] text-text-subtle">
+                  fee_total: {String(lastAction.fee_total ?? "—")} • treasury: {String(lastAction.treasury_address ?? "—")}
+                </div>
+                <button
+                  onClick={() => copyText(String(lastAction.run_id ?? ""))}
+                  className="mt-2 text-[10px] font-bold text-primary uppercase tracking-widest"
+                >
+                  Copy run_id
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* My orders */}
+          <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-text-subtle uppercase">My Orders</div>
+              <select
+                className="text-[10px] bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/10 rounded-lg px-2 py-1"
+                value={ordersStatus}
+                onChange={(e) => setOrdersStatus(e.target.value as any)}
+              >
+                <option value="open">open</option>
+                <option value="filled">filled</option>
+                <option value="cancelled">cancelled</option>
+                <option value="all">all</option>
+              </select>
+            </div>
+
+            {ordersError && (
+              <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
+                {ordersError}{" "}
+                <button onClick={() => loadOrders({ reset: true })} className="underline font-bold">
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {!ordersError && orders.length === 0 && !ordersLoading && <div className="text-sm text-text-subtle">No orders.</div>}
+
             <div className="flex flex-col gap-2">
-              {trades.slice(0, 5).map((t, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className={t.side === 'BUY' ? 'text-binance-green' : 'text-binance-red'}>{t.rate}</span>
-                  <span>{t.amount}</span>
-                  <span className="text-text-subtle">12:00:01</span>
+              {orders.map((o) => (
+                <div
+                  key={o.order_id}
+                  className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold">
+                      <span className={o.side === "BUY" ? "text-binance-green" : "text-binance-red"}>{o.side}</span>{" "}
+                      <span className="text-text-subtle">{o.asset_out}</span>
+                    </div>
+                    <div className="text-[10px] text-text-subtle">{o.status}</div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px] font-mono text-text-subtle">
+                    <span>order: {formatCompactId(o.order_id)}</span>
+                    <span>run: {formatCompactId(o.run_id)}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 text-xs">
+                    <span>
+                      amt: <span className="font-mono">{o.amount}</span> {o.asset_in}
+                    </span>
+                    <span>
+                      px: <span className="font-mono">{o.price}</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <button
+                      onClick={() => copyText(o.run_id)}
+                      className="text-[10px] font-bold text-primary uppercase tracking-widest"
+                    >
+                      Copy run_id
+                    </button>
+                    {o.status === "open" && (
+                      <button
+                        onClick={() => handleCancelOrder(o.order_id)}
+                        className="text-[10px] font-bold text-binance-red uppercase tracking-widest"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
 
-        {/* Right: Trading Form */}
-        <div className="lg:col-span-3 flex flex-col gap-4 glass-dark p-4 rounded-2xl">
-          <div className="flex p-1 bg-surface-light dark:bg-surface-dark rounded-xl">
-            <button 
-              onClick={() => setSide('BUY')}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${side === 'BUY' ? 'bg-binance-green text-text-main dark:text-white' : 'text-text-subtle'}`}
-            >
-              Buy
-            </button>
-            <button 
-              onClick={() => setSide('SELL')}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${side === 'SELL' ? 'bg-binance-red text-text-main dark:text-white' : 'text-text-subtle'}`}
-            >
-              Sell
-            </button>
+            {ordersLoading && <div className="mt-3 text-[10px] text-text-subtle">Loading…</div>}
+            {!ordersLoading && ordersHasMore && (
+              <button
+                onClick={() => loadOrders()}
+                className="mt-3 w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
+              >
+                Load more
+              </button>
+            )}
           </div>
 
-          <div className="flex flex-col gap-4 mt-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] text-text-subtle uppercase px-1">Rate</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-black/5 dark:border-white/5">
-                <input 
-                  className="bg-transparent flex-1 outline-none text-sm"
-                  value={rate}
-                  onChange={(e) => setRate(e.target.value)}
-                />
-                <span className="text-[10px] text-text-subtle">{assetOut}</span>
-              </div>
+          {/* My trades */}
+          <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-text-subtle uppercase">My Trades</div>
+              <button
+                onClick={() => loadTrades({ reset: true })}
+                className="text-[10px] font-bold text-primary uppercase tracking-widest"
+              >
+                Refresh
+              </button>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] text-text-subtle uppercase px-1">Amount</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-black/5 dark:border-white/5">
-                <input 
-                  className="bg-transparent flex-1 outline-none text-sm"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <span className="text-[10px] text-text-subtle">{assetIn}</span>
+            {tradesError && (
+              <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
+                {tradesError}{" "}
+                <button onClick={() => loadTrades({ reset: true })} className="underline font-bold">
+                  Retry
+                </button>
               </div>
+            )}
+
+            {!tradesError && trades.length === 0 && !tradesLoading && <div className="text-sm text-text-subtle">No trades.</div>}
+
+            <div className="flex flex-col gap-2">
+              {trades.map((t) => (
+                <div
+                  key={t.trade_id}
+                  className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={t.side === "BUY" ? "text-binance-green font-bold" : "text-binance-red font-bold"}>
+                      {t.side}
+                    </span>
+                    <span className="text-text-subtle font-mono">{formatCompactId(t.trade_id)}</span>
+                  </div>
+                  <div className="mt-1 text-xs">
+                    amt: <span className="font-mono">{t.amount}</span> • px: <span className="font-mono">{t.price}</span>
+                  </div>
+                  <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run: {t.run_id}</div>
+                </div>
+              ))}
             </div>
 
-            <button 
-              onClick={handlePlaceOrder}
-              className={`w-full py-3 rounded-xl font-bold mt-2 transition-all active:scale-95 ${
-                side === 'BUY' ? 'bg-binance-green' : 'bg-binance-red'
-              }`}
-            >
-              {side} {assetIn}
-            </button>
-
-            <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5">
-              <div className="flex justify-between text-xs text-text-subtle">
-                <span>Fee (Est.)</span>
-                <span className="text-text-main dark:text-white">0.10 %</span>
-              </div>
-            </div>
+            {tradesLoading && <div className="mt-3 text-[10px] text-text-subtle">Loading…</div>}
+            {!tradesLoading && tradesHasMore && (
+              <button
+                onClick={() => loadTrades()}
+                className="mt-3 w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
+              >
+                Load more
+              </button>
+            )}
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
-      {status && (
-        <div className="fixed bottom-24 right-6 px-4 py-2 rounded-xl bg-primary text-black text-xs font-bold shadow-2xl animate-in slide-in-from-right">
-          {status}
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-primary text-black text-xs font-bold shadow-2xl animate-in slide-in-from-bottom-2">
+          {toast}
         </div>
       )}
     </div>

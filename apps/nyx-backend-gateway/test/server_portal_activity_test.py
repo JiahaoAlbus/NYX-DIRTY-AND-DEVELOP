@@ -60,7 +60,7 @@ class ServerPortalActivityTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> str:
+    def _auth_token(self) -> tuple[str, str]:
         key = b"portal-key-activity-0001"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "activity", "pubkey": pubkey})
@@ -77,13 +77,13 @@ class ServerPortalActivityTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return verified.get("access_token")
+        return account_id, verified.get("access_token")
 
     def test_activity_returns_receipts(self) -> None:
-        token = self._auth_token()
+        account_id, token = self._auth_token()
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 7, "run_id": "activity-faucet", "address": "wallet-a", "amount": 1000, "token": "NYXT"},
+            {"seed": 7, "run_id": "activity-faucet", "address": account_id, "amount": 1000, "asset_id": "NYXT"},
             token=token,
         )
         self.assertEqual(status, 200)
@@ -92,7 +92,7 @@ class ServerPortalActivityTests(unittest.TestCase):
             {
                 "seed": 7,
                 "run_id": "activity-transfer",
-                "payload": {"from_address": "wallet-a", "to_address": "wallet-b", "amount": 5},
+                "payload": {"from_address": account_id, "to_address": "wallet-b", "amount": 5, "asset_id": "NYXT"},
             },
             token=token,
         )

@@ -52,6 +52,7 @@ class StorageRoundtripTests(unittest.TestCase):
 
         order = Order(
             order_id="order-1",
+            owner_address="trader-1",
             side="BUY",
             amount=5,
             price=7,
@@ -75,6 +76,7 @@ class StorageRoundtripTests(unittest.TestCase):
         message = MessageEvent(
             message_id="msg-1",
             channel="general",
+            sender_account_id="acct-1",
             body="hello",
             run_id="run-001",
         )
@@ -83,9 +85,11 @@ class StorageRoundtripTests(unittest.TestCase):
 
         listing = Listing(
             listing_id="list-1",
+            publisher_id="seller-1",
             sku="sku-1",
             title="Item One",
             price=10,
+            status="active",
             run_id="run-001",
         )
         insert_listing(self.conn, listing)
@@ -94,6 +98,7 @@ class StorageRoundtripTests(unittest.TestCase):
         purchase = Purchase(
             purchase_id="purchase-1",
             listing_id="list-1",
+            buyer_id="buyer-1",
             qty=2,
             run_id="run-001",
         )

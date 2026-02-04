@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { downloadExportZip, fetchEvidence, fetchActivity, PortalSession } from '../api';
+import { downloadExportZip, downloadProofZip, fetchEvidence, fetchActivity, PortalSession, verifyEvidenceReplayV1 } from '../api';
 import { formatJson } from '../utils';
 import { History, FileJson, Download, ShieldCheck, ArrowRight } from 'lucide-react';
 
@@ -16,15 +16,17 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
   const [status, setStatus] = useState('');
   const [replaying, setReplaying] = useState(false);
   const [replayResult, setReplayResult] = useState<boolean | null>(null);
+  const [replayDetails, setReplayDetails] = useState<Record<string, unknown> | null>(null);
 
   const verifyReplay = async () => {
-    if (!selected) return;
+    if (!selected || !session) return;
     setReplaying(true);
     setReplayResult(null);
+    setReplayDetails(null);
     try {
-      const payload = await fetchEvidence(selected.trim());
-      setReplayResult(payload.replay_ok);
-      setEvidence(payload);
+      const result = await verifyEvidenceReplayV1(session.access_token, selected.trim());
+      setReplayResult(Boolean(result.ok));
+      setReplayDetails(result as any);
     } catch (err) {
       setStatus(`Verification failed: ${(err as Error).message}`);
     } finally {
@@ -32,6 +34,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
     }
   };
   const [loading, setLoading] = useState(false);
+  const selectedReceipt = receipts.find((r) => r?.run_id === selected);
 
   const loadActivity = async () => {
     if (!session) return;
@@ -81,6 +84,29 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
     }
   };
 
+  const downloadProof = async () => {
+    if (!session) {
+      setStatus('Sign in required');
+      return;
+    }
+    const prefix = (runId || '').trim();
+    if (!prefix) {
+      setStatus('Run ID prefix required');
+      return;
+    }
+    try {
+      const blob = await downloadProofZip(session.access_token, prefix);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${prefix}-proof.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setStatus(`Error: ${(err as Error).message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-white">
       <div className="flex items-center justify-between px-2">
@@ -88,7 +114,10 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
           <History className="text-primary" size={20} />
           <h2 className="text-xl font-black tracking-tight">Recent Activity</h2>
         </div>
-        <button onClick={loadActivity} className="text-[10px] font-bold text-primary uppercase tracking-widest">Refresh</button>
+        <div className="flex items-center gap-3">
+          <button onClick={downloadProof} className="text-[10px] font-bold text-primary uppercase tracking-widest">Export Proof</button>
+          <button onClick={loadActivity} className="text-[10px] font-bold text-primary uppercase tracking-widest">Refresh</button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -109,6 +138,9 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium">Deterministic Receipt</span>
+                {r.fee_total !== null && r.fee_total !== undefined && (
+                  <span className="text-[10px] font-bold text-primary">fee {String(r.fee_total)}</span>
+                )}
                 <ArrowRight size={12} className="text-text-subtle" />
               </div>
             </div>
@@ -146,7 +178,13 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
             </div>
             {replayResult === true && (
               <div className="text-[10px] text-binance-green font-bold animate-pulse">
-                ✨ Deterministic replay successful. State hash matches.
+                Deterministic replay successful. State hash matches.
+              </div>
+            )}
+            {selectedReceipt?.fee_total !== null && selectedReceipt?.fee_total !== undefined && (
+              <div className="text-[10px] text-text-subtle">
+                fee_total: <span className="font-mono">{String(selectedReceipt.fee_total)}</span>{" "}
+                treasury: <span className="font-mono">{String(selectedReceipt.treasury_address || "")}</span>
               </div>
             )}
           </div>
@@ -159,6 +197,12 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
               <div className="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 backdrop-blur-md text-[8px] font-bold text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
                 Verified Deterministic
               </div>
+              </div>
+          )}
+
+          {replayDetails && replayResult === false && (
+            <div className="p-4 rounded-2xl bg-binance-red/10 border border-binance-red/20 text-[10px] font-mono overflow-x-auto">
+              {formatJson(replayDetails)}
             </div>
           )}
         </div>

@@ -56,15 +56,11 @@ export const Settings: React.FC<SettingsProps> = ({ session, seed, runId, onSeed
         </section>
 
         <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm glass">
-          <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">Treasury Configuration</h3>
-          <div className="flex flex-col gap-2">
-            <div className="text-[10px] font-bold text-text-subtle uppercase">Testnet Treasury Address</div>
-            <div className="p-2 rounded-lg bg-surface-light dark:bg-surface-dark/5 text-[10px] font-mono break-all text-primary">
-              0x0Aa313fCE773786C8425a13B96DB64205c5edCBc
-            </div>
-            <div className="text-[9px] text-text-subtle mt-1">
-              *All transaction fees are automatically routed to this treasury for ecosystem growth.
-            </div>
+          <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">Treasury + Fees</h3>
+          <div className="text-xs text-text-subtle leading-relaxed">
+            Treasury routing is configured server-side (testnet). Each state mutation response includes{" "}
+            <code>fee_total</code> and <code>treasury_address</code>. Use Activity → Evidence Inspector to audit the
+            full fee + receipt chain.
           </div>
         </section>
 

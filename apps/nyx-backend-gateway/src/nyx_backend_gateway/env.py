@@ -85,3 +85,71 @@ def get_portal_challenge_ttl_seconds() -> int:
     if value < 60 or value > 3600:
         raise StorageError("NYX_PORTAL_CHALLENGE_TTL out of bounds")
     return value
+
+
+def get_faucet_cooldown_seconds() -> int:
+    raw = os.environ.get("NYX_FAUCET_COOLDOWN_SECONDS", "").strip()
+    if not raw:
+        return 24 * 60 * 60
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise StorageError("NYX_FAUCET_COOLDOWN_SECONDS must be int") from exc
+    if value < 0 or value > 30 * 24 * 60 * 60:
+        raise StorageError("NYX_FAUCET_COOLDOWN_SECONDS out of bounds")
+    return value
+
+
+def get_faucet_max_amount_per_24h() -> int:
+    raw = os.environ.get("NYX_FAUCET_MAX_AMOUNT_PER_24H", "").strip()
+    if not raw:
+        return 1_000
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise StorageError("NYX_FAUCET_MAX_AMOUNT_PER_24H must be int") from exc
+    if value < 0 or value > 1_000_000_000:
+        raise StorageError("NYX_FAUCET_MAX_AMOUNT_PER_24H out of bounds")
+    return value
+
+
+def get_faucet_max_claims_per_24h() -> int:
+    raw = os.environ.get("NYX_FAUCET_MAX_CLAIMS_PER_24H", "").strip()
+    if not raw:
+        return 1
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise StorageError("NYX_FAUCET_MAX_CLAIMS_PER_24H must be int") from exc
+    if value < 0 or value > 1000:
+        raise StorageError("NYX_FAUCET_MAX_CLAIMS_PER_24H out of bounds")
+    return value
+
+
+def get_faucet_ip_max_claims_per_24h() -> int:
+    raw = os.environ.get("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H", "").strip()
+    if not raw:
+        return 5
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise StorageError("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H must be int") from exc
+    if value < 0 or value > 10_000:
+        raise StorageError("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H out of bounds")
+    return value
+
+
+def get_0x_api_key() -> str:
+    return os.environ.get("NYX_0X_API_KEY", "").strip()
+
+
+def get_jupiter_api_key() -> str:
+    return os.environ.get("NYX_JUPITER_API_KEY", "").strip()
+
+
+def get_magic_eden_api_key() -> str:
+    return os.environ.get("NYX_MAGIC_EDEN_API_KEY", "").strip()
+
+
+def get_payevm_api_key() -> str:
+    return os.environ.get("NYX_PAYEVM_API_KEY", "").strip()

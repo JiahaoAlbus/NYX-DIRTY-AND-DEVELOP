@@ -2,9 +2,14 @@ import _bootstrap
 import json
 import tempfile
 from pathlib import Path
+import sys
 import unittest
 
-from nyx_backend.evidence import run_evidence
+_BACKEND_SRC = Path(__file__).resolve().parents[2] / "nyx-backend" / "src"
+if str(_BACKEND_SRC) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_SRC))
+
+from nyx_backend.evidence import run_evidence  # noqa: E402
 
 
 def _find_run_dir(run_root: Path, run_id: str) -> Path:

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Gift, CheckCircle2, Circle, Trophy } from 'lucide-react';
-import { claimAirdrop, PortalSession } from '../api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Gift, CheckCircle2, Circle, Trophy, ShieldCheck } from 'lucide-react';
+import { allocateRunId, ApiError, AirdropTaskV1, claimAirdropV1, fetchAirdropTasksV1, parseSeed, PortalSession } from '../api';
 
 interface AirdropProps {
   seed: string;
@@ -10,25 +10,56 @@ interface AirdropProps {
 }
 
 export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, session }) => {
-  const [claimed, setClaimed] = useState<string[]>([]);
-  const [status, setStatus] = useState('');
+  const [tasks, setTasks] = useState<AirdropTaskV1[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [lastClaim, setLastClaim] = useState<Record<string, unknown> | null>(null);
 
-  const tasks = [
-    { id: 't1', title: 'Follow NYX on X', reward: 50000000 },
-    { id: 't2', title: 'Join Discord Community', reward: 50000000 },
-    { id: 't3', title: 'First Trade on Exchange', reward: 100000000 },
-    { id: 't4', title: 'Buy an item in Store', reward: 100000000 },
-  ];
+  const baseRunId = useMemo(() => (runId || '').trim() || 'airdrop', [runId]);
 
-  const handleClaim = async (id: string, reward: number) => {
-    if (claimed.includes(id) || !backendOnline || !session) return;
-    setStatus('Claiming reward...');
+  const loadTasks = async () => {
+    if (!backendOnline) {
+      setStatus('Backend unavailable.');
+      return;
+    }
+    if (!session?.access_token) {
+      setStatus('Sign in required.');
+      return;
+    }
+    setLoading(true);
+    setStatus(null);
     try {
-      await claimAirdrop(session.access_token, session.account_id, id, reward);
-      setClaimed([...claimed, id]);
-      setStatus('Reward claimed successfully!');
+      const payload = await fetchAirdropTasksV1(session.access_token);
+      setTasks(payload.tasks || []);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      setStatus(`Failed to load tasks: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendOnline, session?.access_token]);
+
+  const handleClaim = async (taskId: string) => {
+    if (!backendOnline || !session?.access_token) return;
+    setLoading(true);
+    setStatus(null);
+    setLastClaim(null);
+    try {
+      const seedValue = parseSeed(seed.trim());
+      const claimRunId = allocateRunId(baseRunId, `airdrop_${taskId}`);
+      const result = await claimAirdropV1(session.access_token, seedValue, claimRunId, taskId);
+      setLastClaim(result);
+      await loadTasks();
+    } catch (err) {
+      const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      setStatus(`Claim failed: ${message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,34 +70,72 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
           <Trophy size={40} />
         </div>
         <h2 className="text-2xl font-bold">NYX Ecosystem Airdrop</h2>
-        <p className="text-sm text-text-subtle mt-2">Complete tasks to earn testnet rewards</p>
+        <p className="text-sm text-text-subtle mt-2">Tasks are verified from real receipts (no Web2 tasks).</p>
       </div>
 
       <div className="flex flex-col gap-4">
         <h3 className="font-bold px-2 flex items-center gap-2"><Gift size={18} className="text-primary" /> Available Tasks</h3>
-        {tasks.map(task => (
-          <div key={task.id} className="p-5 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex items-center justify-between group">
+        {tasks.length === 0 ? (
+          <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-xs text-text-subtle">
+            {loading ? 'Loading tasks…' : backendOnline ? 'No tasks available.' : 'Backend unavailable.'}
+          </div>
+        ) : tasks.map(task => (
+          <div key={task.task_id} className="p-5 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex items-center justify-between group">
             <div className="flex items-center gap-4">
-              <div className={`size-10 rounded-xl flex items-center justify-center ${claimed.includes(task.id) ? 'bg-binance-green/20 text-binance-green' : 'bg-primary/20 text-primary'}`}>
-                {claimed.includes(task.id) ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+              <div className={`size-10 rounded-xl flex items-center justify-center ${task.claimed ? 'bg-binance-green/20 text-binance-green' : task.completed ? 'bg-primary/20 text-primary' : 'bg-black/5 dark:bg-white/5 text-text-subtle'}`}>
+                {task.claimed ? <CheckCircle2 size={24} /> : task.completed ? <Circle size={24} /> : <Circle size={24} />}
               </div>
               <div>
                 <div className="font-bold text-sm">{task.title}</div>
+                <div className="text-[10px] text-text-subtle">{task.description}</div>
                 <div className="text-xs text-primary">+{task.reward} NYXT</div>
+                {task.completion_run_id && (
+                  <div className="mt-1 flex items-center gap-1 text-[10px] font-mono text-text-subtle">
+                    <ShieldCheck size={12} className="text-binance-green" />
+                    completion_run_id: {task.completion_run_id}
+                  </div>
+                )}
               </div>
             </div>
             <button 
-              onClick={() => handleClaim(task.id, task.reward)}
-              disabled={claimed.includes(task.id)}
+              onClick={() => handleClaim(task.task_id)}
+              disabled={!task.claimable || loading}
+              title={
+                task.claimed
+                  ? `Already claimed: ${task.claim_run_id ?? ''}`
+                  : task.completed
+                    ? undefined
+                    : 'Complete the task via real receipts first.'
+              }
               className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
-                claimed.includes(task.id) ? 'bg-surface-light dark:bg-surface-dark text-text-subtle' : 'bg-primary text-black hover:scale-105 active:scale-95'
+                task.claimable ? 'bg-primary text-black hover:scale-105 active:scale-95' : 'bg-surface-light dark:bg-surface-dark text-text-subtle opacity-70 cursor-not-allowed'
               }`}
             >
-              {claimed.includes(task.id) ? 'Claimed' : 'Claim'}
+              {task.claimed ? 'Claimed' : task.claimable ? 'Claim' : task.completed ? 'Ready' : 'Incomplete'}
             </button>
           </div>
         ))}
       </div>
+
+      {lastClaim && (
+        <div className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-white/10 text-xs">
+          <div className="font-bold">Last Claim Receipt</div>
+          <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-[10px] text-text-subtle break-all">
+            {"run_id" in lastClaim && <div>run_id: {String((lastClaim as any).run_id)}</div>}
+            {"state_hash" in lastClaim && <div>state_hash: {String((lastClaim as any).state_hash)}</div>}
+            {"receipt_hashes" in lastClaim && <div>receipt_hashes: {JSON.stringify((lastClaim as any).receipt_hashes)}</div>}
+            {"fee_total" in lastClaim && <div>fee_total: {String((lastClaim as any).fee_total)}</div>}
+            {"treasury_address" in lastClaim && <div>treasury_address: {String((lastClaim as any).treasury_address)}</div>}
+            {"balance" in lastClaim && <div>balance(NYXT): {String((lastClaim as any).balance)}</div>}
+          </div>
+        </div>
+      )}
+
+      {status && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-binance-red text-white text-sm font-bold shadow-2xl">
+          {status}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import _bootstrap
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -33,21 +35,59 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         self.httpd.server_close()
         self.tmp.cleanup()
 
-    def test_listing_and_purchase(self) -> None:
+    def _post(self, path: str, payload: dict, token: str | None = None) -> tuple[int, dict]:
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        listing_payload = {
-            "seed": 123,
-            "run_id": "run-listing-1",
-            "payload": {"sku": "sku-1", "title": "Item One", "price": 10},
-        }
-        body = json.dumps(listing_payload, separators=(",", ":"))
-        conn.request("POST", "/marketplace/listing", body=body, headers={"Content-Type": "application/json"})
+        body = json.dumps(payload, separators=(",", ":"))
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()
         data = response.read()
-        self.assertEqual(response.status, 200)
-        parsed = json.loads(data.decode("utf-8"))
-        self.assertEqual(parsed.get("status"), "complete")
         conn.close()
+        return response.status, json.loads(data.decode("utf-8"))
+
+    def _auth_token(self, handle: str) -> tuple[str, str]:
+        key = f"portal-key-{handle}-0001".encode("utf-8")
+        pubkey = base64.b64encode(key).decode("utf-8")
+        status, created = self._post("/portal/v1/accounts", {"handle": handle, "pubkey": pubkey})
+        self.assertEqual(status, 200)
+        account_id = created.get("account_id")
+        status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
+        self.assertEqual(status, 200)
+        nonce = challenge.get("nonce")
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        status, verified = self._post(
+            "/portal/v1/auth/verify",
+            {"account_id": account_id, "nonce": nonce, "signature": signature},
+        )
+        self.assertEqual(status, 200)
+        return account_id, verified.get("access_token")
+
+    def test_listing_and_purchase(self) -> None:
+        seller_id, seller_token = self._auth_token("seller")
+        buyer_id, buyer_token = self._auth_token("buyer")
+
+        status, _ = self._post(
+            "/wallet/v1/faucet",
+            {"seed": 123, "run_id": "run-market-faucet-seller", "address": seller_id, "amount": 1000, "asset_id": "NYXT"},
+            token=seller_token,
+        )
+        self.assertEqual(status, 200)
+        status, _ = self._post(
+            "/wallet/v1/faucet",
+            {"seed": 123, "run_id": "run-market-faucet-buyer", "address": buyer_id, "amount": 1000, "asset_id": "NYXT"},
+            token=buyer_token,
+        )
+        self.assertEqual(status, 200)
+
+        status, parsed = self._post(
+            "/marketplace/listing",
+            {"seed": 123, "run_id": "run-listing-1", "payload": {"sku": "sku-1", "title": "Item One", "price": 10}},
+            token=seller_token,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(parsed.get("status"), "complete")
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         conn.request("GET", "/marketplace/listings")
@@ -60,20 +100,13 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         listing_id = listings[0]["listing_id"]
         conn.close()
 
-        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        purchase_payload = {
-            "seed": 123,
-            "run_id": "run-purchase-1",
-            "payload": {"listing_id": listing_id, "qty": 1},
-        }
-        body = json.dumps(purchase_payload, separators=(",", ":"))
-        conn.request("POST", "/marketplace/purchase", body=body, headers={"Content-Type": "application/json"})
-        response = conn.getresponse()
-        data = response.read()
-        self.assertEqual(response.status, 200)
-        parsed = json.loads(data.decode("utf-8"))
+        status, parsed = self._post(
+            "/marketplace/purchase",
+            {"seed": 123, "run_id": "run-purchase-1", "payload": {"listing_id": listing_id, "qty": 1}},
+            token=buyer_token,
+        )
+        self.assertEqual(status, 200)
         self.assertEqual(parsed.get("status"), "complete")
-        conn.close()
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         conn.request("GET", "/marketplace/purchases?listing_id=" + listing_id)
@@ -82,6 +115,15 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         parsed = json.loads(data.decode("utf-8"))
         self.assertIn("purchases", parsed)
+        conn.close()
+
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
+        conn.request("GET", "/marketplace/v1/my_purchases?limit=10&offset=0", headers={"Authorization": f"Bearer {buyer_token}"})
+        response = conn.getresponse()
+        data = response.read()
+        self.assertEqual(response.status, 200)
+        parsed = json.loads(data.decode("utf-8"))
+        self.assertGreaterEqual(len(parsed.get("purchases") or []), 1)
         conn.close()
 
 

@@ -1,221 +1,413 @@
 import SwiftUI
 
-// MARK: - Home View (Binance Style)
+// MARK: - Home View (Capability-driven)
 struct NYXHomeView: View {
     @ObservedObject var settings: BackendSettings
+    @Binding var selectedTab: Int
+    @State private var backendOk: Bool = false
+    @State private var statusText: String = "Backend: unknown"
+    private let client = GatewayClient()
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("NYX Portal")
-                                .font(.largeTitle)
-                                .fontWeight(.black)
-                            Text("Testnet Ecosystem")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "diamond.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(.yellow)
-                    }
-                    .padding(.horizontal)
-                    
-                    // Banner
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Secure Your Future")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        Text("Deterministic Web3 Infrastructure")
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("NYX Portal")
+                            .font(.largeTitle)
+                            .fontWeight(.black)
+                        Text("Testnet • Mainnet-equivalent flows • Evidence for every mutation")
                             .font(.caption)
-                            .fontWeight(.bold)
                             .foregroundColor(.secondary)
-                        
-                        Button(action: {}) {
-                            Text("Claim Airdrop")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 8)
-                                .background(Color.accentColor)
-                                .foregroundColor(.black)
-                                .cornerRadius(10)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(statusText)
+                                .font(.footnote)
+                                .foregroundColor(backendOk ? .green : .secondary)
+                            Spacer()
+                            Button("Refresh") {
+                                Task { await refreshStatus() }
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .padding(.top, 10)
+
+                        if let session = settings.session {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("@\(session.handle)")
+                                    .font(.headline)
+                                Text(session.account_id)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(25)
-                    .background(LinearGradient(colors: [.yellow, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .cornerRadius(25)
-                    .padding(.horizontal)
-                    
-                    // Quick Actions
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]) {
-                        ShortcutIcon(icon: "drop.fill", label: "Faucet")
-                        ShortcutIcon(icon: "banknote.fill", label: "Fiat")
-                        ShortcutIcon(icon: "gift.fill", label: "Airdrop")
-                        ShortcutIcon(icon: "ellipsis.circle.fill", label: "More")
-                    }
-                    .padding(.horizontal)
-                    
-                    // Modules
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("Core Modules")
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Modules")
                             .font(.headline)
-                            .padding(.horizontal)
-                        
-                        ModuleRow(icon: "wallet.pass.fill", title: "Web3 Wallet", desc: "MetaMask-style assets", color: .yellow)
-                        ModuleRow(icon: "arrow.left.arrow.right", title: "Exchange", desc: "Binance-style trading", color: .green)
-                        ModuleRow(icon: "bubble.left.and.bubble.right.fill", title: "Chat", desc: "Instagram-style social", color: .blue)
-                        ModuleRow(icon: "bag.fill", title: "Store", desc: "Taobao-style marketplace", color: .orange)
+                        ModuleButton(icon: "wallet.pass.fill", title: "Wallet", subtitle: "Native balances • faucet • send", color: .yellow) {
+                            selectedTab = 1
+                        }
+                        ModuleButton(icon: "arrow.left.arrow.right.circle.fill", title: "Trade", subtitle: "Web module (shared session)", color: .green) {
+                            selectedTab = 2
+                        }
+                        ModuleButton(icon: "bubble.left.and.bubble.right.fill", title: "Chat", subtitle: "Web module (E2EE)", color: .blue) {
+                            selectedTab = 3
+                        }
+                        ModuleButton(icon: "bag.fill", title: "Store", subtitle: "Web module (purchase receipts)", color: .orange) {
+                            selectedTab = 4
+                        }
+                        ModuleButton(icon: "checkmark.seal.fill", title: "Evidence", subtitle: "Replay verify • proof export", color: .purple) {
+                            selectedTab = 5
+                        }
                     }
                 }
-                .padding(.bottom, 100)
+                .padding()
+                .padding(.bottom, 90)
             }
-            .navigationBarHidden(true)
+            .navigationTitle("Home")
+        }
+        .task {
+            await refreshStatus()
+        }
+    }
+
+    @MainActor
+    private func refreshStatus() async {
+        guard let url = settings.resolvedURL() else {
+            backendOk = false
+            statusText = "Backend: invalid URL"
+            return
+        }
+        client.setBaseURL(url)
+        do {
+            let ok = try await client.checkHealth()
+            backendOk = ok
+            statusText = ok ? "Backend: available" : "Backend: unavailable"
+        } catch {
+            backendOk = false
+            statusText = "Backend: unavailable"
         }
     }
 }
 
-// MARK: - Wallet View (MetaMask Style)
+// MARK: - Wallet View (Native, no fake UI)
 struct NYXWalletView: View {
     @ObservedObject var settings: BackendSettings
-    @State private var balance: Int = 0
-    @State private var address: String = "0x0Aa313...CBc"
-    @State private var isRefreshing = false
-    
-    func refreshBalance() async {
-        isRefreshing = true
-        guard let url = URL(string: settings.baseURL)?.appendingPathComponent("wallet/balance") else { return }
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        components?.queryItems = [URLQueryItem(name: "address", value: address)]
-        
-        guard let finalURL = components?.url else { return }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: finalURL)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let bal = json["balance"] as? Int {
-                self.balance = bal
-            }
-        } catch {
-            print("Failed to fetch balance: \(error)")
-        }
-        isRefreshing = false
-    }
+    @State private var assets: [WalletAssetV1] = []
+    @State private var balances: [WalletBalanceRowV1] = []
+    @State private var transfers: [WalletTransferRowV1] = []
+    @State private var status: String = ""
+    @State private var loading: Bool = false
+    @State private var showFaucet: Bool = false
+    @State private var showSend: Bool = false
+    @State private var faucetAmount: String = "1000"
+    @State private var faucetAsset: String = "NYXT"
+    @State private var sendTo: String = ""
+    @State private var sendAmount: String = ""
+    @State private var sendAsset: String = "NYXT"
+    @State private var transfersOffset: Int = 0
+    @State private var lastReceipt: String = ""
+    private let transfersPageSize: Int = 25
+    private let client = GatewayClient()
 
-    func requestFaucet() async {
-        guard let account = settings.session?.account_id else { return }
-        let client = GatewayClient(baseURL: URL(string: settings.baseURL)!)
-        do {
-            _ = try await client.faucetV1(
-                token: settings.session?.access_token ?? "",
-                seed: Int.random(in: 1...1000000),
-                runId: "faucet-\(Date().timeIntervalSince1970)",
-                address: account,
-                amount: 1000000000 // 1000 NYXT
-            )
-            await refreshBalance()
-        } catch {
-            print("Faucet failed: \(error)")
-        }
-    }
-    
+    private var accountId: String { settings.session?.account_id ?? "" }
+    private var token: String { settings.session?.access_token ?? "" }
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Account Card
-                VStack(spacing: 15) {
-                    Circle()
-                        .fill(LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom))
-                        .frame(width: 60, height: 60)
-                        .overlay(Text("N").fontWeight(.bold).foregroundColor(.black))
-                    
-                    Text("@NYXUser")
-                        .font(.headline)
-                    
-                    HStack {
-                        Text(address)
-                            .font(.system(.caption, design: .monospaced))
-                        Button(action: {
-                            UIPasteboard.general.string = address
-                        }) {
-                            Image(systemName: "doc.on.doc").font(.caption2)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(15)
-                }
-                .padding(.vertical, 30)
-                .frame(maxWidth: .infinity)
-                .background(Color.yellow.opacity(0.1))
-                
-                // Balance
-                VStack(spacing: 8) {
-                    Text("\(balance) NYXT")
-                        .font(.system(size: 40, weight: .black, design: .rounded))
-                    Text("≈ $\(Double(balance) / 1_000_000_000.0, specifier: "%.2f")")
-                        .font(.subheadline)
+        NavigationStack {
+            VStack(spacing: 14) {
+                if accountId.isEmpty || token.isEmpty {
+                    Text("Sign in required.")
                         .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 20)
-                
-                // Actions
-                HStack(spacing: 30) {
-                    WalletActionBtn(icon: "plus", label: "Buy")
-                    WalletActionBtn(icon: "arrow.up", label: "Send")
-                    WalletActionBtn(icon: "arrow.left.arrow.right", label: "Swap")
-                    Button(action: {
-                        Task { await requestFaucet() }
-                    }) {
-                        WalletActionBtn(icon: "drop", label: "Faucet")
-                    }
-                }
-                .padding(.bottom, 30)
-                
-                // Assets
-                List {
-                    Section(header: Text("Assets")) {
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Circle().fill(.yellow).frame(width: 32)
-                            VStack(alignment: .leading) {
-                                Text("NYXT").fontWeight(.bold)
-                                Text("NYX Testnet Token").font(.caption2).foregroundColor(.secondary)
-                            }
+                            Text("Address")
+                                .font(.headline)
                             Spacer()
-                            Text("\(balance)").fontWeight(.bold)
+                            Button("Copy") {
+                                UIPasteboard.general.string = accountId
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        Text(accountId)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    .padding()
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
+
+                    HStack(spacing: 12) {
+                        Button("Faucet") { showFaucet = true }
+                            .buttonStyle(.borderedProminent)
+                        Button("Send") { showSend = true }
+                            .buttonStyle(.bordered)
+                        Button("Refresh") { Task { await refreshAll(resetTransfers: true) } }
+                            .buttonStyle(.bordered)
+                    }
+
+                    if loading {
+                        ProgressView()
+                    }
+                    if !status.isEmpty {
+                        Text(status)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    List {
+                        Section(header: Text("Assets")) {
+                            ForEach(assets, id: \.asset_id) { asset in
+                                let bal = balances.first(where: { $0.asset_id == asset.asset_id })?.balance ?? 0
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(asset.asset_id)
+                                            .fontWeight(.bold)
+                                        if let name = asset.name {
+                                            Text(name)
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Text("\(bal)")
+                                        .font(.system(.body, design: .monospaced))
+                                }
+                            }
+                        }
+
+                        Section(header: Text("Transfers")) {
+                            if transfers.isEmpty {
+                                Text("No transfers yet.")
+                                    .foregroundColor(.secondary)
+                            } else {
+                                ForEach(transfers) { t in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text("\(t.amount) \(t.asset_id)")
+                                                .fontWeight(.bold)
+                                            Spacer()
+                                            Text("fee \(t.fee_total)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Text("run_id: \(t.run_id)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                            .textSelection(.enabled)
+                                    }
+                                }
+                                Button("Load more") {
+                                    Task { await loadTransfers(nextPage: true) }
+                                }
+                            }
                         }
                     }
-                }
-                .listStyle(InsetGroupedListStyle())
-                .refreshable {
-                    await refreshBalance()
-                }
-            }
-            .navigationTitle("Wallet")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        Task { await refreshBalance() }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                            .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                    .listStyle(.insetGrouped)
+
+                    if !lastReceipt.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Last Receipt")
+                                .font(.headline)
+                            Text(lastReceipt)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        .padding()
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(16)
                     }
                 }
             }
+            .padding(.horizontal)
+            .padding(.top, 10)
+            .navigationTitle("Wallet")
         }
         .task {
-            await refreshBalance()
+            await refreshAll(resetTransfers: true)
         }
+        .sheet(isPresented: $showFaucet) {
+            NavigationStack {
+                Form {
+                    Picker("Asset", selection: $faucetAsset) {
+                        ForEach(assets.map(\.asset_id), id: \.self) { assetId in
+                            Text(assetId).tag(assetId)
+                        }
+                    }
+                    TextField("Amount", text: $faucetAmount)
+                        .keyboardType(.numberPad)
+                    Button("Claim Faucet") {
+                        Task { await claimFaucet() }
+                    }
+                    .disabled(loading)
+                }
+                .navigationTitle("Faucet")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showFaucet = false }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showSend) {
+            NavigationStack {
+                Form {
+                    Picker("Asset", selection: $sendAsset) {
+                        ForEach(assets.map(\.asset_id), id: \.self) { assetId in
+                            Text(assetId).tag(assetId)
+                        }
+                    }
+                    TextField("To Address", text: $sendTo)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                    TextField("Amount", text: $sendAmount)
+                        .keyboardType(.numberPad)
+                    Button("Send") {
+                        Task { await sendTransfer() }
+                    }
+                    .disabled(loading)
+                }
+                .navigationTitle("Send")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { showSend = false }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshAll(resetTransfers: Bool) async {
+        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        loading = true
+        status = ""
+        client.setBaseURL(url)
+        do {
+            async let balancesResp = client.fetchWalletBalancesV1(token: token, address: accountId)
+            let b = try await balancesResp
+            assets = b.assets
+            balances = b.balances
+            if resetTransfers {
+                transfersOffset = 0
+                transfers = []
+            }
+            await loadTransfers(nextPage: false)
+        } catch {
+            status = "Load failed: \(String(describing: error))"
+        }
+        loading = false
+    }
+
+    @MainActor
+    private func loadTransfers(nextPage: Bool) async {
+        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        client.setBaseURL(url)
+        if nextPage {
+            transfersOffset += transfersPageSize
+        }
+        do {
+            let resp = try await client.fetchWalletTransfersV1(
+                token: token,
+                address: accountId,
+                limit: transfersPageSize,
+                offset: transfersOffset
+            )
+            if nextPage {
+                transfers.append(contentsOf: resp.transfers)
+            } else {
+                transfers = resp.transfers
+            }
+        } catch {
+            status = "Transfers load failed: \(String(describing: error))"
+        }
+    }
+
+    private func parseSeedValue() -> Int? {
+        let trimmed = settings.seed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmed), value >= 0 else { return nil }
+        return value
+    }
+
+    private func allocateRunId(action: String) -> String {
+        let base = settings.runIdBase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeBase = base.isEmpty ? "ios-run" : base
+        let safeAction = action.replacingOccurrences(of: "[^A-Za-z0-9_-]", with: "_", options: .regularExpression)
+        let key = "nyx_run_counter_\(safeBase)"
+        let current = UserDefaults.standard.integer(forKey: key)
+        let next = current + 1
+        UserDefaults.standard.set(next, forKey: key)
+        return "\(safeBase)-\(safeAction)-\(next)"
+    }
+
+    @MainActor
+    private func claimFaucet() async {
+        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let seedValue = parseSeedValue() else {
+            status = "Seed must be a non-negative integer"
+            return
+        }
+        guard let amount = Int(faucetAmount.trimmingCharacters(in: .whitespacesAndNewlines)), amount > 0 else {
+            status = "Amount must be a positive integer"
+            return
+        }
+        loading = true
+        status = ""
+        client.setBaseURL(url)
+        do {
+            let runId = allocateRunId(action: "faucet")
+            let result = try await client.faucetV1(token: token, seed: seedValue, runId: runId, address: accountId, amount: amount, assetId: faucetAsset)
+            lastReceipt = "run_id=\(result.runId) state_hash=\(result.stateHash) fee_total=\(result.feeTotal) treasury=\(result.treasuryAddress)"
+            showFaucet = false
+            await refreshAll(resetTransfers: true)
+        } catch {
+            status = "Faucet failed: \(String(describing: error))"
+        }
+        loading = false
+    }
+
+    @MainActor
+    private func sendTransfer() async {
+        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let seedValue = parseSeedValue() else {
+            status = "Seed must be a non-negative integer"
+            return
+        }
+        let to = sendTo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !to.isEmpty else {
+            status = "To address required"
+            return
+        }
+        guard let amount = Int(sendAmount.trimmingCharacters(in: .whitespacesAndNewlines)), amount > 0 else {
+            status = "Amount must be a positive integer"
+            return
+        }
+        loading = true
+        status = ""
+        client.setBaseURL(url)
+        do {
+            let runId = allocateRunId(action: "transfer")
+            let result = try await client.transferV1(token: token, seed: seedValue, runId: runId, from: accountId, to: to, amount: amount, assetId: sendAsset)
+            lastReceipt = "run_id=\(result.runId) state_hash=\(result.stateHash) fee_total=\(result.feeTotal) treasury=\(result.treasuryAddress)"
+            showSend = false
+            sendTo = ""
+            sendAmount = ""
+            await refreshAll(resetTransfers: true)
+        } catch {
+            status = "Send failed: \(String(describing: error))"
+        }
+        loading = false
     }
 }
 
@@ -261,6 +453,36 @@ struct ModuleRow: View {
         .background(.ultraThinMaterial)
         .cornerRadius(20)
         .padding(.horizontal)
+    }
+}
+
+struct ModuleButton: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .frame(width: 36, height: 36)
+                    .background(color.opacity(0.12))
+                    .cornerRadius(10)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text(subtitle).font(.caption).foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .cornerRadius(16)
+        }
+        .buttonStyle(.plain)
     }
 }
 
