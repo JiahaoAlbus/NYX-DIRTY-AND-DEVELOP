@@ -795,6 +795,16 @@ def _web2_headers(method: str) -> dict[str, str]:
     return headers
 
 
+def _web2_normalized_url(url: str, allow_entry: dict[str, object]) -> str:
+    parsed = urlparse(url)
+    path = parsed.path or "/"
+    if not path.startswith("/"):
+        path = f"/{path}"
+    query = f"?{parsed.query}" if parsed.query else ""
+    base = str(allow_entry["base_url"]).rstrip("/")
+    return f"{base}{path}{query}"
+
+
 def _web2_request(
     *,
     url: str,
@@ -1551,9 +1561,10 @@ def execute_web2_guard_request(
 
     allow_entry = _web2_match_allowlist(url, method)
     allowlist_id = str(allow_entry["id"])
-    request_hash = _web2_request_hash(method, url, body_text, allowlist_id)
+    safe_url = _web2_normalized_url(url, allow_entry)
+    request_hash = _web2_request_hash(method, safe_url, body_text, allowlist_id)
 
-    status, response_bytes, truncated, error_hint = _web2_request(url=url, method=method, body=body_text)
+    status, response_bytes, truncated, error_hint = _web2_request(url=safe_url, method=method, body=body_text)
     response_hash = _web2_hash_bytes(response_bytes)
     response_size = len(response_bytes)
     body_size = len(body_text.encode("utf-8")) if body_text else 0
@@ -1580,7 +1591,7 @@ def execute_web2_guard_request(
 
         run_root = run_root or _run_root()
         evidence_payload = {
-            "url": url,
+            "url": safe_url,
             "method": method,
             "allowlist_id": allowlist_id,
             "request_hash": request_hash,
@@ -1648,7 +1659,7 @@ def execute_web2_guard_request(
                 request_id=_deterministic_id("web2-req", run_id),
                 account_id=account_id,
                 run_id=run_id,
-                url=url,
+                url=safe_url,
                 method=method,
                 request_hash=request_hash,
                 response_hash=response_hash,
