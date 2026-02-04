@@ -302,7 +302,15 @@ const App: React.FC = () => {
       case Screen.FIAT:
         return <Fiat />;
       case Screen.WEB2_ACCESS:
-        return <Web2Access />;
+        return (
+          <Web2Access
+            seed={seed}
+            runId={runId}
+            backendOnline={backendOnline}
+            session={session}
+            onNavigate={navigate}
+          />
+        );
       default:
         return <Home 
           backendOnline={backendOnline} 

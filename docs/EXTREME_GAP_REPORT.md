@@ -112,9 +112,16 @@ Legend:
 | Jupiter Quote (Solana) | `GET /integrations/v1/jupiter/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_JUPITER_API_KEY` is set (`integrations.jupiter_quote`). |
 | Magic Eden / PayEVM | N/A | N/A | N/A | 🔴 Disabled | Keys tracked for prod readiness, but endpoints/UI are not shipped yet (NO FAKE UI). |
 
+### J) Web2 Guard
+
+| UI Entry | Backend endpoint | MutatesState | Evidence | Status | Notes |
+|---|---|---:|---:|---:|---|
+| Web2 Guard | `GET /web2/v1/allowlist` | No | N/A | 🟢 | Allowlisted public Web2 endpoints. |
+| Web2 Guard request | `POST /web2/v1/request` | Yes | Yes | 🟢 | Deterministic evidence includes request/response hashes + fee routing. |
+| Web2 Guard history | `GET /web2/v1/requests` | No | N/A | 🟢 | Paginated request history per account. |
+
 ## Remaining disabled features (by design)
 
 | Module | Capability | Status | Reason |
 |---|---|---:|---|
-| Web2 Guard | `web2.guard` | 🔴 Disabled | Out of scope for testnet v1; requires deterministic signing/policy system. |
 | Fiat on-ramp | (no capability in backend) | 🔴 Disabled | No provider integration in this repo; not exposed as a primary flow. |

@@ -12,6 +12,7 @@ from nyx_backend_gateway.storage import (
     Purchase,
     Receipt,
     Trade,
+    Web2GuardRequest,
     create_connection,
     insert_evidence_run,
     insert_fee_ledger,
@@ -21,6 +22,7 @@ from nyx_backend_gateway.storage import (
     insert_purchase,
     insert_receipt,
     insert_trade,
+    insert_web2_guard_request,
     load_by_id,
 )
 
@@ -129,6 +131,25 @@ class StorageRoundtripTests(unittest.TestCase):
         )
         insert_fee_ledger(self.conn, fee)
         self.assertIsNotNone(load_by_id(self.conn, "fee_ledger", "fee_id", "fee-1"))
+
+        web2 = Web2GuardRequest(
+            request_id="web2-1",
+            account_id="acct-1",
+            run_id="run-001",
+            url="https://api.github.com",
+            method="GET",
+            request_hash="aa" * 32,
+            response_hash="bb" * 32,
+            response_status=200,
+            response_size=120,
+            response_truncated=False,
+            body_size=0,
+            header_names=["Accept", "User-Agent"],
+            sealed_request=None,
+            created_at=1234567890,
+        )
+        insert_web2_guard_request(self.conn, web2)
+        self.assertIsNotNone(load_by_id(self.conn, "web2_guard_requests", "request_id", "web2-1"))
 
 
 if __name__ == "__main__":

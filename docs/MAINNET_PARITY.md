@@ -38,7 +38,10 @@ This document defines what “mainnet-equivalent” means for this Testnet Relea
    - Client MUST encrypt before sending; backend MUST store ciphertext envelope only (no plaintext).
    - Key agreement + encryption algorithms MUST remain the same between testnet and mainnet.
 
+6. **Web2 Guard**
+   - Web2 Guard MUST remain allowlist-gated and evidence-backed (request/response hashes) across testnet and mainnet.
+   - Only the allowlist contents and API credentials MAY differ between environments.
+
 ## 3) Explicit non-parity (disabled in testnet v1)
 
-- Web2 Guard: capability-disabled (`web2.guard = disabled`) until deterministic signing + policy are implemented.
 - Fiat on-ramp: not shipped in this repo; must remain disabled (no fake “Buy” buttons).

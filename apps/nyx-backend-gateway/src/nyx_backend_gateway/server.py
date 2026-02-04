@@ -79,8 +79,7 @@ def _capabilities() -> dict[str, object]:
         "marketplace": {"listing": "enabled", "purchase": "enabled"},
         "chat": {"e2ee": "verified", "dm": "enabled"},
         "dapp": {"browser": "enabled"},
-        # Web2 Guard stays disabled until it is fully wired to real backends (NO FAKE UI).
-        "web2": {"guard": "disabled"},
+        "web2": {"guard": "enabled"},
         "integrations": integration_features,
     }
     return {
@@ -110,6 +109,9 @@ def _capabilities() -> dict[str, object]:
             "/chat/messages",
             "/integrations/v1/0x/quote",
             "/integrations/v1/jupiter/quote",
+            "/web2/v1/allowlist",
+            "/web2/v1/request",
+            "/web2/v1/requests",
             "/evidence",
             "/evidence/v1/replay",
             "/export.zip",
@@ -803,6 +805,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     response.update(_fee_summary("marketplace", "purchase_listing", purchase_payload, result.run_id))
                 self._send_json(response)
                 return
+            if self.path == "/web2/v1/request":
+                session = self._require_auth()
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                web2_payload = payload.get("payload")
+                if web2_payload is None:
+                    web2_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                if not isinstance(web2_payload, dict):
+                    raise GatewayError("payload must be object")
+                response = gateway.execute_web2_guard_request(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=web2_payload,
+                    account_id=session.account_id,
+                )
+                self._send_json(response)
+                return
             if self.path == "/entertainment/step":
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
@@ -880,6 +900,28 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/capabilities":
             self._send_json(_capabilities())
+            return
+        if path == "/web2/v1/allowlist":
+            self._send_json({"allowlist": gateway.list_web2_allowlist()})
+            return
+        if path == "/web2/v1/requests":
+            try:
+                session = self._require_auth()
+                limit_raw = (query.get("limit") or ["50"])[0]
+                offset_raw = (query.get("offset") or ["0"])[0]
+                try:
+                    limit = int(limit_raw)
+                    offset = int(offset_raw)
+                except ValueError:
+                    raise GatewayError("limit or offset invalid")
+                rows = gateway.fetch_web2_guard_requests(
+                    account_id=session.account_id,
+                    limit=limit,
+                    offset=offset,
+                )
+                self._send_json({"requests": rows, "limit": limit, "offset": offset})
+            except (GatewayError, GatewayApiError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
         if path == "/portal/v1/me":
             try:

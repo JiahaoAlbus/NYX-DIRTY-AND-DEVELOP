@@ -54,6 +54,13 @@ Open the URL printed by Vite (default `http://localhost:5173`).
 
 Notes:
 - dApp Browser is capability-gated (`dapp.browser`) and can open dApps in a new tab (recommended for wallet extension injection).
+- Web2 Guard is capability-gated (`web2.guard`). It only allows allowlisted HTTPS endpoints and records request/response hashes in evidence.
+- Default allowlist includes 0x, Jupiter, Magic Eden, GitHub, CoinGecko, CoinCap, and HttpBin (see `/web2/v1/allowlist`).
+
+Web2 Guard quick check:
+```bash
+curl -sS http://127.0.0.1:8091/web2/v1/allowlist | jq .
+```
 
 ## 4) iOS (Simulator)
 
@@ -66,6 +73,7 @@ xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj -scheme NYXPortal -destinat
 Notes:
 - Wallet flows are native (balances/faucet/send).
 - Trade/Chat/Store/Proof are embedded web modules with session token injection.
+- Web2 Guard can be opened from Home → Web2 Guard (web module).
 - IPA export requires Apple Developer signing; this repo only produces a simulator `.app` by default.
 
 ## 5) Build release artifacts (web + backend + iOS + proof)

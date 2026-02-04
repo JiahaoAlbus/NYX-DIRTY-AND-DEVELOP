@@ -2,6 +2,7 @@ import { bytesToBase64, encodeUtf8 } from "./utils";
 import { hmac } from "@noble/hashes/hmac";
 import { sha256 } from "@noble/hashes/sha256";
 import type { Capabilities } from "./capabilities";
+import type { Web2AllowlistEntry, Web2GuardRequestRow, Web2GuardResponse } from "./types";
 
 export type BackendStatus = "unknown" | "online" | "offline";
 
@@ -284,6 +285,34 @@ export async function downloadProofZip(token: string, prefix: string, limit: num
     throw new ApiError(response.status, `HTTP_${response.status}`, message);
   }
   return await response.blob();
+}
+
+export async function fetchWeb2Allowlist() {
+  return requestJson<{ allowlist: Web2AllowlistEntry[] }>("/web2/v1/allowlist", { retry: false });
+}
+
+export async function fetchWeb2Requests(token: string, limit: number = 25, offset: number = 0) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  qs.set("offset", String(offset));
+  return requestJson<{ requests: Web2GuardRequestRow[]; limit: number; offset: number }>(
+    `/web2/v1/requests?${qs.toString()}`,
+    { token }
+  );
+}
+
+export async function executeWeb2GuardRequest(
+  token: string,
+  seed: number,
+  runId: string,
+  payload: { url: string; method?: string; body?: string | Record<string, unknown>; sealed_request?: string }
+): Promise<Web2GuardResponse> {
+  return requestJson<Web2GuardResponse>("/web2/v1/request", {
+    method: "POST",
+    token,
+    body: { seed, run_id: runId, payload },
+    retry: false,
+  });
 }
 
 export async function fetchWalletBalance(address: string, assetId: string = "NYXT") {

@@ -6,6 +6,7 @@ struct NYXHomeView: View {
     @Binding var selectedTab: Int
     @State private var backendOk: Bool = false
     @State private var statusText: String = "Backend: unknown"
+    @State private var showWeb2Guard: Bool = false
     private let client = GatewayClient()
     
     var body: some View {
@@ -63,6 +64,9 @@ struct NYXHomeView: View {
                         ModuleButton(icon: "bag.fill", title: "Store", subtitle: "Web module (purchase receipts)", color: .orange) {
                             selectedTab = 4
                         }
+                        ModuleButton(icon: "lock.shield.fill", title: "Web2 Guard", subtitle: "Allowlisted Web2 access", color: .purple) {
+                            showWeb2Guard = true
+                        }
                         ModuleButton(icon: "checkmark.seal.fill", title: "Evidence", subtitle: "Replay verify • proof export", color: .purple) {
                             selectedTab = 5
                         }
@@ -75,6 +79,9 @@ struct NYXHomeView: View {
         }
         .task {
             await refreshStatus()
+        }
+        .sheet(isPresented: $showWeb2Guard) {
+            WebPortalView(settings: settings, initialScreen: "web2_access")
         }
     }
 

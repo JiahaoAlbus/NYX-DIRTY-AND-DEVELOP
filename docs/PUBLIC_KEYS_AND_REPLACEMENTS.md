@@ -1,6 +1,6 @@
-# Public/Test Keys & Replacement Checklist
+# Production Key Replacement + Public Endpoints
 
-This file records **non-production** API keys and “public key” defaults currently used for development.
+This file records **non-production** API keys and “public key” defaults currently used for development, plus the **public endpoints** in use.
 
 **MUST** replace these values before production launch:
 - rotate keys with the provider
@@ -32,6 +32,33 @@ This file records **non-production** API keys and “public key” defaults curr
   - Currently uses a **public/shared** key (per team convention).
   - Not integrated with Moon yet.
 - Replace before prod: **YES**
+
+## Public endpoints in use (dev/test)
+
+These endpoints are the current external API bases for integrations and the Web2 Guard allowlist.
+
+### 0x (EVM swaps)
+- Base: `https://api.0x.org`
+- Quote: `https://api.0x.org/swap/permit2/quote`
+- Header: `0x-api-key` + `0x-version: v2`
+- Chain selection: `chainId` query parameter (v2 unified endpoint)
+
+### Jupiter (Solana swaps)
+- Base: `https://api.jup.ag`
+- Quote: `https://api.jup.ag/swap/v1/quote`
+- Header: `x-api-key`
+
+### Magic Eden (NFTs)
+- Solana API: `https://api-mainnet.magiceden.dev/v2`
+- EVM public API: `https://api-mainnet.magiceden.dev/v4/evm-public`
+
+### PayEVM (fiat onramp)
+- Integration currently disabled in `/capabilities` (no endpoint configured in code).
+- Define a production endpoint + webhook verification before enabling.
+
+### Web2 Guard allowlist (shared)
+- Gatekept hosts include GitHub, CoinGecko, CoinCap, HttpBin, plus the endpoints above.
+- Update the allowlist in `apps/nyx-backend-gateway/src/nyx_backend_gateway/gateway.py` before production.
 
 ## Operational reminders
 

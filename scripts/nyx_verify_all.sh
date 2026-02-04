@@ -156,6 +156,10 @@ ensure_backend() {
   # Relax faucet IP limits for repeatable local verification runs.
   # Per-account limits and cooldown remain enforced unless overridden externally.
   export NYX_FAUCET_IP_MAX_CLAIMS_PER_24H="${NYX_FAUCET_IP_MAX_CLAIMS_PER_24H:-10000}"
+  export NYX_FAUCET_MAX_AMOUNT_PER_24H="${NYX_FAUCET_MAX_AMOUNT_PER_24H:-10000}"
+  export NYX_FAUCET_MAX_CLAIMS_PER_24H="${NYX_FAUCET_MAX_CLAIMS_PER_24H:-3}"
+  export NYX_GATEWAY_DB_PATH="${NYX_GATEWAY_DB_PATH:-$evidence_root/gateway.db}"
+  rm -f "$NYX_GATEWAY_DB_PATH" >/dev/null 2>&1 || true
 
   local host port
   host="$(python - <<PY
@@ -198,8 +202,8 @@ curl_get_json "$BASE_URL/version" "" "$evidence_dir/version.json" 200 || true
 if ! jq -e '.module_features.dapp.browser | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
   die "capabilities: dapp.browser must be enabled"
 fi
-if ! jq -e '.module_features.web2.guard | tostring | test("^disabled")' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
-  die "capabilities: web2.guard must remain disabled unless fully wired"
+if ! jq -e '.module_features.web2.guard | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
+  die "capabilities: web2.guard must be enabled"
 fi
 
 if [[ -n "${NYX_0X_API_KEY:-}" ]]; then
@@ -398,7 +402,7 @@ PY
 
 # Faucet limits are enforced server-side; by default each account can faucet once per 24h.
 next_run_id "wallet-faucet-a-nyxt"; FAUCET_A_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:1000,asset_id:"NYXT"}}')"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
 curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$TOKEN_A" "$body" "$evidence_dir/A_faucet.json" "200,429" || die "wallet faucet (A) failed"
 if jq -e '.status=="complete"' "$evidence_dir/A_faucet.json" >/dev/null 2>&1; then
   RUN_IDS+=("$FAUCET_A_RUN")
@@ -418,6 +422,17 @@ fi
 
 ADDR="$ACCOUNT_A" wallet_balances "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" || die "balances (A) failed"
 ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balances_1.json" || die "balances (B) failed"
+
+log "Web2 Guard allowlist"
+curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
+
+next_run_id "web2-guard-a"; WEB2_RUN="$NEXT_RUN_ID"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "https://httpbin.org/get" \
+  '{seed:$seed,run_id:$run_id,payload:{url:$url,method:"GET"}}')"
+curl_json "POST" "$BASE_URL/web2/v1/request" "$TOKEN_A" "$body" "$evidence_dir/A_web2_guard.json" 200 || die "web2 guard request failed"
+jq -e '.request_hash and .response_hash' "$evidence_dir/A_web2_guard.json" >/dev/null 2>&1 \
+  || die "web2 guard response invalid"
+RUN_IDS+=("$WEB2_RUN")
 
 next_run_id "wallet-transfer-a-to-b"; TRANSFER_RUN="$NEXT_RUN_ID"
 body="$(jq -n --argjson seed "$SEED" --arg run_id "$TRANSFER_RUN" --arg from "$ACCOUNT_A" --arg to "$ACCOUNT_B" \

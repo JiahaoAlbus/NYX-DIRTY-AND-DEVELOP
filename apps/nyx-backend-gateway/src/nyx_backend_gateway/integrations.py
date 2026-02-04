@@ -123,21 +123,21 @@ def _0x_base_url(network: str | None, chain_id: int | None) -> str:
     network_map = {
         "ethereum": "https://api.0x.org",
         "mainnet": "https://api.0x.org",
-        "polygon": "https://polygon.api.0x.org",
-        "optimism": "https://optimism.api.0x.org",
-        "arbitrum": "https://arbitrum.api.0x.org",
-        "base": "https://base.api.0x.org",
-        "bsc": "https://bsc.api.0x.org",
-        "avalanche": "https://avalanche.api.0x.org",
+        "polygon": "https://api.0x.org",
+        "optimism": "https://api.0x.org",
+        "arbitrum": "https://api.0x.org",
+        "base": "https://api.0x.org",
+        "bsc": "https://api.0x.org",
+        "avalanche": "https://api.0x.org",
     }
     chain_map = {
         1: "https://api.0x.org",
-        10: "https://optimism.api.0x.org",
-        56: "https://bsc.api.0x.org",
-        137: "https://polygon.api.0x.org",
-        42161: "https://arbitrum.api.0x.org",
-        8453: "https://base.api.0x.org",
-        43114: "https://avalanche.api.0x.org",
+        10: "https://api.0x.org",
+        56: "https://api.0x.org",
+        137: "https://api.0x.org",
+        42161: "https://api.0x.org",
+        8453: "https://api.0x.org",
+        43114: "https://api.0x.org",
     }
     if network:
         base = network_map.get(network)

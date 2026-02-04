@@ -418,6 +418,7 @@ def run_evidence(
         ("wallet", "transfer"),
         ("wallet", "airdrop"),
         ("chat", "message_event"),
+        ("web2", "guard_request"),
     }:
         outputs.update(_fee_summary(mod, act, payload))
     if mod == "marketplace" and act == "order_intent":
@@ -512,6 +513,7 @@ def replay_compute_outputs(
         ("wallet", "transfer"),
         ("wallet", "airdrop"),
         ("chat", "message_event"),
+        ("web2", "guard_request"),
     }:
         outputs.update(_fee_summary(mod, act, payload))
     if mod == "marketplace" and act == "order_intent":

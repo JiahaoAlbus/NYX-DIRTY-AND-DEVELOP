@@ -300,4 +300,24 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS web2_guard_requests (
+            request_id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            url TEXT NOT NULL,
+            method TEXT NOT NULL,
+            request_hash TEXT NOT NULL,
+            response_hash TEXT NOT NULL,
+            response_status INTEGER NOT NULL,
+            response_size INTEGER NOT NULL,
+            response_truncated INTEGER NOT NULL,
+            body_size INTEGER NOT NULL,
+            header_names TEXT NOT NULL,
+            sealed_request TEXT,
+            created_at INTEGER NOT NULL
+        )
+        """
+    )
     conn.commit()

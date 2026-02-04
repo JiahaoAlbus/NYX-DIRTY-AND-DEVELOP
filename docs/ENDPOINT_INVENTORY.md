@@ -71,6 +71,14 @@ This document lists all available backend endpoints, their methods, schemas, and
 | `/chat/send` | POST | Send legacy message | Yes | No |
 | `/chat/messages` | GET | List legacy messages | No | No |
 
+## Web2 Guard Module
+
+| Route | Method | Description | Mutation? | Auth? |
+| :--- | :--- | :--- | :--- | :--- |
+| `/web2/v1/allowlist` | GET | List approved Web2 endpoints | No | No |
+| `/web2/v1/request` | POST | Execute guarded Web2 request (evidence + fee) | Yes | Yes |
+| `/web2/v1/requests` | GET | List guarded requests (per account) | No | Yes |
+
 ## Entertainment Module
 
 | Route | Method | Description | Mutation? | Auth? |

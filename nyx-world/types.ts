@@ -63,3 +63,53 @@ export interface EntertainmentEvent {
   step: number;
   created_at: number;
 }
+
+export interface Web2AllowlistEntry {
+  id: string;
+  label: string;
+  base_url: string;
+  path_prefix: string;
+  methods: string[];
+}
+
+export interface Web2GuardRequestRow {
+  request_id: string;
+  account_id: string;
+  run_id: string;
+  url: string;
+  method: string;
+  request_hash: string;
+  response_hash: string;
+  response_status: number;
+  response_size: number;
+  response_truncated: boolean;
+  body_size: number;
+  header_names: string[];
+  sealed_request_present?: boolean;
+  created_at: number;
+}
+
+export interface Web2GuardResponse {
+  run_id: string;
+  state_hash: string;
+  receipt_hashes: string[];
+  replay_ok: boolean;
+  request_id: string;
+  request_hash: string;
+  response_hash: string;
+  response_status: number;
+  response_size: number;
+  response_truncated: boolean;
+  body_size: number;
+  upstream_ok: boolean;
+  upstream_error?: string | null;
+  response_preview?: string;
+  fee_total: number;
+  fee_breakdown?: {
+    protocol_fee_total: number;
+    platform_fee_amount: number;
+  };
+  treasury_address?: string;
+  from_balance?: number;
+  treasury_balance?: number;
+}

@@ -31,6 +31,7 @@ class StorageMigrationTests(unittest.TestCase):
                 "fee_ledger",
                 "wallet_accounts",
                 "wallet_transfers",
+                "web2_guard_requests",
             }
             self.assertTrue(expected.issubset(tables))
             conn.close()
