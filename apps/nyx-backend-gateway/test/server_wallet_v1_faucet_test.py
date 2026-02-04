@@ -49,7 +49,7 @@ class ServerWalletV1FaucetTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> str:
+    def _auth_token(self) -> tuple[str, str]:
         key = b"portal-key-0003-0003-0003-0003"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "carl", "pubkey": pubkey})
@@ -66,16 +66,16 @@ class ServerWalletV1FaucetTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return verified.get("access_token")
+        return account_id, verified.get("access_token")
 
     def test_faucet_requires_auth_and_fee(self) -> None:
         status, _ = self._post("/wallet/v1/faucet", {"seed": 1, "run_id": "x", "address": "a", "amount": 10})
-        self.assertEqual(status, 400)
+        self.assertEqual(status, 401)
 
-        token = self._auth_token()
+        account_id, token = self._auth_token()
         status, result = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-faucet-1", "address": "wallet-a", "amount": 10, "token": "NYXT"},
+            {"seed": 123, "run_id": "run-faucet-1", "address": account_id, "amount": 10, "asset_id": "NYXT"},
             token=token,
         )
         self.assertEqual(status, 200)

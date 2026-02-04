@@ -5,8 +5,8 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from nyx_backend_gateway.gateway import execute_run
-from nyx_backend_gateway.storage import create_connection, load_by_id
+from nyx_backend_gateway.gateway import GatewayError, execute_run
+from nyx_backend_gateway.storage import apply_wallet_faucet, create_connection, load_by_id
 
 
 def _receipt_id(run_id: str) -> str:
@@ -65,57 +65,161 @@ class GatewayFlowTests(unittest.TestCase):
         )
 
     def test_exchange_place_order_flow(self) -> None:
-        self._run_and_check(
-            "exchange",
-            "place_order",
-            {
-                "side": "BUY",
-                "asset_in": "asset-a",
-                "asset_out": "asset-b",
-                "amount": 5,
-                "price": 10,
-            },
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "gateway.db"
+            run_root = Path(tmp) / "runs"
+            account_id = "trader-1"
+            conn = create_connection(db_path)
+            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            conn.close()
+
+            run_id = "run-exchange-place-order"
+            result = execute_run(
+                seed=123,
+                run_id=run_id,
+                module="exchange",
+                action="place_order",
+                payload={
+                    "owner_address": account_id,
+                    "side": "BUY",
+                    "asset_in": "NYXT",
+                    "asset_out": "ECHO",
+                    "amount": 100,
+                    "price": 10,
+                },
+                caller_account_id=account_id,
+                db_path=db_path,
+                run_root=run_root,
+            )
+            self.assertTrue(result.replay_ok)
+            conn = create_connection(db_path)
+            evidence = load_by_id(conn, "evidence_runs", "run_id", run_id)
+            receipt = load_by_id(conn, "receipts", "receipt_id", _receipt_id(run_id))
+            fee = load_by_id(conn, "fee_ledger", "run_id", run_id)
+            self.assertIsNotNone(evidence)
+            self.assertIsNotNone(receipt)
+            self.assertIsNotNone(fee)
+            conn.close()
 
     def test_exchange_cancel_order_flow(self) -> None:
-        self._run_and_check(
-            "exchange",
-            "cancel_order",
-            {"order_id": "order-unknown"},
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "gateway.db"
+            run_root = Path(tmp) / "runs"
+            account_id = "trader-2"
+            conn = create_connection(db_path)
+            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            conn.close()
+
+            run_id_order = "run-exchange-cancel-order-place"
+            execute_run(
+                seed=123,
+                run_id=run_id_order,
+                module="exchange",
+                action="place_order",
+                payload={
+                    "owner_address": account_id,
+                    "side": "BUY",
+                    "asset_in": "NYXT",
+                    "asset_out": "ECHO",
+                    "amount": 50,
+                    "price": 10,
+                },
+                caller_account_id=account_id,
+                db_path=db_path,
+                run_root=run_root,
+            )
+
+            order_id = f"order-{hashlib.sha256(f'order:{run_id_order}'.encode('utf-8')).hexdigest()[:16]}"
+            run_id_cancel = "run-exchange-cancel-order"
+            result = execute_run(
+                seed=123,
+                run_id=run_id_cancel,
+                module="exchange",
+                action="cancel_order",
+                payload={"order_id": order_id},
+                caller_account_id=account_id,
+                db_path=db_path,
+                run_root=run_root,
+            )
+            self.assertTrue(result.replay_ok)
 
     def test_chat_flow(self) -> None:
-        self._run_and_check(
-            "chat",
-            "message_event",
-            {"channel": "general", "message": "hello"},
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "gateway.db"
+            run_root = Path(tmp) / "runs"
+            conn = create_connection(db_path)
+            apply_wallet_faucet(conn, "acct-1", 1_000, asset_id="NYXT")
+            conn.close()
+            run_id = "run-chat"
+            result = execute_run(
+                seed=123,
+                run_id=run_id,
+                module="chat",
+                action="message_event",
+                payload={"channel": "dm/acct-1/acct-2", "message": "{\"ciphertext\":\"AA==\",\"iv\":\"BB==\"}"},
+                caller_account_id="acct-1",
+                db_path=db_path,
+                run_root=run_root,
+            )
+            self.assertTrue(result.replay_ok)
 
     def test_marketplace_flow(self) -> None:
-        self._run_and_check(
-            "marketplace",
-            "order_intent",
-            {"sku": "sku-1", "title": "Item One", "price": 10, "qty": 2},
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "gateway.db"
+            run_root = Path(tmp) / "runs"
+            with self.assertRaises(GatewayError):
+                execute_run(
+                    seed=123,
+                    run_id="run-market-unsupported",
+                    module="marketplace",
+                    action="order_intent",
+                    payload={"sku": "sku-1", "title": "Item One", "price": 10, "qty": 2},
+                    caller_account_id="buyer-1",
+                    db_path=db_path,
+                    run_root=run_root,
+                )
 
     def test_marketplace_listing_flow(self) -> None:
-        self._run_and_check(
-            "marketplace",
-            "listing_publish",
-            {"sku": "sku-2", "title": "Item Two", "price": 12},
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "gateway.db"
+            run_root = Path(tmp) / "runs"
+            account_id = "seller-1"
+            conn = create_connection(db_path)
+            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            conn.close()
+
+            run_id = "run-market-listing"
+            result = execute_run(
+                seed=123,
+                run_id=run_id,
+                module="marketplace",
+                action="listing_publish",
+                payload={"publisher_id": account_id, "sku": "sku-2", "title": "Item Two", "price": 12},
+                caller_account_id=account_id,
+                db_path=db_path,
+                run_root=run_root,
+            )
+            self.assertTrue(result.replay_ok)
 
     def test_marketplace_purchase_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "gateway.db"
             run_root = Path(tmp) / "runs"
+            seller_id = "seller-9"
+            buyer_id = "buyer-9"
+            conn = create_connection(db_path)
+            apply_wallet_faucet(conn, seller_id, 1_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, buyer_id, 10_000, asset_id="NYXT")
+            conn.close()
+
             run_id_listing = "run-listing"
             execute_run(
                 seed=123,
                 run_id=run_id_listing,
                 module="marketplace",
                 action="listing_publish",
-                payload={"sku": "sku-9", "title": "Item Nine", "price": 9},
+                payload={"publisher_id": seller_id, "sku": "sku-9", "title": "Item Nine", "price": 9},
+                caller_account_id=seller_id,
                 db_path=db_path,
                 run_root=run_root,
             )
@@ -125,7 +229,8 @@ class GatewayFlowTests(unittest.TestCase):
                 run_id="run-purchase",
                 module="marketplace",
                 action="purchase_listing",
-                payload={"listing_id": listing_id, "qty": 1},
+                payload={"buyer_id": buyer_id, "listing_id": listing_id, "qty": 1},
+                caller_account_id=buyer_id,
                 db_path=db_path,
                 run_root=run_root,
             )

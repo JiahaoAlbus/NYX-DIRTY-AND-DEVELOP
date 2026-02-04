@@ -85,6 +85,7 @@ class Trade:
 class MessageEvent:
     message_id: str
     channel: str
+    sender_account_id: str
     body: str
     run_id: str
 
@@ -211,6 +212,28 @@ class WalletTransfer:
     amount: int
     fee_total: int
     treasury_address: str
+    run_id: str
+
+
+@dataclass(frozen=True)
+class FaucetClaim:
+    claim_id: str
+    account_id: str
+    address: str
+    asset_id: str
+    amount: int
+    ip: str
+    created_at: int
+    run_id: str
+
+
+@dataclass(frozen=True)
+class AirdropClaim:
+    claim_id: str
+    account_id: str
+    task_id: str
+    reward: int
+    created_at: int
     run_id: str
 
 
@@ -408,7 +431,7 @@ def list_receipts(conn: sqlite3.Connection, limit: int = 50, offset: int = 0) ->
     return results
 
 
-def insert_order(conn: sqlite3.Connection, order: Order) -> None:
+def insert_order(conn: sqlite3.Connection, order: Order, *, commit: bool = True) -> None:
     order_id = _validate_text(order.order_id, "order_id")
     owner_address = _validate_wallet_address(order.owner_address, "owner_address")
     side = _validate_text(order.side, "side", r"(BUY|SELL)")
@@ -422,20 +445,31 @@ def insert_order(conn: sqlite3.Connection, order: Order) -> None:
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (order_id, owner_address, side, amount, price, asset_in, asset_out, run_id),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
-def update_order_amount(conn: sqlite3.Connection, order_id: str, new_amount: int) -> None:
+def update_order_amount(conn: sqlite3.Connection, order_id: str, new_amount: int, *, commit: bool = True) -> None:
     oid = _validate_text(order_id, "order_id")
-    amount = _validate_int(new_amount, "amount", 1)
+    amount = _validate_int(new_amount, "amount", 0)
     conn.execute("UPDATE orders SET amount = ? WHERE order_id = ?", (amount, oid))
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
-def delete_order(conn: sqlite3.Connection, order_id: str) -> None:
+def delete_order(conn: sqlite3.Connection, order_id: str, *, commit: bool = True) -> None:
     oid = _validate_text(order_id, "order_id")
     conn.execute("DELETE FROM orders WHERE order_id = ?", (oid,))
-    conn.commit()
+    if commit:
+        conn.commit()
+
+
+def update_order_status(conn: sqlite3.Connection, order_id: str, status: str, *, commit: bool = True) -> None:
+    oid = _validate_text(order_id, "order_id")
+    st = _validate_text(status, "status", r"(open|filled|cancelled)")
+    conn.execute("UPDATE orders SET status = ? WHERE order_id = ?", (st, oid))
+    if commit:
+        conn.commit()
 
 
 def list_orders(
@@ -443,6 +477,7 @@ def list_orders(
     side: str | None = None,
     asset_in: str | None = None,
     asset_out: str | None = None,
+    status: str | None = "open",
     order_by: str = "price ASC, order_id ASC",
     limit: int = 100,
     offset: int = 0,
@@ -460,6 +495,9 @@ def list_orders(
     if asset_out:
         clauses.append("asset_out = ?")
         params.append(_validate_text(asset_out, "asset_out"))
+    if status is not None:
+        clauses.append("status = ?")
+        params.append(_validate_text(status, "status", r"(open|filled|cancelled)"))
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     if order_by not in {"price ASC, order_id ASC", "price DESC, order_id ASC"}:
         raise StorageError("order_by not allowed")
@@ -470,7 +508,7 @@ def list_orders(
     return [{col: row[col] for col in row.keys()} for row in rows]
 
 
-def insert_trade(conn: sqlite3.Connection, trade: Trade) -> None:
+def insert_trade(conn: sqlite3.Connection, trade: Trade, *, commit: bool = True) -> None:
     trade_id = _validate_text(trade.trade_id, "trade_id")
     order_id = _validate_text(trade.order_id, "order_id")
     amount = _validate_int(trade.amount, "amount", 1)
@@ -481,7 +519,8 @@ def insert_trade(conn: sqlite3.Connection, trade: Trade) -> None:
         "VALUES (?, ?, ?, ?, ?)",
         (trade_id, order_id, amount, price, run_id),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def list_trades(conn: sqlite3.Connection, limit: int = 100, offset: int = 0) -> list[dict[str, object]]:
@@ -494,14 +533,15 @@ def list_trades(conn: sqlite3.Connection, limit: int = 100, offset: int = 0) -> 
 def insert_message_event(conn: sqlite3.Connection, message: MessageEvent) -> None:
     message_id = _validate_text(message.message_id, "message_id")
     channel = _validate_text(message.channel, "channel")
+    sender_account_id = _validate_wallet_address(message.sender_account_id, "sender_account_id")
     if not isinstance(message.body, str) or not message.body or isinstance(message.body, bool):
         raise StorageError("body required")
-    if len(message.body) > 512:
+    if len(message.body) > 2048:
         raise StorageError("body too long")
     run_id = _validate_text(message.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO messages (message_id, channel, body, run_id) VALUES (?, ?, ?, ?)",
-        (message_id, channel, message.body, run_id),
+        "INSERT OR REPLACE INTO messages (message_id, channel, sender_account_id, body, run_id) VALUES (?, ?, ?, ?, ?)",
+        (message_id, channel, sender_account_id, message.body, run_id),
     )
     conn.commit()
 
@@ -715,7 +755,7 @@ def insert_wallet_transfer(conn: sqlite3.Connection, transfer: WalletTransfer) -
     from_address = _validate_wallet_address(transfer.from_address, "from_address")
     to_address = _validate_wallet_address(transfer.to_address, "to_address")
     asset_id = _validate_text(transfer.asset_id, "asset_id", r"[A-Z0-9]{3,12}")
-    amount = _validate_int(transfer.amount, "amount", 1)
+    amount = _validate_int(transfer.amount, "amount", 0)
     fee_total = _validate_int(transfer.fee_total, "fee_total", 0)
     treasury_address = _validate_wallet_address(transfer.treasury_address, "treasury_address")
     run_id = _validate_text(transfer.run_id, "run_id")
@@ -723,6 +763,36 @@ def insert_wallet_transfer(conn: sqlite3.Connection, transfer: WalletTransfer) -
         "INSERT OR REPLACE INTO wallet_transfers (transfer_id, from_address, to_address, asset_id, amount, fee_total, treasury_address, run_id) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (transfer_id, from_address, to_address, asset_id, amount, fee_total, treasury_address, run_id),
+    )
+
+
+def insert_faucet_claim(conn: sqlite3.Connection, claim: FaucetClaim) -> None:
+    claim_id = _validate_text(claim.claim_id, "claim_id")
+    account_id = _validate_wallet_address(claim.account_id, "account_id")
+    address = _validate_wallet_address(claim.address, "address")
+    asset_id = _validate_text(claim.asset_id, "asset_id", r"[A-Z0-9]{3,12}")
+    amount = _validate_int(claim.amount, "amount", 1)
+    ip = _validate_text(claim.ip or "unknown", "ip", r"[A-Za-z0-9_.:-]{1,64}")
+    created_at = _validate_int(claim.created_at, "created_at", 1)
+    run_id = _validate_text(claim.run_id, "run_id")
+    conn.execute(
+        "INSERT OR REPLACE INTO faucet_claims (claim_id, account_id, address, asset_id, amount, ip, created_at, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (claim_id, account_id, address, asset_id, amount, ip, created_at, run_id),
+    )
+
+
+def insert_airdrop_claim(conn: sqlite3.Connection, claim: AirdropClaim) -> None:
+    claim_id = _validate_text(claim.claim_id, "claim_id")
+    account_id = _validate_wallet_address(claim.account_id, "account_id")
+    task_id = _validate_text(claim.task_id, "task_id", r"[A-Za-z0-9_-]{1,32}")
+    reward = _validate_int(claim.reward, "reward", 1)
+    created_at = _validate_int(claim.created_at, "created_at", 1)
+    run_id = _validate_text(claim.run_id, "run_id")
+    conn.execute(
+        "INSERT OR REPLACE INTO airdrop_claims (claim_id, account_id, task_id, reward, created_at, run_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (claim_id, account_id, task_id, reward, created_at, run_id),
     )
 
 
@@ -737,13 +807,14 @@ def apply_wallet_transfer(
     treasury_address: str,
     run_id: str,
     asset_id: str = "NYXT",
+    commit: bool = True,
 ) -> dict[str, int]:
     transfer_id = _validate_text(transfer_id, "transfer_id")
     from_addr = _validate_wallet_address(from_address, "from_address")
     to_addr = _validate_wallet_address(to_address, "to_address")
     treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
     asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
-    amt = _validate_int(amount, "amount", 1)
+    amt = _validate_int(amount, "amount", 0)
     fee = _validate_int(fee_total, "fee_total", 0)
     if from_addr == to_addr:
         raise StorageError("from_address must differ")
@@ -787,7 +858,8 @@ def apply_wallet_transfer(
             run_id=run_id,
         ),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
     return {
         "from_balance": new_from,
         "to_balance": new_to,

@@ -52,6 +52,8 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     order_columns = [row[1] for row in cursor.fetchall()]
     if "owner_address" not in order_columns:
         cursor.execute("ALTER TABLE orders ADD COLUMN owner_address TEXT NOT NULL DEFAULT '0x0'")
+    if "status" not in order_columns:
+        cursor.execute("ALTER TABLE orders ADD COLUMN status TEXT NOT NULL DEFAULT 'open'")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS trades (
@@ -68,11 +70,16 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS messages (
             message_id TEXT PRIMARY KEY,
             channel TEXT NOT NULL,
+            sender_account_id TEXT NOT NULL DEFAULT '',
             body TEXT NOT NULL,
             run_id TEXT NOT NULL
         )
         """
     )
+    cursor.execute("PRAGMA table_info(messages)")
+    msg_columns = [row[1] for row in cursor.fetchall()]
+    if "sender_account_id" not in msg_columns:
+        cursor.execute("ALTER TABLE messages ADD COLUMN sender_account_id TEXT NOT NULL DEFAULT ''")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS portal_accounts (
@@ -107,6 +114,15 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
             token TEXT PRIMARY KEY,
             account_id TEXT NOT NULL,
             expires_at INTEGER NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS e2ee_identities (
+            account_id TEXT PRIMARY KEY,
+            public_jwk TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
         )
         """
     )
@@ -236,6 +252,33 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     transfer_columns = [row[1] for row in cursor.fetchall()]
     if "asset_id" not in transfer_columns:
         cursor.execute("ALTER TABLE wallet_transfers ADD COLUMN asset_id TEXT NOT NULL DEFAULT 'NYXT'")
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS faucet_claims (
+            claim_id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            address TEXT NOT NULL,
+            asset_id TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            ip TEXT NOT NULL DEFAULT 'unknown',
+            created_at INTEGER NOT NULL,
+            run_id TEXT NOT NULL
+        )
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS airdrop_claims (
+            claim_id TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            reward INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            run_id TEXT NOT NULL,
+            UNIQUE (account_id, task_id)
+        )
+        """
+    )
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS entertainment_items (

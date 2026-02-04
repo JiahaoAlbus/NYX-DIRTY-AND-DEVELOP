@@ -14,7 +14,9 @@ import { Settings } from './screens/Settings';
 import { DappBrowser } from './screens/DappBrowser';
 import { BottomNav } from './components/BottomNav';
 import { Screen } from './types';
-import { checkHealth, fetchCapabilities, PortalSession } from './api';
+import { checkHealth, fetchCapabilities, fetchPortalMe, PortalSession } from './api';
+import type { Capabilities } from './capabilities';
+import { featureReasonText, isFeatureEnabled, isModuleUsable } from './capabilities';
 
 const SESSION_KEY = 'nyx_portal_session';
 
@@ -24,8 +26,8 @@ const loadSession = (): PortalSession | null => {
   if (injectedToken) {
     return { 
       access_token: injectedToken, 
-      account_id: "injected",
-      handle: "Injected User",
+      account_id: "",
+      handle: "",
       pubkey: ""
     }; 
   }
@@ -51,6 +53,10 @@ const saveSession = (session: PortalSession | null) => {
 
 const getInitialTab = (): Screen => {
   const injectedScreen = (window as any).__NYX_INITIAL_SCREEN__;
+  if (injectedScreen === 'activity' || injectedScreen === 'evidence') return Screen.ACTIVITY;
+  if (injectedScreen === 'wallet') return Screen.WALLET;
+  if (injectedScreen === 'faucet') return Screen.FAUCET;
+  if (injectedScreen === 'airdrop') return Screen.AIRDROP;
   if (injectedScreen === 'exchange') return Screen.EXCHANGE;
   if (injectedScreen === 'chat') return Screen.CHAT;
   if (injectedScreen === 'store') return Screen.STORE;
@@ -61,10 +67,11 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Screen>(() => getInitialTab());
   const [backendOnline, setBackendOnline] = useState(false);
   const [backendStatus, setBackendStatus] = useState('Backend: unknown');
-  const [capabilities, setCapabilities] = useState<Record<string, unknown> | null>(null);
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [session, setSession] = useState<PortalSession | null>(() => loadSession());
   const [seed, setSeed] = useState('123');
   const [runId, setRunId] = useState('web-run-1');
+  const [uiNotice, setUiNotice] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('nyx_theme');
     return saved ? saved === 'dark' : true; // Default to dark
@@ -82,6 +89,26 @@ const App: React.FC = () => {
   useEffect(() => {
     saveSession(session);
   }, [session]);
+
+  useEffect(() => {
+    const hydrateInjectedSession = async () => {
+      if (!session?.access_token) return;
+      if (session.account_id) return;
+      try {
+        const me = await fetchPortalMe(session.access_token);
+        setSession({
+          access_token: session.access_token,
+          account_id: me.account_id,
+          handle: me.handle,
+          pubkey: me.pubkey,
+        });
+      } catch {
+        setSession(null);
+      }
+    };
+    hydrateInjectedSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token, session?.account_id]);
 
   const refreshHealth = async () => {
     const ok = await checkHealth();
@@ -101,7 +128,94 @@ const App: React.FC = () => {
     refreshHealth();
   }, []);
 
+  const guardScreen = (screen: Screen): { ok: boolean; reason?: string } => {
+    if (screen === Screen.HOME) return { ok: true };
+    if (screen === Screen.SETTINGS) return { ok: true };
+    if (screen === Screen.ACTIVITY) return { ok: true };
+    if (screen === Screen.EVIDENCE) return { ok: true };
+
+    if (!capabilities) {
+      return { ok: false, reason: 'Capabilities are required to render this module. Refresh backend status.' };
+    }
+
+    if (screen === Screen.WALLET) {
+      return isModuleUsable(capabilities, 'wallet')
+        ? { ok: true }
+        : { ok: false, reason: 'Wallet module disabled by backend capabilities.' };
+    }
+    if (screen === Screen.FAUCET) {
+      const status = isFeatureEnabled(capabilities, 'wallet', 'faucet') ? null : 'disabled';
+      return isFeatureEnabled(capabilities, 'wallet', 'faucet')
+        ? { ok: true }
+        : { ok: false, reason: `Faucet unavailable. ${featureReasonText(status)}` };
+    }
+    if (screen === Screen.AIRDROP) {
+      const ok = isFeatureEnabled(capabilities, 'wallet', 'airdrop');
+      return ok ? { ok: true } : { ok: false, reason: 'Airdrop unavailable by backend capabilities.' };
+    }
+    if (screen === Screen.EXCHANGE) {
+      const ok = isFeatureEnabled(capabilities, 'exchange', 'trading');
+      return ok ? { ok: true } : { ok: false, reason: 'Exchange unavailable by backend capabilities.' };
+    }
+    if (screen === Screen.STORE) {
+      const ok = isFeatureEnabled(capabilities, 'marketplace', 'purchase');
+      return ok ? { ok: true } : { ok: false, reason: 'Store unavailable by backend capabilities.' };
+    }
+    if (screen === Screen.CHAT) {
+      const ok = isFeatureEnabled(capabilities, 'chat', 'dm');
+      return ok ? { ok: true } : { ok: false, reason: 'Chat unavailable by backend capabilities.' };
+    }
+    if (screen === Screen.DAPP_BROWSER) {
+      const ok = isFeatureEnabled(capabilities, 'dapp', 'browser');
+      return ok ? { ok: true } : { ok: false, reason: 'Dapp browser is disabled in this environment.' };
+    }
+    if (screen === Screen.WEB2_ACCESS) {
+      const ok = isFeatureEnabled(capabilities, 'web2', 'guard');
+      return ok ? { ok: true } : { ok: false, reason: 'Web2 Guard is disabled in this environment.' };
+    }
+    if (screen === Screen.FIAT) {
+      return { ok: false, reason: 'Fiat onramp is out of scope for testnet release.' };
+    }
+    return { ok: false, reason: 'Screen disabled by policy.' };
+  };
+
+  const navigate = (screen: Screen) => {
+    const guard = guardScreen(screen);
+    if (guard.ok) {
+      setUiNotice(null);
+      setActiveTab(screen);
+      return;
+    }
+    setUiNotice(guard.reason ?? 'Feature unavailable.');
+    setActiveTab(Screen.HOME);
+  };
+
+  useEffect(() => {
+    const guard = guardScreen(activeTab);
+    if (guard.ok) return;
+    setUiNotice(guard.reason ?? 'Feature unavailable.');
+    setActiveTab(Screen.HOME);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capabilities]);
+
+  const renderDisabled = (reason: string) => (
+    <div className="flex flex-col gap-3 rounded-3xl border border-primary/20 bg-surface-light dark:bg-surface-dark/40 p-6 text-sm">
+      <div className="text-lg font-black">Feature unavailable</div>
+      <div className="text-text-subtle">{reason}</div>
+      <button
+        onClick={() => navigate(Screen.HOME)}
+        className="mt-2 w-fit rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black"
+      >
+        Back to Home
+      </button>
+    </div>
+  );
+
   const renderScreen = () => {
+    const guard = guardScreen(activeTab);
+    if (!guard.ok) {
+      return renderDisabled(guard.reason ?? 'Feature unavailable.');
+    }
     switch (activeTab) {
       case Screen.HOME:
         return (
@@ -112,7 +226,7 @@ const App: React.FC = () => {
             onRefresh={refreshHealth}
             seed={seed}
             runId={runId}
-            onNavigate={setActiveTab}
+            onNavigate={navigate}
           />
         );
       case Screen.WALLET:
@@ -123,7 +237,7 @@ const App: React.FC = () => {
             backendOnline={backendOnline}
             session={session}
             onNavigate={(screen) => {
-              setActiveTab(screen);
+              navigate(screen);
             }}
           />
         );
@@ -134,6 +248,7 @@ const App: React.FC = () => {
             runId={runId}
             backendOnline={backendOnline}
             session={session}
+            onNavigate={navigate}
           />
         );
       case Screen.CHAT:
@@ -143,6 +258,7 @@ const App: React.FC = () => {
             runId={runId}
             backendOnline={backendOnline}
             session={session}
+            onNavigate={navigate}
           />
         );
       case Screen.STORE:
@@ -152,6 +268,7 @@ const App: React.FC = () => {
             runId={runId}
             backendOnline={backendOnline}
             session={session}
+            onNavigate={navigate}
           />
         );
       case Screen.ACTIVITY:
@@ -181,7 +298,7 @@ const App: React.FC = () => {
           />
         );
       case Screen.FAUCET:
-        return <Faucet seed={seed} runId={runId} backendOnline={backendOnline} session={session} />;
+        return <Faucet seed={seed} runId={runId} backendOnline={backendOnline} session={session} onNavigate={navigate} />;
       case Screen.FIAT:
         return <Fiat />;
       case Screen.WEB2_ACCESS:
@@ -194,7 +311,7 @@ const App: React.FC = () => {
           onRefresh={refreshHealth} 
           seed={seed} 
           runId={runId}
-          onNavigate={setActiveTab}
+          onNavigate={navigate}
         />;
     }
   };
@@ -210,6 +327,14 @@ const App: React.FC = () => {
           onRefresh={refreshHealth}
           onComplete={(next) => setSession(next)}
         />
+      </div>
+    );
+  }
+
+  if (!session.account_id) {
+    return (
+      <div className="flex h-screen w-full max-w-md mx-auto shadow-2xl overflow-hidden bg-background-light dark:bg-background-dark items-center justify-center">
+        <div className="text-sm text-text-subtle">Signing in…</div>
       </div>
     );
   }
@@ -241,13 +366,18 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+        {uiNotice && (
+          <div className="rounded-2xl border border-binance-red/30 bg-binance-red/10 px-3 py-2 text-[10px] font-bold text-binance-red">
+            {uiNotice}
+          </div>
+        )}
       </header>
 
       <main className="flex-1 overflow-y-auto no-scrollbar px-6 pb-20 pt-4">
         {renderScreen()}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={navigate} capabilities={capabilities} />
     </div>
   );
 };

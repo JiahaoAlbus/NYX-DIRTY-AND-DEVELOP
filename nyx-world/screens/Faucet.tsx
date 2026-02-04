@@ -1,21 +1,57 @@
-import React, { useState } from 'react';
-import { Droplets, Send, Info, ShieldCheck } from 'lucide-react';
-import { faucetWallet, PortalSession } from '../api';
+import React, { useMemo, useState } from "react";
+import { Droplets, Send, Info, ShieldCheck } from "lucide-react";
+import { allocateRunId, faucetWallet, parseSeed, PortalSession } from "../api";
+import { Screen } from "../types";
 
-export const Faucet: React.FC<{ seed: string, runId: string, backendOnline: boolean, session: PortalSession | null }> = ({ seed, runId, backendOnline, session }) => {
-  const [address, setAddress] = useState(session?.account_id ?? '');
-  const [status, setStatus] = useState('');
+type FaucetProps = {
+  seed: string;
+  runId: string;
+  backendOnline: boolean;
+  session: PortalSession | null;
+  onNavigate?: (screen: Screen) => void;
+};
+
+export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const [address, setAddress] = useState(session?.account_id ?? "");
+  const [assetId, setAssetId] = useState("NYXT");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastRunId, setLastRunId] = useState("");
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
+
+  const canSubmit = useMemo(() => backendOnline && !!session && !!address.trim() && !loading, [backendOnline, session, address, loading]);
 
   const handleRequest = async () => {
-    if (!address.trim() || !backendOnline || !session) return;
+    if (!canSubmit || !session) return;
     setLoading(true);
-    setStatus('Requesting tokens...');
+    setRetryAfter(null);
+    setStatus("Requesting tokens…");
+
+    let seedInt = 0;
     try {
-      await faucetWallet(session.access_token, address.trim(), 1000000000); // 1000 NYXT
-      setStatus('1,000 NYXT sent successfully!');
+      seedInt = parseSeed(seed);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setStatus((err as Error).message);
+      setLoading(false);
+      return;
+    }
+
+    const run_id = allocateRunId(runId, "wallet-faucet");
+    setLastRunId(run_id);
+    try {
+      const res = await faucetWallet(session.access_token, seedInt, run_id, address.trim(), 1000, assetId);
+      const feeTotal = (res as any).fee_total;
+      const treasury = (res as any).treasury_address;
+      const newBalance = (res as any).balance;
+      setStatus(
+        `Faucet success. +1000 ${assetId}. New balance: ${newBalance}. Fee: ${feeTotal ?? "?"} NYXT → ${treasury ?? "treasury"}.`
+      );
+    } catch (err) {
+      const message = (err as Error).message;
+      const details = (err as any)?.details;
+      const ra = details?.retry_after_seconds;
+      if (typeof ra === "number") setRetryAfter(ra);
+      setStatus(`Error: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -28,14 +64,14 @@ export const Faucet: React.FC<{ seed: string, runId: string, backendOnline: bool
           <Droplets size={32} />
         </div>
         <h2 className="text-xl font-bold">Testnet Faucet</h2>
-        <p className="text-xs text-text-subtle mt-2">Get free testnet tokens for exploration</p>
+        <p className="text-xs text-text-subtle mt-2">Deterministic mint with receipts + replayable evidence</p>
       </div>
 
       <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <label className="text-[10px] text-text-subtle uppercase px-1">Wallet Address</label>
           <div className="flex items-center gap-2 px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5">
-            <input 
+            <input
               className="bg-transparent flex-1 outline-none text-sm font-mono"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -43,37 +79,72 @@ export const Faucet: React.FC<{ seed: string, runId: string, backendOnline: bool
           </div>
         </div>
 
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] text-text-subtle uppercase px-1">Asset</label>
+          <select
+            className="h-11 rounded-2xl bg-background-light dark:bg-background-dark border border-black/5 dark:border-white/5 px-4 text-sm outline-none"
+            value={assetId}
+            onChange={(e) => setAssetId(e.target.value)}
+          >
+            <option value="NYXT">NYXT</option>
+            <option value="ECHO">ECHO</option>
+            <option value="USDX">USDX</option>
+          </select>
+        </div>
+
         <div className="flex flex-col gap-4">
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3 items-start">
             <Info size={16} className="text-primary shrink-0 mt-0.5" />
             <div className="text-[10px] text-text-subtle leading-relaxed">
-              Tokens are for testnet use only and have no real-world value. 
-              Limit: 1,000 NYXT per 24 hours.
+              Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns a
+              deterministic receipt and fee routing.
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleRequest}
-            disabled={loading || !address.trim()}
+            disabled={!canSubmit}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${
-              loading || !address.trim() ? 'bg-surface-light dark:bg-surface-dark text-text-subtle' : 'bg-primary text-black hover:scale-[1.02] active:scale-95'
+              !canSubmit ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black hover:scale-[1.02] active:scale-95"
             }`}
           >
-            {loading ? <div className="size-4 border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Send size={18} />}
-            Request Tokens
+            {loading ? (
+              <div className="size-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+            ) : (
+              <Send size={18} />
+            )}
+            Request 1000 {assetId}
           </button>
+
+          {retryAfter !== null && (
+            <div className="text-[10px] text-text-subtle">
+              Retry after: <span className="font-mono">{retryAfter}s</span>
+            </div>
+          )}
+
+          {lastRunId && (
+            <div className="text-[10px] text-text-subtle">
+              run_id: <span className="font-mono break-all">{lastRunId}</span>{" "}
+              {onNavigate && (
+                <button onClick={() => onNavigate(Screen.ACTIVITY)} className="underline text-primary font-bold ml-2">
+                  Open Evidence
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="flex items-center justify-center gap-2 text-[10px] text-text-subtle">
-        <ShieldCheck size={12} /> Secure deterministic execution
+        <ShieldCheck size={12} /> Deterministic execution + replayable proof
       </div>
 
       {status && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-primary text-black text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl bg-primary text-black text-xs font-bold shadow-2xl animate-in fade-in slide-in-from-bottom-4">
           {status}
         </div>
       )}
     </div>
   );
 };
+

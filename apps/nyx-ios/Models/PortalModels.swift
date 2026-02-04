@@ -6,6 +6,13 @@ struct GatewayCapabilities: Codable {
     let notes: String?
 }
 
+struct PortalSession: Codable {
+    let account_id: String
+    let handle: String
+    let pubkey: String
+    let access_token: String
+}
+
 struct PortalAccount: Codable, Identifiable {
     let accountId: String
     let handle: String
