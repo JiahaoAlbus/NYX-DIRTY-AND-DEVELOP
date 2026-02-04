@@ -1,3 +1,5 @@
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -32,7 +34,45 @@ class ServerHardeningTests(unittest.TestCase):
         self.httpd.server_close()
         self.tmp.cleanup()
 
+    def _auth_token(self) -> str:
+        key = b"portal-key-hardening-0001"
+        pubkey = base64.b64encode(key).decode("utf-8")
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
+        conn.request(
+            "POST",
+            "/portal/v1/accounts",
+            body=json.dumps({"handle": "hardener", "pubkey": pubkey}, separators=(",", ":")),
+            headers={"Content-Type": "application/json"},
+        )
+        created = json.loads(conn.getresponse().read().decode("utf-8"))
+        account_id = created.get("account_id")
+        conn.close()
+
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
+        conn.request(
+            "POST",
+            "/portal/v1/auth/challenge",
+            body=json.dumps({"account_id": account_id}, separators=(",", ":")),
+            headers={"Content-Type": "application/json"},
+        )
+        challenge = json.loads(conn.getresponse().read().decode("utf-8"))
+        nonce = challenge.get("nonce")
+        conn.close()
+
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
+        conn.request(
+            "POST",
+            "/portal/v1/auth/verify",
+            body=json.dumps({"account_id": account_id, "nonce": nonce, "signature": signature}, separators=(",", ":")),
+            headers={"Content-Type": "application/json"},
+        )
+        verified = json.loads(conn.getresponse().read().decode("utf-8"))
+        conn.close()
+        return verified.get("access_token")
+
     def test_invalid_run_id_rejected(self) -> None:
+        token = self._auth_token()
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         payload = {
             "seed": 123,
@@ -42,27 +82,42 @@ class ServerHardeningTests(unittest.TestCase):
             "payload": {"asset_in": "asset-a", "asset_out": "asset-b", "amount": 5, "min_out": 3},
         }
         body = json.dumps(payload, separators=(",", ":"))
-        conn.request("POST", "/run", body=body, headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST",
+            "/run",
+            body=body,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        )
         response = conn.getresponse()
         response.read()
         self.assertEqual(response.status, 400)
         conn.close()
 
     def test_message_too_long_rejected(self) -> None:
+        token = self._auth_token()
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         payload = {
             "seed": 123,
             "run_id": "run-chat-long",
-            "payload": {"channel": "general", "message": "x" * 600},
+            "payload": {
+                "channel": "dm/acct-hardener/acct-peer",
+                "message": json.dumps({"ciphertext": "x" * 3000, "iv": "BB=="}),
+            },
         }
         body = json.dumps(payload, separators=(",", ":"))
-        conn.request("POST", "/chat/send", body=body, headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST",
+            "/chat/send",
+            body=body,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        )
         response = conn.getresponse()
         response.read()
         self.assertEqual(response.status, 400)
         conn.close()
 
     def test_payload_too_large_rejected(self) -> None:
+        token = self._auth_token()
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         payload = {
             "seed": 1,
@@ -72,7 +127,12 @@ class ServerHardeningTests(unittest.TestCase):
             "payload": {"text": "y" * 6000},
         }
         body = json.dumps(payload, separators=(",", ":"))
-        conn.request("POST", "/run", body=body, headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST",
+            "/run",
+            body=body,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        )
         response = conn.getresponse()
         response.read()
         self.assertEqual(response.status, 400)

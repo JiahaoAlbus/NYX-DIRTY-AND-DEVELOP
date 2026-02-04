@@ -271,18 +271,35 @@ def list_account_activity(conn, account_id: str, limit: int = 50, offset: int = 
     # In a real system, we'd have a join table or account_id on receipts
     rows = conn.execute(
         """
-        SELECT r.* FROM receipts r
+        SELECT
+          r.receipt_id,
+          r.module,
+          r.action,
+          r.state_hash,
+          r.receipt_hashes,
+          r.replay_ok,
+          r.run_id,
+          f.total_paid AS fee_total,
+          f.protocol_fee_total AS protocol_fee_total,
+          f.platform_fee_amount AS platform_fee_amount,
+          f.fee_address AS treasury_address
+        FROM receipts r
+        LEFT JOIN fee_ledger f ON f.run_id = r.run_id
         WHERE r.run_id IN (
             SELECT run_id FROM wallet_transfers WHERE from_address = ? OR to_address = ?
             UNION
             SELECT run_id FROM orders WHERE owner_address = ?
             UNION
-            SELECT run_id FROM chat_messages WHERE sender_account_id = ?
+            SELECT run_id FROM messages WHERE sender_account_id = ?
+            UNION
+            SELECT run_id FROM listings WHERE publisher_id = ?
+            UNION
+            SELECT run_id FROM purchases WHERE buyer_id = ?
         )
         ORDER BY r.receipt_id DESC
         LIMIT ? OFFSET ?
         """,
-        (account_id, account_id, account_id, account_id, limit, offset),
+        (account_id, account_id, account_id, account_id, account_id, account_id, limit, offset),
     ).fetchall()
     
     results = []

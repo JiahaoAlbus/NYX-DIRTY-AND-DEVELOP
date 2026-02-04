@@ -2,13 +2,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
+from nyx_backend_gateway.env import (
+    get_faucet_cooldown_seconds,
+    get_faucet_ip_max_claims_per_24h,
+    get_faucet_max_amount_per_24h,
+    get_faucet_max_claims_per_24h,
+    get_fee_address,
+)
 from nyx_backend_gateway.exchange import ExchangeError, cancel_order, place_order
 from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.storage import (
+    AirdropClaim,
     EvidenceRun,
     EntertainmentEvent,
     EntertainmentItem,
@@ -22,6 +32,8 @@ from nyx_backend_gateway.storage import (
     apply_wallet_faucet_with_fee,
     apply_wallet_transfer,
     create_connection,
+    insert_airdrop_claim,
+    insert_faucet_claim,
     insert_entertainment_event,
     insert_entertainment_item,
     insert_evidence_run,
@@ -31,12 +43,29 @@ from nyx_backend_gateway.storage import (
     insert_purchase,
     insert_receipt,
     get_wallet_balance,
+    list_listings,
     load_by_id,
+    FaucetClaim,
 )
 
 
 class GatewayError(ValueError):
     pass
+
+
+class GatewayApiError(GatewayError):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        http_status: int = 400,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.http_status = http_status
+        self.details = details or {}
 
 
 @dataclass(frozen=True)
@@ -51,6 +80,251 @@ _MAX_AMOUNT = 1_000_000
 _MAX_PRICE = 1_000_000
 _ENTERTAINMENT_MODES = {"pulse", "drift", "scan"}
 _ADDRESS_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_SUPPORTED_ASSETS: dict[str, dict[str, object]] = {
+    "NYXT": {"name": "NYX Testnet Token"},
+    "ECHO": {"name": "Echo Test Asset"},
+    "USDX": {"name": "NYX Testnet Stable"},
+}
+
+_AIRDROP_TASKS_V1: list[dict[str, object]] = [
+    {
+        "task_id": "trade_1",
+        "title": "Complete 1 trade",
+        "description": "Get an order filled on NYXT/ECHO.",
+        "reward": 250,
+    },
+    {
+        "task_id": "chat_1",
+        "title": "Send 1 E2EE DM",
+        "description": "Send one encrypted DM message.",
+        "reward": 100,
+    },
+    {
+        "task_id": "store_1",
+        "title": "Buy 1 item",
+        "description": "Complete one marketplace purchase.",
+        "reward": 200,
+    },
+]
+
+
+def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
+    acct = _validate_address_text(account_id, "account_id")
+
+    claimed_rows = conn.execute(
+        "SELECT task_id, reward, created_at, run_id FROM airdrop_claims WHERE account_id = ?",
+        (acct,),
+    ).fetchall()
+    claimed: dict[str, dict[str, object]] = {}
+    for row in claimed_rows:
+        task_id = str(row["task_id"])
+        claimed[task_id] = {
+            "task_id": task_id,
+            "reward": int(row["reward"]),
+            "created_at": int(row["created_at"]),
+            "run_id": str(row["run_id"]),
+        }
+
+    trade_row = conn.execute(
+        "SELECT o.run_id AS run_id FROM trades t "
+        "JOIN orders o ON o.order_id = t.order_id "
+        "WHERE o.owner_address = ? "
+        "ORDER BY t.trade_id ASC LIMIT 1",
+        (acct,),
+    ).fetchone()
+    trade_run_id = str(trade_row["run_id"]) if trade_row is not None else None
+
+    chat_row = conn.execute(
+        "SELECT run_id FROM messages WHERE sender_account_id = ? ORDER BY message_id ASC LIMIT 1",
+        (acct,),
+    ).fetchone()
+    chat_run_id = str(chat_row["run_id"]) if chat_row is not None else None
+
+    store_row = conn.execute(
+        "SELECT run_id FROM purchases WHERE buyer_id = ? ORDER BY purchase_id ASC LIMIT 1",
+        (acct,),
+    ).fetchone()
+    store_run_id = str(store_row["run_id"]) if store_row is not None else None
+
+    completion_run_ids: dict[str, str | None] = {
+        "trade_1": trade_run_id,
+        "chat_1": chat_run_id,
+        "store_1": store_run_id,
+    }
+
+    out: list[dict[str, object]] = []
+    for task in _AIRDROP_TASKS_V1:
+        task_id = str(task["task_id"])
+        completion_run_id = completion_run_ids.get(task_id)
+        completed = completion_run_id is not None
+        claim_record = claimed.get(task_id)
+        claimed_flag = claim_record is not None
+        out.append(
+            {
+                "task_id": task_id,
+                "title": str(task["title"]),
+                "description": str(task["description"]),
+                "reward": int(task["reward"]),
+                "completed": completed,
+                "completion_run_id": completion_run_id,
+                "claimed": claimed_flag,
+                "claim_run_id": str(claim_record["run_id"]) if claim_record is not None else None,
+                "claimable": bool(completed and not claimed_flag),
+            }
+        )
+    return out
+
+
+def execute_airdrop_claim_v1(
+    *,
+    seed: int,
+    run_id: str,
+    account_id: str,
+    payload: dict[str, Any],
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, int, FeeLedger, dict[str, object]]:
+    acct = _validate_address_text(account_id, "account_id")
+    if not isinstance(payload, dict):
+        raise GatewayApiError("PAYLOAD_INVALID", "payload must be object", http_status=400)
+    task_id = payload.get("task_id")
+    if not isinstance(task_id, str) or not task_id or isinstance(task_id, bool):
+        raise GatewayApiError("TASK_ID_REQUIRED", "task_id required", http_status=400)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", task_id):
+        raise GatewayApiError("TASK_ID_INVALID", "task_id invalid", http_status=400)
+
+    task_map = {str(t["task_id"]): t for t in _AIRDROP_TASKS_V1}
+    task = task_map.get(task_id)
+    if task is None:
+        raise GatewayApiError("TASK_UNKNOWN", "task_id not supported", http_status=404, details={"task_id": task_id})
+    reward = int(task["reward"])
+
+    conn = create_connection(db_path or _db_path())
+    try:
+        existing = conn.execute(
+            "SELECT run_id FROM airdrop_claims WHERE account_id = ? AND task_id = ?",
+            (acct, task_id),
+        ).fetchone()
+        if existing is not None:
+            raise GatewayApiError(
+                "TASK_ALREADY_CLAIMED",
+                "airdrop already claimed",
+                http_status=409,
+                details={"task_id": task_id, "claim_run_id": str(existing["run_id"])},
+            )
+
+        completion_run_id: str | None = None
+        if task_id == "trade_1":
+            row = conn.execute(
+                "SELECT o.run_id AS run_id FROM trades t "
+                "JOIN orders o ON o.order_id = t.order_id "
+                "WHERE o.owner_address = ? "
+                "ORDER BY t.trade_id ASC LIMIT 1",
+                (acct,),
+            ).fetchone()
+            completion_run_id = str(row["run_id"]) if row is not None else None
+        if task_id == "chat_1":
+            row = conn.execute(
+                "SELECT run_id FROM messages WHERE sender_account_id = ? ORDER BY message_id ASC LIMIT 1",
+                (acct,),
+            ).fetchone()
+            completion_run_id = str(row["run_id"]) if row is not None else None
+        if task_id == "store_1":
+            row = conn.execute(
+                "SELECT run_id FROM purchases WHERE buyer_id = ? ORDER BY purchase_id ASC LIMIT 1",
+                (acct,),
+            ).fetchone()
+            completion_run_id = str(row["run_id"]) if row is not None else None
+
+        if completion_run_id is None:
+            raise GatewayApiError(
+                "TASK_INCOMPLETE",
+                "task not completed yet",
+                http_status=409,
+                details={"task_id": task_id},
+            )
+
+        claim_payload = {"address": acct, "task_id": task_id, "reward": reward, "completion_run_id": completion_run_id}
+        fee_record = route_fee("wallet", "airdrop", claim_payload, run_id)
+
+        backend_src = _backend_src()
+        if str(backend_src) not in __import__("sys").path:
+            __import__("sys").path.insert(0, str(backend_src))
+        from nyx_backend.evidence import EvidenceError, run_evidence
+
+        run_root = run_root or _run_root()
+        try:
+            evidence = run_evidence(
+                seed=seed,
+                run_id=run_id,
+                module="wallet",
+                action="airdrop",
+                payload=claim_payload,
+                base_dir=run_root,
+            )
+        except EvidenceError as exc:
+            raise GatewayError(str(exc)) from exc
+
+        insert_evidence_run(
+            conn,
+            EvidenceRun(
+                run_id=run_id,
+                module="wallet",
+                action="airdrop",
+                seed=seed,
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+            ),
+        )
+        insert_receipt(
+            conn,
+            Receipt(
+                receipt_id=_receipt_id(run_id),
+                module="wallet",
+                action="airdrop",
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+                run_id=run_id,
+            ),
+        )
+
+        result = apply_wallet_faucet_with_fee(
+            conn,
+            address=acct,
+            amount=reward,
+            fee_total=fee_record.total_paid,
+            treasury_address=fee_record.fee_address,
+            run_id=run_id,
+            asset_id="NYXT",
+        )
+        insert_fee_ledger(conn, fee_record)
+        insert_airdrop_claim(
+            conn,
+            AirdropClaim(
+                claim_id=_deterministic_id("airdrop-claim", run_id),
+                account_id=acct,
+                task_id=task_id,
+                reward=reward,
+                created_at=int(time.time()),
+                run_id=run_id,
+            ),
+        )
+        conn.commit()
+        return (
+            GatewayResult(
+                run_id=run_id,
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+            ),
+            int(result["balance"]),
+            fee_record,
+            {"task_id": task_id, "reward": reward, "completion_run_id": completion_run_id},
+        )
+    finally:
+        conn.close()
 
 
 def _entertainment_items() -> list[EntertainmentItem]:
@@ -133,6 +407,16 @@ def _require_address(payload: dict[str, Any], key: str) -> str:
     return value
 
 
+def _validate_address_text(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value or isinstance(value, bool):
+        raise GatewayError(f"{name} required")
+    if len(value) > 64:
+        raise GatewayError(f"{name} too long")
+    if not _ADDRESS_PATTERN.fullmatch(value):
+        raise GatewayError(f"{name} invalid")
+    return value
+
+
 def _require_amount(payload: dict[str, Any], key: str = "amount", max_value: int = _MAX_AMOUNT) -> int:
     value = payload.get(key)
     if not isinstance(value, int) or isinstance(value, bool):
@@ -150,10 +434,12 @@ def _validate_wallet_transfer(payload: dict[str, Any]) -> dict[str, Any]:
     if from_address == to_address:
         raise GatewayError("addresses must differ")
     amount = _require_amount(payload, "amount")
+    asset_id = _require_asset_id(payload, "asset_id")
     return {
         "from_address": from_address,
         "to_address": to_address,
         "amount": amount,
+        "asset_id": asset_id,
     }
 
 
@@ -161,10 +447,12 @@ def _validate_wallet_faucet(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise GatewayError("payload must be object")
     address = _require_address(payload, "address")
-    amount = _require_amount(payload, "amount", max_value=_MAX_AMOUNT)
+    amount = _require_amount(payload, "amount", max_value=10_000)
+    asset_id = _require_asset_id(payload, "asset_id")
     return {
         "address": address,
         "amount": amount,
+        "asset_id": asset_id,
     }
 
 
@@ -175,6 +463,16 @@ def _require_token(payload: dict[str, Any], key: str = "token") -> str:
     if token != "NYXT":
         raise GatewayError("token unsupported")
     return token
+
+
+def _require_asset_id(payload: dict[str, Any], key: str = "asset_id") -> str:
+    raw = payload.get(key, "NYXT")
+    if not isinstance(raw, str) or not raw or isinstance(raw, bool):
+        raise GatewayError("asset_id invalid")
+    asset_id = raw.strip().upper()
+    if asset_id not in _SUPPORTED_ASSETS:
+        raise GatewayError("asset_id unsupported")
+    return asset_id
 
 
 def _require_int(payload: dict[str, Any], key: str, min_value: int = 1, max_value: int | None = None) -> int:
@@ -201,11 +499,20 @@ def _validate_place_order(payload: dict[str, Any]) -> dict[str, Any]:
     side = _require_text(payload, "side", max_len=8).upper()
     if side not in {"BUY", "SELL"}:
         raise GatewayError("side must be BUY or SELL")
+    asset_in = _require_asset_id(payload, "asset_in")
+    asset_out = _require_asset_id(payload, "asset_out")
+    if asset_in == asset_out:
+        raise GatewayError("asset_out must differ")
+    # Testnet v1: only the NYXT/ECHO pair is supported (mainnet-equivalent UX, fewer pairs).
+    if side == "BUY" and (asset_in, asset_out) != ("NYXT", "ECHO"):
+        raise GatewayError("pair unsupported")
+    if side == "SELL" and (asset_in, asset_out) != ("ECHO", "NYXT"):
+        raise GatewayError("pair unsupported")
     return {
         "owner_address": _require_address(payload, "owner_address"),
         "side": side,
-        "asset_in": _require_text(payload, "asset_in"),
-        "asset_out": _require_text(payload, "asset_out"),
+        "asset_in": asset_in,
+        "asset_out": asset_out,
         "amount": _require_int(payload, "amount", 1, _MAX_AMOUNT),
         "price": _require_int(payload, "price", 1, _MAX_PRICE),
     }
@@ -219,7 +526,18 @@ def _validate_cancel(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _validate_chat_payload(payload: dict[str, Any]) -> dict[str, Any]:
     channel = _require_text(payload, "channel")
-    message = _require_text(payload, "message", max_len=280)
+    message = _require_text(payload, "message", max_len=2048)
+    # Enforce E2EE ciphertext envelope (backend stores ciphertext only).
+    try:
+        parsed = json.loads(message)
+    except json.JSONDecodeError as exc:
+        raise GatewayError("message must be e2ee json") from exc
+    if not isinstance(parsed, dict):
+        raise GatewayError("message must be e2ee json")
+    if not isinstance(parsed.get("ciphertext"), str) or not parsed.get("ciphertext"):
+        raise GatewayError("message missing ciphertext")
+    if not isinstance(parsed.get("iv"), str) or not parsed.get("iv"):
+        raise GatewayError("message missing iv")
     return {"channel": channel, "message": message}
 
 
@@ -275,6 +593,9 @@ def execute_run(
 ) -> GatewayResult:
     if payload is None:
         payload = {}
+
+    if module == "marketplace" and action == "order_intent":
+        raise GatewayError("action not supported")
     
     # Verify ownership for state-mutating actions
     if module == "exchange" and action == "place_order":
@@ -288,10 +609,14 @@ def execute_run(
         payload = _validate_chat_payload(payload)
         # Note: Chat messages are tied to the caller via post_message logic
     if module == "marketplace" and action == "purchase_listing":
+        if not caller_account_id:
+            raise GatewayError("auth required")
         payload = _validate_purchase_payload(payload)
         if caller_account_id and payload.get("buyer_id") != caller_account_id:
             raise GatewayError("buyer_id mismatch")
     if module == "marketplace" and action == "listing_publish":
+        if not caller_account_id:
+            raise GatewayError("auth required")
         payload = _validate_listing_payload(payload)
         if caller_account_id and payload.get("publisher_id") != caller_account_id:
             raise GatewayError("publisher_id mismatch")
@@ -345,11 +670,20 @@ def execute_run(
     if module == "exchange" and action in {"route_swap", "place_order", "cancel_order"}:
         fee_record = route_fee(module, action, payload, run_id)
         insert_fee_ledger(conn, fee_record)
-    if module == "marketplace" and action in {"order_intent", "listing_publish", "purchase_listing"}:
+    if module == "marketplace" and action in {"listing_publish", "purchase_listing"}:
         fee_record = route_fee(module, action, payload, run_id)
         insert_fee_ledger(conn, fee_record)
+    if module == "chat" and action == "message_event":
+        fee_record = route_fee(module, action, payload, run_id)
 
     if module == "exchange" and action == "place_order":
+        if fee_record is not None and caller_account_id:
+            nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+            required = int(fee_record.total_paid)
+            if payload.get("asset_in") == "NYXT":
+                required += int(payload.get("amount", 0) or 0)
+            if nyxt_balance < required:
+                raise GatewayError("insufficient NYXT balance for amount + fee")
         order = Order(
             order_id=_order_id(run_id),
             owner_address=payload["owner_address"],
@@ -366,44 +700,66 @@ def execute_run(
             raise GatewayError(str(exc)) from exc
     if module == "exchange" and action == "cancel_order":
         try:
+            if caller_account_id:
+                record = load_by_id(conn, "orders", "order_id", payload["order_id"])
+                if record is None:
+                    raise GatewayError("order_id not found")
+                if str(record.get("owner_address")) != caller_account_id:
+                    raise GatewayError("order_id ownership mismatch")
+                if str(record.get("status") or "open") != "open":
+                    raise GatewayError("order not cancellable")
             cancel_order(conn, payload["order_id"])
         except ExchangeError as exc:
             raise GatewayError(str(exc)) from exc
+    if fee_record is not None and module == "exchange" and action in {"place_order", "cancel_order"}:
+        if not caller_account_id:
+            raise GatewayError("auth required")
+        apply_wallet_transfer(
+            conn,
+            transfer_id=_deterministic_id("fee", run_id),
+            from_address=caller_account_id,
+            to_address=fee_record.fee_address,
+            asset_id="NYXT",
+            amount=0,
+            fee_total=fee_record.total_paid,
+            treasury_address=fee_record.fee_address,
+            run_id=run_id,
+        )
 
     if module == "chat" and action == "message_event":
+        if not caller_account_id:
+            raise GatewayError("auth required")
+        if fee_record is not None:
+            nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+            if nyxt_balance < int(fee_record.total_paid):
+                raise GatewayError("insufficient NYXT balance for fee")
+            apply_wallet_transfer(
+                conn,
+                transfer_id=_deterministic_id("fee", run_id),
+                from_address=caller_account_id,
+                to_address=fee_record.fee_address,
+                asset_id="NYXT",
+                amount=0,
+                fee_total=fee_record.total_paid,
+                treasury_address=fee_record.fee_address,
+                run_id=run_id,
+            )
+            insert_fee_ledger(conn, fee_record)
         insert_message_event(
             conn,
             MessageEvent(
                 message_id=_deterministic_id("message", run_id),
                 channel=payload["channel"],
+                sender_account_id=caller_account_id,
                 body=payload["message"],
                 run_id=run_id,
             ),
         )
-    if module == "marketplace" and action == "order_intent":
-        insert_listing(
-            conn,
-            Listing(
-                listing_id=_deterministic_id("listing", run_id),
-                publisher_id=payload["publisher_id"],
-                sku=payload["sku"],
-                title=payload["title"],
-                price=payload["price"],
-                status="active",
-                run_id=run_id,
-            ),
-        )
-        insert_purchase(
-            conn,
-            Purchase(
-                purchase_id=_deterministic_id("purchase", run_id),
-                listing_id=_deterministic_id("listing", run_id),
-                buyer_id=payload["buyer_id"],
-                qty=payload["qty"],
-                run_id=run_id,
-            ),
-        )
     if module == "marketplace" and action == "listing_publish":
+        if fee_record is not None and caller_account_id:
+            nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+            if nyxt_balance < int(fee_record.total_paid):
+                raise GatewayError("insufficient NYXT balance for fee")
         insert_listing(
             conn,
             Listing(
@@ -416,13 +772,32 @@ def execute_run(
                 run_id=run_id,
             ),
         )
+        if fee_record is not None and caller_account_id:
+            apply_wallet_transfer(
+                conn,
+                transfer_id=_deterministic_id("fee", run_id),
+                from_address=caller_account_id,
+                to_address=fee_record.fee_address,
+                asset_id="NYXT",
+                amount=0,
+                fee_total=fee_record.total_paid,
+                treasury_address=fee_record.fee_address,
+                run_id=run_id,
+            )
     if module == "marketplace" and action == "purchase_listing":
         listing_record = load_by_id(conn, "listings", "listing_id", payload["listing_id"])
         if listing_record is None:
             raise GatewayError("listing_id not found")
+        if str(listing_record.get("status") or "active") != "active":
+            raise GatewayError("listing not available")
         
         # Real logic: Transfer funds
         total_price = int(listing_record["price"]) * int(payload["qty"])
+        if fee_record is not None and caller_account_id:
+            nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+            required = total_price + int(fee_record.total_paid)
+            if nyxt_balance < required:
+                raise GatewayError("insufficient NYXT balance for amount + fee")
         apply_wallet_transfer(
             conn,
             transfer_id=_deterministic_id("purchase-xfer", run_id),
@@ -430,8 +805,8 @@ def execute_run(
             to_address=str(listing_record["publisher_id"]),
             asset_id="NYXT",
             amount=total_price,
-            fee_total=max(1, (total_price * 10) // 10_000),
-            treasury_address=get_fee_address(),
+            fee_total=int(fee_record.total_paid) if fee_record is not None else 0,
+            treasury_address=fee_record.fee_address if fee_record is not None else get_fee_address(),
             run_id=run_id
         )
         
@@ -447,6 +822,7 @@ def execute_run(
         )
         # Mark listing as sold for simplicity
         conn.execute("UPDATE listings SET status = 'sold' WHERE listing_id = ?", (payload["listing_id"],))
+        conn.commit()
     if module == "entertainment" and action == "state_step":
         _ensure_entertainment_items(conn)
         item_record = load_by_id(conn, "entertainment_items", "item_id", payload["item_id"])
@@ -578,11 +954,12 @@ def execute_wallet_faucet(
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
-    address = str(payload["address"])
-    amount = int(payload.get("amount", 1000000000)) # Default 1000 NYXT
-    asset_id = str(payload.get("asset_id", "NYXT"))
-    
-    fee_record = route_fee("wallet", "faucet", payload, run_id)
+    validated = _validate_wallet_faucet(payload)
+    address = validated["address"]
+    amount = int(validated.get("amount", 1000))
+    asset_id = validated.get("asset_id", "NYXT")
+
+    fee_record = route_fee("wallet", "faucet", validated, run_id)
     conn = create_connection(db_path or _db_path())
     
     backend_src = _backend_src()
@@ -597,7 +974,7 @@ def execute_wallet_faucet(
             run_id=run_id,
             module="wallet",
             action="faucet",
-            payload=payload,
+            payload=validated,
             base_dir=run_root,
         )
     except EvidenceError as exc:
@@ -649,6 +1026,174 @@ def execute_wallet_faucet(
         result,
         fee_record,
     )
+
+
+def execute_wallet_faucet_v1(
+    *,
+    seed: int,
+    run_id: str,
+    payload: dict[str, Any],
+    account_id: str,
+    client_ip: str | None = None,
+    db_path: Path | None = None,
+    run_root: Path | None = None,
+) -> tuple[GatewayResult, int, FeeLedger]:
+    validated = _validate_wallet_faucet(payload)
+    address = validated["address"]
+    if address != account_id:
+        raise GatewayApiError(
+            "FAUCET_ADDRESS_MISMATCH",
+            "address must match authenticated account_id",
+            http_status=403,
+        )
+
+    ip = (client_ip or "unknown").strip() or "unknown"
+    now = int(time.time())
+    window_start = now - 24 * 60 * 60
+    cooldown = get_faucet_cooldown_seconds()
+    max_amount = get_faucet_max_amount_per_24h()
+    max_claims = get_faucet_max_claims_per_24h()
+    ip_max_claims = get_faucet_ip_max_claims_per_24h()
+
+    conn = create_connection(db_path or _db_path())
+    try:
+        last_row = conn.execute(
+            "SELECT created_at FROM faucet_claims WHERE account_id = ? ORDER BY created_at DESC LIMIT 1",
+            (account_id,),
+        ).fetchone()
+        if last_row is not None and cooldown:
+            last_at = int(last_row["created_at"])
+            retry_after = cooldown - (now - last_at)
+            if retry_after > 0:
+                raise GatewayApiError(
+                    "FAUCET_COOLDOWN",
+                    "faucet cooldown active",
+                    http_status=429,
+                    details={"retry_after_seconds": retry_after},
+                )
+
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) AS total_amount, COUNT(*) AS claim_count "
+            "FROM faucet_claims WHERE account_id = ? AND created_at >= ?",
+            (account_id, window_start),
+        ).fetchone()
+        total_amount = int(row["total_amount"]) if row is not None else 0
+        claim_count = int(row["claim_count"]) if row is not None else 0
+
+        if max_claims and claim_count >= max_claims:
+            raise GatewayApiError(
+                "FAUCET_DAILY_CLAIMS_EXCEEDED",
+                "daily faucet claim limit exceeded",
+                http_status=429,
+                details={"max_claims_per_24h": max_claims},
+            )
+
+        requested_amount = int(validated["amount"])
+        if max_amount and (total_amount + requested_amount) > max_amount:
+            raise GatewayApiError(
+                "FAUCET_DAILY_AMOUNT_EXCEEDED",
+                "daily faucet amount limit exceeded",
+                http_status=429,
+                details={
+                    "max_amount_per_24h": max_amount,
+                    "already_claimed_amount_24h": total_amount,
+                },
+            )
+
+        ip_row = conn.execute(
+            "SELECT COUNT(*) AS claim_count FROM faucet_claims WHERE ip = ? AND created_at >= ?",
+            (ip, window_start),
+        ).fetchone()
+        ip_claim_count = int(ip_row["claim_count"]) if ip_row is not None else 0
+        if ip_max_claims and ip_claim_count >= ip_max_claims:
+            raise GatewayApiError(
+                "FAUCET_IP_LIMIT_EXCEEDED",
+                "ip faucet claim limit exceeded",
+                http_status=429,
+                details={"ip_max_claims_per_24h": ip_max_claims},
+            )
+
+        fee_record = route_fee("wallet", "faucet", validated, run_id)
+
+        backend_src = _backend_src()
+        if str(backend_src) not in __import__("sys").path:
+            __import__("sys").path.insert(0, str(backend_src))
+        from nyx_backend.evidence import EvidenceError, run_evidence
+
+        run_root = run_root or _run_root()
+        try:
+            evidence = run_evidence(
+                seed=seed,
+                run_id=run_id,
+                module="wallet",
+                action="faucet",
+                payload=validated,
+                base_dir=run_root,
+            )
+        except EvidenceError as exc:
+            raise GatewayError(str(exc)) from exc
+
+        insert_evidence_run(
+            conn,
+            EvidenceRun(
+                run_id=run_id,
+                module="wallet",
+                action="faucet",
+                seed=seed,
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+            ),
+        )
+        insert_receipt(
+            conn,
+            Receipt(
+                receipt_id=_receipt_id(run_id),
+                module="wallet",
+                action="faucet",
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+                run_id=run_id,
+            ),
+        )
+
+        faucet_result = apply_wallet_faucet_with_fee(
+            conn,
+            address=validated["address"],
+            amount=requested_amount,
+            fee_total=fee_record.total_paid,
+            treasury_address=fee_record.fee_address,
+            run_id=run_id,
+            asset_id=validated["asset_id"],
+        )
+        insert_fee_ledger(conn, fee_record)
+        insert_faucet_claim(
+            conn,
+            FaucetClaim(
+                claim_id=_deterministic_id("faucet-claim", run_id),
+                account_id=account_id,
+                address=validated["address"],
+                asset_id=validated["asset_id"],
+                amount=requested_amount,
+                ip=ip,
+                created_at=now,
+                run_id=run_id,
+            ),
+        )
+        conn.commit()
+        return (
+            GatewayResult(
+                run_id=run_id,
+                state_hash=evidence.state_hash,
+                receipt_hashes=evidence.receipt_hashes,
+                replay_ok=evidence.replay_ok,
+            ),
+            int(faucet_result["balance"]),
+            fee_record,
+        )
+    finally:
+        conn.close()
 
 
 def execute_airdrop_claim(
@@ -728,8 +1273,37 @@ def execute_airdrop_claim(
     )
 
 
+def supported_assets() -> list[dict[str, object]]:
+    return [{"asset_id": asset_id, **meta} for asset_id, meta in sorted(_SUPPORTED_ASSETS.items())]
+
+
 def fetch_wallet_balance(address: str, asset_id: str = "NYXT") -> int:
     conn = create_connection(_db_path())
     balance = get_wallet_balance(conn, address, asset_id)
     conn.close()
     return balance
+
+
+def marketplace_list_active_listings(conn, limit: int = 100, offset: int = 0) -> list[dict[str, object]]:
+    return list_listings(conn, limit=limit, offset=offset)
+
+
+def marketplace_search_listings(conn, q: str, limit: int = 100, offset: int = 0) -> list[dict[str, object]]:
+    query = (q or "").strip()
+    if not query:
+        return list_listings(conn, limit=limit, offset=offset)
+    if len(query) > 64:
+        raise GatewayError("q too long")
+    lim = int(limit)
+    off = int(offset)
+    if lim < 1 or lim > 200:
+        raise GatewayError("limit out of bounds")
+    if off < 0:
+        raise GatewayError("offset out of bounds")
+    pattern = f"%{query}%"
+    rows = conn.execute(
+        "SELECT * FROM listings WHERE status = 'active' AND (sku LIKE ? OR title LIKE ?) "
+        "ORDER BY listing_id ASC LIMIT ? OFFSET ?",
+        (pattern, pattern, lim, off),
+    ).fetchall()
+    return [{col: row[col] for col in row.keys()} for row in rows]

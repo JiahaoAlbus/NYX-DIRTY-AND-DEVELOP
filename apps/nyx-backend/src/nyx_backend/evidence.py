@@ -203,6 +203,20 @@ def _summary_stdout(state_hash: str, receipt_hashes: list[str], replay_ok: bool)
     )
 
 
+def _derive_execution_hash(base_hex: str, *, fingerprint_hex: str, label: str) -> str:
+    if not isinstance(base_hex, str) or not base_hex:
+        raise EvidenceError("base hash required")
+    if not isinstance(fingerprint_hex, str) or not fingerprint_hex:
+        raise EvidenceError("fingerprint required")
+    if not isinstance(label, str) or not label:
+        raise EvidenceError("label required")
+    return hashlib.sha256(f"{label}:{base_hex}:{fingerprint_hex}".encode("utf-8")).hexdigest()
+
+
+def _execution_fingerprint(inputs: dict[str, object]) -> str:
+    return hashlib.sha256(_json_dumps(inputs).encode("utf-8")).hexdigest()
+
+
 def _platform_fee_for_marketplace(payload: object) -> dict[str, object]:
     from action import ActionDescriptor, ActionKind
     from engine import FeeEngineV0
@@ -280,9 +294,19 @@ def _fee_summary(module: str, action: str, payload: object) -> dict[str, object]
     platform_amount = _platform_fee_amount(payload)
     payer = "testnet-payer"
     if isinstance(payload, dict):
-        candidate = payload.get("from_address")
-        if isinstance(candidate, str) and candidate:
-            payer = candidate
+        for key in (
+            "from_address",
+            "owner_address",
+            "buyer_id",
+            "publisher_id",
+            "address",
+            "account_id",
+            "sender_account_id",
+        ):
+            candidate = payload.get(key)
+            if isinstance(candidate, str) and candidate:
+                payer = candidate
+                break
     descriptor = ActionDescriptor(
         kind=ActionKind.STATE_MUTATION,
         module=module,
@@ -362,13 +386,24 @@ def run_evidence(
 
     protocol_anchor = _protocol_anchor()
     inputs = {"seed": seed, "module": mod, "action": act, "payload": payload}
-    receipt_hashes = [
+    fingerprint = _execution_fingerprint(inputs)
+    base_receipts = [
         trace.fee.receipt_hash_hex,
         trace.chain.tx_hash_hex,
         trace.chain.block_hash_hex,
     ]
+    receipt_hashes = [
+        _derive_execution_hash(base_receipts[0], fingerprint_hex=fingerprint, label="receipt:fee"),
+        _derive_execution_hash(base_receipts[1], fingerprint_hex=fingerprint, label="receipt:tx"),
+        _derive_execution_hash(base_receipts[2], fingerprint_hex=fingerprint, label="receipt:block"),
+    ]
+    derived_state_hash = _derive_execution_hash(
+        trace.chain.state_root_after_hex,
+        fingerprint_hex=fingerprint,
+        label="state",
+    )
     outputs = {
-        "state_hash": trace.chain.state_root_after_hex,
+        "state_hash": derived_state_hash,
         "receipt_hashes": receipt_hashes,
         "replay_ok": replay_ok,
     }
@@ -379,7 +414,10 @@ def run_evidence(
         ("marketplace", "order_intent"),
         ("marketplace", "listing_publish"),
         ("marketplace", "purchase_listing"),
+        ("wallet", "faucet"),
         ("wallet", "transfer"),
+        ("wallet", "airdrop"),
+        ("chat", "message_event"),
     }:
         outputs.update(_fee_summary(mod, act, payload))
     if mod == "marketplace" and act == "order_intent":
@@ -417,6 +455,135 @@ def run_evidence(
         replay_ok=replay_ok,
         stdout=stdout_text,
     )
+
+
+def replay_compute_outputs(
+    *,
+    seed: int,
+    module: str,
+    action: str,
+    payload: object | None,
+) -> tuple[dict[str, object], list[str], str, bool, str]:
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        raise EvidenceError("seed must be int")
+    mod = _validate_text(module, "module")
+    act = _validate_text(action, "action")
+    payload = _validate_payload(payload)
+
+    _ensure_paths()
+    from e2e_private_transfer.pipeline import run_private_transfer
+    from e2e_private_transfer.replay import replay_and_verify
+
+    trace, _ = run_private_transfer(seed=seed)
+    replay_ok = replay_and_verify(trace)
+    if not replay_ok:
+        raise EvidenceError("replay verification failed")
+
+    inputs = {"seed": seed, "module": mod, "action": act, "payload": payload}
+    fingerprint = _execution_fingerprint(inputs)
+    base_receipts = [
+        trace.fee.receipt_hash_hex,
+        trace.chain.tx_hash_hex,
+        trace.chain.block_hash_hex,
+    ]
+    receipt_hashes = [
+        _derive_execution_hash(base_receipts[0], fingerprint_hex=fingerprint, label="receipt:fee"),
+        _derive_execution_hash(base_receipts[1], fingerprint_hex=fingerprint, label="receipt:tx"),
+        _derive_execution_hash(base_receipts[2], fingerprint_hex=fingerprint, label="receipt:block"),
+    ]
+    derived_state_hash = _derive_execution_hash(
+        trace.chain.state_root_after_hex,
+        fingerprint_hex=fingerprint,
+        label="state",
+    )
+    outputs: dict[str, object] = {
+        "state_hash": derived_state_hash,
+        "receipt_hashes": receipt_hashes,
+        "replay_ok": replay_ok,
+    }
+    if (mod, act) in {
+        ("exchange", "route_swap"),
+        ("exchange", "place_order"),
+        ("exchange", "cancel_order"),
+        ("marketplace", "order_intent"),
+        ("marketplace", "listing_publish"),
+        ("marketplace", "purchase_listing"),
+        ("wallet", "faucet"),
+        ("wallet", "transfer"),
+        ("wallet", "airdrop"),
+        ("chat", "message_event"),
+    }:
+        outputs.update(_fee_summary(mod, act, payload))
+    if mod == "marketplace" and act == "order_intent":
+        outputs["platform_fee"] = _platform_fee_for_marketplace(payload)
+    if mod == "entertainment" and act == "state_step":
+        outputs["entertainment_state"] = _entertainment_state(seed, payload)
+
+    stdout_text = _summary_stdout(outputs["state_hash"], receipt_hashes, replay_ok)
+    return outputs, receipt_hashes, str(outputs["state_hash"]), replay_ok, stdout_text
+
+
+def replay_verify_run(run_id: str, base_dir: Path | None = None) -> dict[str, object]:
+    rid = _sanitize_run_id(run_id)
+    recorded = load_evidence(rid, base_dir=base_dir)
+    verify_evidence_payload(recorded)
+
+    if not isinstance(recorded.inputs, dict):
+        raise EvidenceError("inputs must be dict")
+    seed = recorded.inputs.get("seed")
+    module = recorded.inputs.get("module")
+    action = recorded.inputs.get("action")
+    payload = recorded.inputs.get("payload")
+
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        raise EvidenceError("inputs.seed must be int")
+    if not isinstance(module, str) or not module or isinstance(module, bool):
+        raise EvidenceError("inputs.module required")
+    if not isinstance(action, str) or not action or isinstance(action, bool):
+        raise EvidenceError("inputs.action required")
+
+    replayed_outputs, replayed_receipts, replayed_state, replayed_ok, replayed_stdout = replay_compute_outputs(
+        seed=seed, module=module, action=action, payload=payload
+    )
+
+    diffs: dict[str, object] = {}
+    if replayed_state != recorded.state_hash:
+        diffs["state_hash"] = {"recorded": recorded.state_hash, "replayed": replayed_state}
+    if replayed_receipts != recorded.receipt_hashes:
+        diffs["receipt_hashes"] = {"recorded": recorded.receipt_hashes, "replayed": replayed_receipts}
+    if replayed_ok != recorded.replay_ok:
+        diffs["replay_ok"] = {"recorded": recorded.replay_ok, "replayed": replayed_ok}
+
+    if isinstance(recorded.outputs, dict):
+        recorded_outputs = recorded.outputs
+        keys = sorted(set(recorded_outputs.keys()) | set(replayed_outputs.keys()))
+        out_diff: dict[str, object] = {}
+        for key in keys:
+            if recorded_outputs.get(key) != replayed_outputs.get(key):
+                out_diff[key] = {"recorded": recorded_outputs.get(key), "replayed": replayed_outputs.get(key)}
+        if out_diff:
+            diffs["outputs"] = out_diff
+
+    ok = len(diffs) == 0
+    return {
+        "run_id": rid,
+        "ok": ok,
+        "recorded": {
+            "state_hash": recorded.state_hash,
+            "receipt_hashes": recorded.receipt_hashes,
+            "replay_ok": recorded.replay_ok,
+            "stdout": recorded.stdout,
+            "outputs": recorded.outputs,
+        },
+        "replayed": {
+            "state_hash": replayed_state,
+            "receipt_hashes": replayed_receipts,
+            "replay_ok": replayed_ok,
+            "stdout": replayed_stdout,
+            "outputs": replayed_outputs,
+        },
+        "diff": diffs,
+    }
 
 
 def load_evidence(run_id: str, base_dir: Path | None = None) -> EvidencePayload:

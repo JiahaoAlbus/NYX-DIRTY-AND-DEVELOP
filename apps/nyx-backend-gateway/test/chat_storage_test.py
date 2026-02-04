@@ -12,11 +12,11 @@ class ChatStorageTests(unittest.TestCase):
             conn = create_connection(Path(tmp) / "gateway.db")
             insert_message_event(
                 conn,
-                MessageEvent(message_id="m1", channel="general", body="hello", run_id="run-1"),
+                MessageEvent(message_id="m1", channel="general", sender_account_id="acct-1", body="hello", run_id="run-1"),
             )
             insert_message_event(
                 conn,
-                MessageEvent(message_id="m2", channel="alpha", body="ping", run_id="run-2"),
+                MessageEvent(message_id="m2", channel="alpha", sender_account_id="acct-2", body="ping", run_id="run-2"),
             )
             messages = list_messages(conn, channel="general")
             self.assertEqual(len(messages), 1)

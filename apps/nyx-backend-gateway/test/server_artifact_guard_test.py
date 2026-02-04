@@ -1,4 +1,6 @@
 import _bootstrap
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -33,17 +35,32 @@ class ServerArtifactGuardTests(unittest.TestCase):
         self.httpd.server_close()
         self.tmp.cleanup()
 
-    def _post(self, path: str, payload: dict) -> dict:
+    def _post(self, path: str, payload: dict, token: str | None = None) -> dict:
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         body = json.dumps(payload, separators=(",", ":"))
-        conn.request("POST", path, body=body, headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)
         conn.close()
         return json.loads(data.decode("utf-8"))
 
+    def _auth_token(self) -> tuple[str, str]:
+        key = b"portal-key-art-0001"
+        pubkey = base64.b64encode(key).decode("utf-8")
+        created = self._post("/portal/v1/accounts", {"handle": "archivist", "pubkey": pubkey})
+        account_id = created.get("account_id")
+        challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
+        nonce = challenge.get("nonce")
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        verified = self._post("/portal/v1/auth/verify", {"account_id": account_id, "nonce": nonce, "signature": signature})
+        return account_id, verified.get("access_token")
+
     def test_artifact_path_traversal_rejected(self) -> None:
+        _, token = self._auth_token()
         self._post(
             "/run",
             {
@@ -53,6 +70,7 @@ class ServerArtifactGuardTests(unittest.TestCase):
                 "action": "route_swap",
                 "payload": {"asset_in": "asset-a", "asset_out": "asset-b", "amount": 5, "min_out": 3},
             },
+            token=token,
         )
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
         conn.request("GET", "/artifact?run_id=artifact-run-1&name=../x")

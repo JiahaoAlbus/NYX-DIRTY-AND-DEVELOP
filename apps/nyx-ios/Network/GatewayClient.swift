@@ -41,6 +41,16 @@ final class GatewayClient {
                 }
                 if httpResponse.statusCode >= 400 {
                     let errorText = String(data: data, encoding: .utf8) ?? "request failed"
+                    if let obj = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                        if let errObj = obj["error"] as? [String: Any] {
+                            if let message = errObj["message"] as? String, !message.isEmpty {
+                                throw GatewayError(message: message)
+                            }
+                        }
+                        if let errStr = obj["error"] as? String, !errStr.isEmpty {
+                            throw GatewayError(message: errStr)
+                        }
+                    }
                     throw GatewayError(message: errorText)
                 }
                 return data
@@ -318,7 +328,35 @@ final class GatewayClient {
         return payload["messages"] ?? []
     }
 
-    func faucetV1(token: String, seed: Int, runId: String, address: String, amount: Int) async throws -> FaucetV1Response {
+    func fetchWalletBalancesV1(token: String, address: String) async throws -> WalletBalancesV1Response {
+        var components = URLComponents(url: baseURL.appendingPathComponent("wallet/v1/balances"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "address", value: address)]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(WalletBalancesV1Response.self, from: data)
+    }
+
+    func fetchWalletTransfersV1(token: String, address: String, limit: Int, offset: Int) async throws -> WalletTransfersV1Response {
+        var components = URLComponents(url: baseURL.appendingPathComponent("wallet/v1/transfers"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "address", value: address),
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset)),
+        ]
+        guard let url = components?.url else {
+            throw GatewayError(message: "invalid url")
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let data = try await requestData(request)
+        return try JSONDecoder().decode(WalletTransfersV1Response.self, from: data)
+    }
+
+    func faucetV1(token: String, seed: Int, runId: String, address: String, amount: Int, assetId: String) async throws -> FaucetV1Response {
         let url = baseURL.appendingPathComponent("wallet/v1/faucet")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -327,14 +365,14 @@ final class GatewayClient {
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
-            "payload": ["address": address, "amount": amount, "token": "NYXT"],
+            "payload": ["address": address, "amount": amount, "asset_id": assetId],
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
         let data = try await requestData(request)
         return try JSONDecoder().decode(FaucetV1Response.self, from: data)
     }
 
-    func transferV1(token: String, seed: Int, runId: String, from: String, to: String, amount: Int) async throws -> WalletTransferV1Response {
+    func transferV1(token: String, seed: Int, runId: String, from: String, to: String, amount: Int, assetId: String) async throws -> WalletTransferV1Response {
         let url = baseURL.appendingPathComponent("wallet/v1/transfer")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -343,7 +381,7 @@ final class GatewayClient {
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
-            "payload": ["from_address": from, "to_address": to, "amount": amount],
+            "payload": ["from_address": from, "to_address": to, "amount": amount, "asset_id": assetId],
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
         let data = try await requestData(request)

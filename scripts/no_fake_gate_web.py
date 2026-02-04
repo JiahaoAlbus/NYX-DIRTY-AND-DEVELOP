@@ -37,7 +37,10 @@ def main() -> int:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         for idx, line in enumerate(text.splitlines(), start=1):
-            if BANNED.search(line):
+            # Allow HTML/JSX placeholder attributes (they are UX affordances, not fake UI).
+            # Still ban "placeholder" in other contexts (e.g. "placeholder data", "placeholder button").
+            scan_line = re.sub(r"\bplaceholder\s*=", "ph=", line)
+            if BANNED.search(scan_line):
                 offenders.append(f"{path}:{idx}: {line.strip()}")
 
     if offenders:

@@ -2,6 +2,47 @@ import CryptoKit
 import Foundation
 import Security
 
+// MARK: - Wallet (v1) Models
+
+struct WalletAssetV1: Codable {
+    let asset_id: String
+    let name: String?
+}
+
+struct WalletBalanceRowV1: Codable {
+    let asset_id: String
+    let balance: Int
+}
+
+struct WalletBalancesV1Response: Codable {
+    let address: String
+    let assets: [WalletAssetV1]
+    let balances: [WalletBalanceRowV1]
+}
+
+struct WalletTransferRowV1: Codable, Identifiable {
+    let transfer_id: String
+    let from_address: String
+    let to_address: String
+    let asset_id: String
+    let amount: Int
+    let fee_total: Int
+    let treasury_address: String
+    let run_id: String
+    let state_hash: String?
+    let receipt_hashes: [String]
+    let replay_ok: Bool
+
+    var id: String { transfer_id }
+}
+
+struct WalletTransfersV1Response: Codable {
+    let address: String
+    let transfers: [WalletTransferRowV1]
+    let limit: Int
+    let offset: Int
+}
+
 struct WalletSignature: Codable {
     let message: String
     let signatureHex: String
