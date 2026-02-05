@@ -20,6 +20,20 @@ _SAFE_HEX_OR_WORD = re.compile(r"^[A-Za-z0-9_-]{1,256}$")
 _SAFE_SOL_MINT = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,64}$")
 _SAFE_EVM_ADDRESS = re.compile(r"^0x[a-fA-F0-9]{40}$")
 _SAFE_ME_SYMBOL = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_SAFE_ME_PATTERN = re.compile(r"^[A-Za-z0-9 _.-]{1,64}$")
+_MAGIC_EDEN_EVM_CHAINS = {
+    "ethereum",
+    "polygon",
+    "base",
+    "sei",
+    "arbitrum",
+    "apechain",
+    "avalanche",
+    "bsc",
+    "abstract",
+    "berachain",
+    "monad",
+}
 
 
 def _read_limited(resp, limit: int) -> bytes:
@@ -128,6 +142,46 @@ def _http_get_json_any(url: str, headers: dict[str, str]) -> dict[str, Any]:
     return {"status": int(status), "data": parsed}
 
 
+def _http_post_json_any(url: str, headers: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    headers = {**headers, "content-type": "application/json"}
+    req = Request(url, headers=headers, method="POST", data=body)
+    try:
+        with urlopen(req, timeout=_DEFAULT_TIMEOUT_SECONDS) as resp:
+            status = getattr(resp, "status", 200)
+            resp_body = _read_limited(resp, _MAX_UPSTREAM_BYTES)
+    except HTTPError as exc:
+        resp_body = b""
+        try:
+            resp_body = _read_limited(exc, _MAX_UPSTREAM_BYTES)
+        except Exception:
+            resp_body = b""
+        raise GatewayApiError(
+            "UPSTREAM_HTTP_ERROR",
+            f"upstream http error {exc.code}",
+            http_status=502,
+            details={"status": int(exc.code), "body": _safe_snippet(resp_body)},
+        ) from exc
+    except URLError as exc:
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, socket.timeout):
+            raise GatewayApiError("UPSTREAM_TIMEOUT", "upstream timeout", http_status=504) from exc
+        raise GatewayApiError("UPSTREAM_UNAVAILABLE", "upstream unavailable", http_status=502) from exc
+    except socket.timeout as exc:
+        raise GatewayApiError("UPSTREAM_TIMEOUT", "upstream timeout", http_status=504) from exc
+
+    try:
+        parsed = json.loads(resp_body.decode("utf-8"))
+    except Exception as exc:
+        raise GatewayApiError(
+            "UPSTREAM_BAD_JSON",
+            "upstream returned invalid json",
+            http_status=502,
+            details={"status": int(status), "body": _safe_snippet(resp_body)},
+        ) from exc
+    return {"status": int(status), "data": parsed}
+
+
 def _require_nonempty_str(value: str, *, name: str, pattern: re.Pattern[str] | None = None) -> str:
     raw = (value or "").strip()
     if not raw:
@@ -154,6 +208,34 @@ def _optional_int(value: str | None, *, name: str, min_value: int | None = None,
     if max_value is not None and parsed > max_value:
         raise GatewayApiError("PARAM_INVALID", f"{name} out of bounds", http_status=400, details={"param": name})
     return parsed
+
+
+def _require_magic_eden_chain(value: str) -> str:
+    raw = _require_nonempty_str(value, name="chain")
+    raw = raw.strip().lower()
+    if raw not in _MAGIC_EDEN_EVM_CHAINS:
+        raise GatewayApiError(
+            "PARAM_INVALID",
+            "chain not supported",
+            http_status=400,
+            details={"param": "chain", "supported": sorted(_MAGIC_EDEN_EVM_CHAINS)},
+        )
+    return raw
+
+
+def _split_csv(value: str | None, *, name: str, max_items: int = 50) -> list[str]:
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    items = [item.strip() for item in raw.split(",") if item.strip()]
+    if len(items) > max_items:
+        raise GatewayApiError(
+            "PARAM_INVALID",
+            f"{name} too many items",
+            http_status=400,
+            details={"param": name, "max": max_items},
+        )
+    return items
 
 
 def _0x_base_url(network: str | None, chain_id: int | None) -> str:
@@ -378,3 +460,45 @@ def magic_eden_solana_token(*, mint: str) -> dict[str, Any]:
     url = f"https://api-mainnet.magiceden.dev/v2/tokens/{mint}"
     result = _http_get_json_any(url, headers=_magic_eden_headers())
     return {"provider": "magic_eden", "network": "solana", "endpoint": "token", "mint": mint, **result}
+
+
+def magic_eden_evm_search_collections(*, chain: str, pattern: str, limit: int | None, offset: int | None) -> dict[str, Any]:
+    chain = _require_magic_eden_chain(chain)
+    pattern = _require_nonempty_str(pattern, name="pattern", pattern=_SAFE_ME_PATTERN)
+    payload: dict[str, Any] = {"chain": chain, "pattern": pattern}
+    if limit is not None:
+        payload["limit"] = _optional_int(str(limit), name="limit", min_value=1, max_value=200)
+    if offset is not None:
+        payload["offset"] = _optional_int(str(offset), name="offset", min_value=0, max_value=1_000_000)
+    url = "https://api-mainnet.magiceden.dev/v4/evm-public/collections/search"
+    result = _http_post_json_any(url, headers=_magic_eden_headers(), payload=payload)
+    return {"provider": "magic_eden", "network": "evm", "endpoint": "collections_search", "request": payload, **result}
+
+
+def magic_eden_evm_collections(
+    *, chain: str, collection_slugs: list[str] | None, collection_ids: list[str] | None
+) -> dict[str, Any]:
+    chain = _require_magic_eden_chain(chain)
+    slugs = collection_slugs or []
+    ids = collection_ids or []
+    if not slugs and not ids:
+        raise GatewayApiError(
+            "PARAM_REQUIRED",
+            "collection_slugs or collection_ids required",
+            http_status=400,
+            details={"param": "collection_slugs|collection_ids"},
+        )
+    if slugs:
+        for slug in slugs:
+            _require_nonempty_str(slug, name="collection_slug", pattern=_SAFE_ME_SYMBOL)
+    if ids:
+        for cid in ids:
+            _require_nonempty_str(cid, name="collection_id", pattern=_SAFE_EVM_ADDRESS)
+    payload: dict[str, Any] = {"chain": chain}
+    if slugs:
+        payload["collectionSlugs"] = slugs
+    if ids:
+        payload["collectionIds"] = ids
+    url = "https://api-mainnet.magiceden.dev/v4/evm-public/collections"
+    result = _http_post_json_any(url, headers=_magic_eden_headers(), payload=payload)
+    return {"provider": "magic_eden", "network": "evm", "endpoint": "collections", "request": payload, **result}

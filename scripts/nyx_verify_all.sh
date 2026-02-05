@@ -236,6 +236,9 @@ fi
 jq -e '.module_features.integrations.magic_eden_solana | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
   || die "capabilities: integrations.magic_eden_solana should be enabled"
 
+jq -e '.module_features.integrations.magic_eden_evm | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
+  || die "capabilities: integrations.magic_eden_evm should be enabled"
+
 log "Seed=$SEED"
 log "Run prefix=$RUN_ID_BASE"
 log "Run session=$RUN_SESSION"
@@ -426,6 +429,28 @@ if [[ -n "$mint" ]]; then
 else
   log "Integration: Magic Eden token skipped (mint not found)"
 fi
+
+log "Integration: Magic Eden EVM collections search"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections/search?chain=ethereum&pattern=azuki&limit=1" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_search.json" 200 || die "magic eden evm search failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data.collections|type=="array")' "$evidence_dir/integration_magic_eden_evm_search.json" >/dev/null 2>&1 \
+  || die "magic eden evm search response invalid"
+
+evm_slug="$(jq -r '.data.collections[0].symbol // .data.collections[0].slug // empty' "$evidence_dir/integration_magic_eden_evm_search.json" 2>/dev/null || true)"
+evm_id="$(jq -r '.data.collections[0].id // empty' "$evidence_dir/integration_magic_eden_evm_search.json" 2>/dev/null || true)"
+if [[ -n "$evm_slug" ]]; then
+  log "Integration: Magic Eden EVM collections (slug=$evm_slug)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections?chain=ethereum&collection_slugs=$evm_slug" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_collections.json" 200 || die "magic eden evm collections failed"
+elif [[ -n "$evm_id" ]]; then
+  log "Integration: Magic Eden EVM collections (id=$evm_id)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections?chain=ethereum&collection_ids=$evm_id" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_collections.json" 200 || die "magic eden evm collections failed"
+else
+  die "magic eden evm collections missing slug/id"
+fi
+jq -e '.provider=="magic_eden" and .status==200 and (.data.collections|type=="array")' "$evidence_dir/integration_magic_eden_evm_collections.json" >/dev/null 2>&1 \
+  || die "magic eden evm collections response invalid"
 
 # -------------------------------------------------------------------
 # Mutations (Wallet/Exchange/Store/Chat/Airdrop) + Evidence Replay

@@ -66,9 +66,11 @@ This document lists all available backend endpoints, their methods, schemas, and
 | :--- | :--- | :--- | :--- | :--- |
 | `/integrations/v1/0x/quote` | GET | 0x swap quote | No | Yes |
 | `/integrations/v1/jupiter/quote` | GET | Jupiter swap quote | No | Yes |
-| `/integrations/v1/magic_eden/solana/collections` | GET | Magic Eden Solana collections (public; optional API key header) | No | No |
-| `/integrations/v1/magic_eden/solana/collection_listings` | GET | Magic Eden Solana collection listings (public; optional API key header) | No | No |
-| `/integrations/v1/magic_eden/solana/token` | GET | Magic Eden Solana token detail (public; optional API key header) | No | No |
+| `/integrations/v1/magic_eden/solana/collections` | GET | Magic Eden Solana collections (public; optional API key header) | No | Yes |
+| `/integrations/v1/magic_eden/solana/collection_listings` | GET | Magic Eden Solana collection listings (public; optional API key header) | No | Yes |
+| `/integrations/v1/magic_eden/solana/token` | GET | Magic Eden Solana token detail (public; optional API key header) | No | Yes |
+| `/integrations/v1/magic_eden/evm/collections/search` | GET | Magic Eden EVM collections search (public; optional API key header) | No | Yes |
+| `/integrations/v1/magic_eden/evm/collections` | GET | Magic Eden EVM collections by slug/id (public; optional API key header) | No | Yes |
 
 ## Chat Module
 

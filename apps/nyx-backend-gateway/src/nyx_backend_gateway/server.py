@@ -69,8 +69,8 @@ def _capabilities() -> dict[str, object]:
         "0x_quote": "enabled" if get_0x_api_key() else "disabled_missing_api_key",
         "jupiter_quote": "enabled" if get_jupiter_api_key() else "disabled_missing_api_key",
         "magic_eden_solana": "enabled",
-        # EVM Magic Eden and PayEVM are not shipped yet (NO FAKE UI).
-        "magic_eden_evm": "disabled_not_implemented",
+        "magic_eden_evm": "enabled",
+        # PayEVM is not shipped yet (NO FAKE UI).
         "payevm": "disabled_not_implemented",
     }
     module_features = {
@@ -113,6 +113,8 @@ def _capabilities() -> dict[str, object]:
             "/integrations/v1/magic_eden/solana/collections",
             "/integrations/v1/magic_eden/solana/collection_listings",
             "/integrations/v1/magic_eden/solana/token",
+            "/integrations/v1/magic_eden/evm/collections/search",
+            "/integrations/v1/magic_eden/evm/collections",
             "/web2/v1/allowlist",
             "/web2/v1/request",
             "/web2/v1/requests",
@@ -1541,6 +1543,39 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
                 mint = (query.get("mint") or [""])[0]
                 result = magic_eden_solana_token(mint=mint)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/evm/collections/search":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_evm_search_collections
+
+                chain = (query.get("chain") or [""])[0]
+                pattern = (query.get("pattern") or [""])[0]
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_evm_search_collections(chain=chain, pattern=pattern, limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/evm/collections":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_evm_collections, _split_csv
+
+                chain = (query.get("chain") or [""])[0]
+                slugs_raw = (query.get("collection_slugs") or [""])[0]
+                ids_raw = (query.get("collection_ids") or [""])[0]
+                slugs = _split_csv(slugs_raw, name="collection_slugs", max_items=50)
+                ids = _split_csv(ids_raw, name="collection_ids", max_items=50)
+
+                result = magic_eden_evm_collections(chain=chain, collection_slugs=slugs, collection_ids=ids)
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)

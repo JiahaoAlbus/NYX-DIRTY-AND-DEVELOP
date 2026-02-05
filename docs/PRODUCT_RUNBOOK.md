@@ -37,6 +37,9 @@ Optional (external integrations):
 - `NYX_0X_API_KEY` → enables `GET /integrations/v1/0x/quote`.
 - `NYX_JUPITER_API_KEY` → enables `GET /integrations/v1/jupiter/quote`.
 - `NYX_MAGIC_EDEN_API_KEY` → optional (public endpoints work without it; key can improve rate limits).
+- Magic Eden EVM endpoints:
+  - `GET /integrations/v1/magic_eden/evm/collections/search`
+  - `GET /integrations/v1/magic_eden/evm/collections`
 - Key inventory + replacement checklist: `PUBLIC_KEYS_AND_REPLACEMENTS.md`.
 
 Health check:

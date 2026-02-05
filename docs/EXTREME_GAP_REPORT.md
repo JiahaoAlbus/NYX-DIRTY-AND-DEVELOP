@@ -110,10 +110,12 @@ Legend:
 |---|---|---:|---:|---:|---|
 | 0x Quote (EVM) | `GET /integrations/v1/0x/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_0X_API_KEY` is set (`integrations.0x_quote`). |
 | Jupiter Quote (Solana) | `GET /integrations/v1/jupiter/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_JUPITER_API_KEY` is set (`integrations.jupiter_quote`). |
-| Magic Eden collections (Solana) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | 🟡 Limited | Public endpoint; optional `NYX_MAGIC_EDEN_API_KEY` header improves rate limits (`integrations.magic_eden_solana`). |
-| Magic Eden listings (Solana) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | 🟡 Limited | Requires `symbol` + pagination; public endpoint, optional API key. |
-| Magic Eden token (Solana) | `GET /integrations/v1/magic_eden/solana/token` | No | No | 🟡 Limited | Requires `mint`; public endpoint, optional API key. |
-| Magic Eden (EVM) / PayEVM | N/A | N/A | N/A | 🔴 Disabled | EVM integration endpoints not shipped; PayEVM not implemented (NO FAKE UI). |
+| Magic Eden collections (Solana) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | 🟡 Limited | Auth required; public upstream endpoint with optional `NYX_MAGIC_EDEN_API_KEY` for rate limits (`integrations.magic_eden_solana`). |
+| Magic Eden listings (Solana) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | 🟡 Limited | Auth required; requires `symbol` + pagination; upstream endpoint is public with optional API key. |
+| Magic Eden token (Solana) | `GET /integrations/v1/magic_eden/solana/token` | No | No | 🟡 Limited | Auth required; requires `mint`; upstream endpoint is public with optional API key. |
+| Magic Eden collections search (EVM) | `GET /integrations/v1/magic_eden/evm/collections/search` | No | No | 🟡 Limited | Auth required; `chain` + `pattern` (optional `limit/offset`). |
+| Magic Eden collections (EVM) | `GET /integrations/v1/magic_eden/evm/collections` | No | No | 🟡 Limited | Auth required; `chain` + `collection_slugs` or `collection_ids`. |
+| PayEVM | N/A | N/A | N/A | 🔴 Disabled | PayEVM not implemented (NO FAKE UI); requires official endpoint + webhook verification. |
 
 ### J) Web2 Guard
 

@@ -56,8 +56,10 @@ Backend declares (example):
 | dApp | Browser | Home card → `nyx-world/screens/DappBrowser.tsx` | N/A (client-side) | No | No | OK | Capability-enabled (`dapp.browser = enabled`). Opens in new tab by default; optional iframe embed may be blocked by CSP/XFO. |
 | Integrations | 0x quote (EVM) | (no UI yet) | `GET /integrations/v1/0x/quote` | No | No | Limited | Auth required; enabled only when `integrations.0x_quote` is not disabled. |
 | Integrations | Jupiter quote (Solana) | (no UI yet) | `GET /integrations/v1/jupiter/quote` | No | No | Limited | Auth required; enabled only when `integrations.jupiter_quote` is not disabled. |
-| Integrations | Magic Eden collections (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | Limited | Public endpoint; optional API key for rate limits. |
-| Integrations | Magic Eden listings (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | Limited | Requires `symbol` + pagination; public endpoint, optional API key. |
-| Integrations | Magic Eden token (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/token` | No | No | Limited | Requires `mint`; public endpoint, optional API key. |
+| Integrations | Magic Eden collections (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | Limited | Auth required; public upstream endpoint with optional API key for rate limits. |
+| Integrations | Magic Eden listings (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | Limited | Auth required; requires `symbol` + pagination; upstream endpoint is public with optional API key. |
+| Integrations | Magic Eden token (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/token` | No | No | Limited | Auth required; requires `mint`; upstream endpoint is public with optional API key. |
+| Integrations | Magic Eden collections search (EVM) | (no UI yet) | `GET /integrations/v1/magic_eden/evm/collections/search` | No | No | Limited | Auth required; requires `chain` + `pattern` (optional `limit/offset`). |
+| Integrations | Magic Eden collections (EVM) | (no UI yet) | `GET /integrations/v1/magic_eden/evm/collections` | No | No | Limited | Auth required; requires `chain` + `collection_slugs` or `collection_ids`. |
 | Web2 | Guard | Home card → Web2 Guard | `GET /web2/v1/allowlist`, `POST /web2/v1/request`, `GET /web2/v1/requests` | Yes (request) | Yes | OK | Allowlisted HTTPS only; response hash captured in evidence; secrets stored as ciphertext. |
 | Fiat | On-ramp | (not exposed) | N/A | N/A | N/A | Disabled | No provider integration; screen is not part of the primary flow. |
