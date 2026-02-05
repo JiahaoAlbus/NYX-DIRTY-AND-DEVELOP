@@ -106,3 +106,14 @@ bash scripts/build_release_artifacts.sh
 ```
 
 Outputs are written under `release_artifacts/` (web zip, backend tarball, extension zip, iOS `.app`, proof tarballs, checksums).
+
+## 6) Monitoring + Backup (free tier)
+
+```bash
+python scripts/nyx_monitor_local.py
+export NYX_BACKUP_PASSPHRASE="your-strong-passphrase"
+bash scripts/nyx_backup_encrypted.sh
+```
+
+Docs:
+- `docs/OPS_RUNBOOK_FREE_TIER.md`
