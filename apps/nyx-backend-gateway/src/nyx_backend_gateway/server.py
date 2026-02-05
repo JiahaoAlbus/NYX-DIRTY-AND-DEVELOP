@@ -63,13 +63,12 @@ def _capabilities() -> dict[str, object]:
     from nyx_backend_gateway.env import (
         get_0x_api_key,
         get_jupiter_api_key,
-        get_magic_eden_api_key,
     )
 
     integration_features = {
         "0x_quote": "enabled" if get_0x_api_key() else "disabled_missing_api_key",
         "jupiter_quote": "enabled" if get_jupiter_api_key() else "disabled_missing_api_key",
-        "magic_eden_solana": "enabled" if get_magic_eden_api_key() else "disabled_missing_api_key",
+        "magic_eden_solana": "enabled",
         # EVM Magic Eden and PayEVM are not shipped yet (NO FAKE UI).
         "magic_eden_evm": "disabled_not_implemented",
         "payevm": "disabled_not_implemented",

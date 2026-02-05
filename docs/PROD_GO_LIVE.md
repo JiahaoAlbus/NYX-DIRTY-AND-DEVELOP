@@ -3,7 +3,7 @@
 This document defines **non‑negotiable** production requirements for a mainnet‑equivalent launch. Testnet releases may run with reduced scope, but **production must satisfy every item** below.
 
 ## 1) Key Replacement + Secrets Management
-- **MUST** replace all dev/test keys listed in `docs/PUBLIC_KEYS_AND_REPLACEMENTS.md`.
+- **MUST** replace all dev/test keys listed in `PUBLIC_KEYS_AND_REPLACEMENTS.md`.
 - **MUST** store keys in a secrets manager (CI/CD or cloud KMS) with least‑privilege access.
 - **MUST** rotate keys before launch and on every security incident.
 - **MUST NOT** commit production keys to git, CI logs, or client bundles.
@@ -73,4 +73,4 @@ This document defines **non‑negotiable** production requirements for a mainnet
 
 ### Sign‑off (Draft)
 - Owner: **Huangjiahao**
-- Date: **2026‑02‑04**
+- Date: **2026‑02‑05**

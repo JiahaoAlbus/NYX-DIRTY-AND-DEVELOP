@@ -233,13 +233,8 @@ else
     || die "capabilities: integrations.jupiter_quote should be disabled when NYX_JUPITER_API_KEY is not set"
 fi
 
-if [[ -n "${NYX_MAGIC_EDEN_API_KEY:-}" ]]; then
-  jq -e '.module_features.integrations.magic_eden_solana | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
-    || die "capabilities: integrations.magic_eden_solana should be enabled when NYX_MAGIC_EDEN_API_KEY is set"
-else
-  jq -e '.module_features.integrations.magic_eden_solana | tostring | test("^disabled")' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
-    || die "capabilities: integrations.magic_eden_solana should be disabled when NYX_MAGIC_EDEN_API_KEY is not set"
-fi
+jq -e '.module_features.integrations.magic_eden_solana | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
+  || die "capabilities: integrations.magic_eden_solana should be enabled"
 
 log "Seed=$SEED"
 log "Run prefix=$RUN_ID_BASE"
@@ -404,36 +399,32 @@ else
   log "Integration: Jupiter quote skipped (NYX_JUPITER_API_KEY not set)"
 fi
 
-if [[ -n "${NYX_MAGIC_EDEN_API_KEY:-}" ]]; then
-  log "Integration: Magic Eden Solana collections"
-  curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collections?limit=1" \
-    "$TOKEN_A" "$evidence_dir/integration_magic_eden_collections.json" 200 || die "magic eden collections failed"
-  jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_collections.json" >/dev/null 2>&1 \
-    || die "magic eden collections response invalid"
+log "Integration: Magic Eden Solana collections"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collections?limit=20&offset=0" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_collections.json" 200 || die "magic eden collections failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_collections.json" >/dev/null 2>&1 \
+  || die "magic eden collections response invalid"
 
-  symbol="$(jq -r '.data[0].symbol // empty' "$evidence_dir/integration_magic_eden_collections.json" 2>/dev/null || true)"
-  if [[ -z "$symbol" ]]; then
-    die "magic eden collections missing symbol"
-  fi
+symbol="$(jq -r '.data[0].symbol // empty' "$evidence_dir/integration_magic_eden_collections.json" 2>/dev/null || true)"
+if [[ -z "$symbol" ]]; then
+  die "magic eden collections missing symbol"
+fi
 
-  log "Integration: Magic Eden Solana listings ($symbol)"
-  curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collection_listings?symbol=$symbol&limit=1" \
-    "$TOKEN_A" "$evidence_dir/integration_magic_eden_listings.json" 200 || die "magic eden listings failed"
-  jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_listings.json" >/dev/null 2>&1 \
-    || die "magic eden listings response invalid"
+log "Integration: Magic Eden Solana listings ($symbol)"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collection_listings?symbol=$symbol&limit=20&offset=0" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_listings.json" 200 || die "magic eden listings failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_listings.json" >/dev/null 2>&1 \
+  || die "magic eden listings response invalid"
 
-  mint="$(jq -r '.data[0].tokenMint // .data[0].mint // empty' "$evidence_dir/integration_magic_eden_listings.json" 2>/dev/null || true)"
-  if [[ -n "$mint" ]]; then
-    log "Integration: Magic Eden Solana token ($mint)"
-    curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/token?mint=$mint" \
-      "$TOKEN_A" "$evidence_dir/integration_magic_eden_token.json" 200 || die "magic eden token failed"
-    jq -e '.provider=="magic_eden" and .status==200' "$evidence_dir/integration_magic_eden_token.json" >/dev/null 2>&1 \
-      || die "magic eden token response invalid"
-  else
-    log "Integration: Magic Eden token skipped (mint not found)"
-  fi
+mint="$(jq -r '.data[0].tokenMint // .data[0].mint // empty' "$evidence_dir/integration_magic_eden_listings.json" 2>/dev/null || true)"
+if [[ -n "$mint" ]]; then
+  log "Integration: Magic Eden Solana token ($mint)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/token?mint=$mint" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_token.json" 200 || die "magic eden token failed"
+  jq -e '.provider=="magic_eden" and .status==200' "$evidence_dir/integration_magic_eden_token.json" >/dev/null 2>&1 \
+    || die "magic eden token response invalid"
 else
-  log "Integration: Magic Eden skipped (NYX_MAGIC_EDEN_API_KEY not set)"
+  log "Integration: Magic Eden token skipped (mint not found)"
 fi
 
 # -------------------------------------------------------------------

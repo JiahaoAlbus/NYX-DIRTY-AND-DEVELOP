@@ -66,9 +66,9 @@ This document lists all available backend endpoints, their methods, schemas, and
 | :--- | :--- | :--- | :--- | :--- |
 | `/integrations/v1/0x/quote` | GET | 0x swap quote | No | Yes |
 | `/integrations/v1/jupiter/quote` | GET | Jupiter swap quote | No | Yes |
-| `/integrations/v1/magic_eden/solana/collections` | GET | Magic Eden Solana collections | No | Yes |
-| `/integrations/v1/magic_eden/solana/collection_listings` | GET | Magic Eden Solana collection listings | No | Yes |
-| `/integrations/v1/magic_eden/solana/token` | GET | Magic Eden Solana token detail | No | Yes |
+| `/integrations/v1/magic_eden/solana/collections` | GET | Magic Eden Solana collections (public; optional API key header) | No | No |
+| `/integrations/v1/magic_eden/solana/collection_listings` | GET | Magic Eden Solana collection listings (public; optional API key header) | No | No |
+| `/integrations/v1/magic_eden/solana/token` | GET | Magic Eden Solana token detail (public; optional API key header) | No | No |
 
 ## Chat Module
 

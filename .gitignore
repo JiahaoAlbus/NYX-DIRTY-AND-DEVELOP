@@ -39,6 +39,7 @@ apps/nyx-ios/NYXPortal.xcodeproj/project.xcworkspace/
 apps/nyx-ios/NYXPortal.xcodeproj/xcuserdata/
 apps/nyx-backend-gateway/data/
 apps/nyx-backend-gateway/runs/
+build_ios/
 
 # --- NYX dirty repo ignores ---
 .env

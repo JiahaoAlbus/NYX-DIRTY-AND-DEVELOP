@@ -337,13 +337,13 @@ def quote_jupiter(
 
 def _magic_eden_headers() -> dict[str, str]:
     api_key = get_magic_eden_api_key()
-    if not api_key:
-        raise GatewayApiError("INTEGRATION_DISABLED", "magic eden integration disabled (missing api key)", http_status=503)
-    return {
+    headers = {
         "accept": "application/json",
-        "authorization": api_key,
         "user-agent": "NYXGateway/2.0",
     }
+    if api_key:
+        headers["authorization"] = api_key
+    return headers
 
 
 def magic_eden_solana_collections(*, limit: int | None, offset: int | None) -> dict[str, Any]:
