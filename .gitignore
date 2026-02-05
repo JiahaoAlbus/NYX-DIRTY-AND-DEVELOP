@@ -11,6 +11,7 @@ Thumbs.db
 cswdz.env
 .env
 *.env
+.env.local
 docs/evidence/fundraising/latest/
 # Local IDEs
 .idea/
@@ -38,6 +39,7 @@ apps/nyx-ios/NYXPortal.xcodeproj/project.xcworkspace/
 apps/nyx-ios/NYXPortal.xcodeproj/xcuserdata/
 apps/nyx-backend-gateway/data/
 apps/nyx-backend-gateway/runs/
+build_ios/
 
 # --- NYX dirty repo ignores ---
 .env
@@ -64,4 +66,3 @@ docs/evidence/
 release_artifacts/
 nyx_proof_package_*.zip
 nyx-testnet-proof-*.tar.gz
-

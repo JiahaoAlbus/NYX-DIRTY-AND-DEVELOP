@@ -68,8 +68,9 @@ def _capabilities() -> dict[str, object]:
     integration_features = {
         "0x_quote": "enabled" if get_0x_api_key() else "disabled_missing_api_key",
         "jupiter_quote": "enabled" if get_jupiter_api_key() else "disabled_missing_api_key",
-        # Keys are tracked, but endpoints/UI are not shipped yet (NO FAKE UI).
-        "magic_eden": "disabled_not_implemented",
+        "magic_eden_solana": "enabled",
+        "magic_eden_evm": "enabled",
+        # PayEVM is not shipped yet (NO FAKE UI).
         "payevm": "disabled_not_implemented",
     }
     module_features = {
@@ -79,8 +80,7 @@ def _capabilities() -> dict[str, object]:
         "marketplace": {"listing": "enabled", "purchase": "enabled"},
         "chat": {"e2ee": "verified", "dm": "enabled"},
         "dapp": {"browser": "enabled"},
-        # Web2 Guard stays disabled until it is fully wired to real backends (NO FAKE UI).
-        "web2": {"guard": "disabled"},
+        "web2": {"guard": "enabled"},
         "integrations": integration_features,
     }
     return {
@@ -110,6 +110,14 @@ def _capabilities() -> dict[str, object]:
             "/chat/messages",
             "/integrations/v1/0x/quote",
             "/integrations/v1/jupiter/quote",
+            "/integrations/v1/magic_eden/solana/collections",
+            "/integrations/v1/magic_eden/solana/collection_listings",
+            "/integrations/v1/magic_eden/solana/token",
+            "/integrations/v1/magic_eden/evm/collections/search",
+            "/integrations/v1/magic_eden/evm/collections",
+            "/web2/v1/allowlist",
+            "/web2/v1/request",
+            "/web2/v1/requests",
             "/evidence",
             "/evidence/v1/replay",
             "/export.zip",
@@ -803,6 +811,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     response.update(_fee_summary("marketplace", "purchase_listing", purchase_payload, result.run_id))
                 self._send_json(response)
                 return
+            if self.path == "/web2/v1/request":
+                session = self._require_auth()
+                payload = self._parse_body()
+                seed = self._require_seed(payload)
+                run_id = self._require_run_id(payload)
+                web2_payload = payload.get("payload")
+                if web2_payload is None:
+                    web2_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                if not isinstance(web2_payload, dict):
+                    raise GatewayError("payload must be object")
+                response = gateway.execute_web2_guard_request(
+                    seed=seed,
+                    run_id=run_id,
+                    payload=web2_payload,
+                    account_id=session.account_id,
+                )
+                self._send_json(response)
+                return
             if self.path == "/entertainment/step":
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
@@ -880,6 +906,28 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/capabilities":
             self._send_json(_capabilities())
+            return
+        if path == "/web2/v1/allowlist":
+            self._send_json({"allowlist": gateway.list_web2_allowlist()})
+            return
+        if path == "/web2/v1/requests":
+            try:
+                session = self._require_auth()
+                limit_raw = (query.get("limit") or ["50"])[0]
+                offset_raw = (query.get("offset") or ["0"])[0]
+                try:
+                    limit = int(limit_raw)
+                    offset = int(offset_raw)
+                except ValueError:
+                    raise GatewayError("limit or offset invalid")
+                rows = gateway.fetch_web2_guard_requests(
+                    account_id=session.account_id,
+                    limit=limit,
+                    offset=offset,
+                )
+                self._send_json({"requests": rows, "limit": limit, "offset": offset})
+            except (GatewayError, GatewayApiError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
         if path == "/portal/v1/me":
             try:
@@ -1453,6 +1501,81 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     slippage_bps=slippage_bps,
                     swap_mode=swap_mode,
                 )
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/collections":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_collections
+
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_solana_collections(limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/collection_listings":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_collection_listings
+
+                symbol = (query.get("symbol") or [""])[0]
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_solana_collection_listings(symbol=symbol, limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/token":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_token
+
+                mint = (query.get("mint") or [""])[0]
+                result = magic_eden_solana_token(mint=mint)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/evm/collections/search":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_evm_search_collections
+
+                chain = (query.get("chain") or [""])[0]
+                pattern = (query.get("pattern") or [""])[0]
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_evm_search_collections(chain=chain, pattern=pattern, limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/evm/collections":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_evm_collections, _split_csv
+
+                chain = (query.get("chain") or [""])[0]
+                slugs_raw = (query.get("collection_slugs") or [""])[0]
+                ids_raw = (query.get("collection_ids") or [""])[0]
+                slugs = _split_csv(slugs_raw, name="collection_slugs", max_items=50)
+                ids = _split_csv(ids_raw, name="collection_ids", max_items=50)
+
+                result = magic_eden_evm_collections(chain=chain, collection_slugs=slugs, collection_ids=ids)
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)

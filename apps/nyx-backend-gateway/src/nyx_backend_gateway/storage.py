@@ -49,6 +49,37 @@ def _validate_wallet_address(value: object, name: str = "address") -> str:
     return _validate_text(value, name, r"[A-Za-z0-9_-]{1,64}")
 
 
+def _validate_url_text(value: object, name: str = "url", max_len: int = 512) -> str:
+    if not isinstance(value, str) or not value or isinstance(value, bool):
+        raise StorageError(f"{name} required")
+    if len(value) > max_len:
+        raise StorageError(f"{name} too long")
+    if not re.fullmatch(r"[A-Za-z0-9:/?&=._%+-]{1,512}", value):
+        raise StorageError(f"{name} invalid")
+    return value
+
+
+def _validate_hash(value: object, name: str = "hash") -> str:
+    if not isinstance(value, str) or not value or isinstance(value, bool):
+        raise StorageError(f"{name} required")
+    if not re.fullmatch(r"[A-Fa-f0-9]{64}", value):
+        raise StorageError(f"{name} invalid")
+    return value
+
+
+def _validate_header_names(value: object) -> list[str]:
+    if not isinstance(value, list):
+        raise StorageError("header_names required")
+    out: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item or isinstance(item, bool):
+            raise StorageError("header_names invalid")
+        if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", item):
+            raise StorageError("header_names invalid")
+        out.append(item)
+    return out
+
+
 @dataclass(frozen=True)
 class EvidenceRun:
     run_id: str
@@ -213,6 +244,24 @@ class WalletTransfer:
     fee_total: int
     treasury_address: str
     run_id: str
+
+
+@dataclass(frozen=True)
+class Web2GuardRequest:
+    request_id: str
+    account_id: str
+    run_id: str
+    url: str
+    method: str
+    request_hash: str
+    response_hash: str
+    response_status: int
+    response_size: int
+    response_truncated: bool
+    body_size: int
+    header_names: list[str]
+    sealed_request: str | None
+    created_at: int
 
 
 @dataclass(frozen=True)
@@ -766,6 +815,51 @@ def insert_wallet_transfer(conn: sqlite3.Connection, transfer: WalletTransfer) -
     )
 
 
+def insert_web2_guard_request(conn: sqlite3.Connection, request: Web2GuardRequest) -> None:
+    request_id = _validate_text(request.request_id, "request_id")
+    account_id = _validate_wallet_address(request.account_id, "account_id")
+    run_id = _validate_text(request.run_id, "run_id")
+    url = _validate_url_text(request.url, "url")
+    method = _validate_text(request.method, "method", r"(GET|POST)")
+    request_hash = _validate_hash(request.request_hash, "request_hash")
+    response_hash = _validate_hash(request.response_hash, "response_hash")
+    response_status = _validate_int(request.response_status, "response_status", 0, 999)
+    response_size = _validate_int(request.response_size, "response_size", 0, 5_000_000)
+    body_size = _validate_int(request.body_size, "body_size", 0, 5_000_000)
+    response_truncated = 1 if request.response_truncated else 0
+    header_names = _validate_header_names(request.header_names)
+    header_json = json.dumps(header_names, sort_keys=True, separators=(",", ":"))
+    sealed_request = request.sealed_request
+    if sealed_request is not None:
+        if not isinstance(sealed_request, str) or isinstance(sealed_request, bool):
+            raise StorageError("sealed_request invalid")
+        if len(sealed_request) > 4096:
+            raise StorageError("sealed_request too long")
+    created_at = _validate_int(request.created_at, "created_at", 1)
+    conn.execute(
+        "INSERT OR REPLACE INTO web2_guard_requests "
+        "(request_id, account_id, run_id, url, method, request_hash, response_hash, response_status, response_size, response_truncated, body_size, header_names, sealed_request, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            request_id,
+            account_id,
+            run_id,
+            url,
+            method,
+            request_hash,
+            response_hash,
+            response_status,
+            response_size,
+            response_truncated,
+            body_size,
+            header_json,
+            sealed_request,
+            created_at,
+        ),
+    )
+    conn.commit()
+
+
 def insert_faucet_claim(conn: sqlite3.Connection, claim: FaucetClaim) -> None:
     claim_id = _validate_text(claim.claim_id, "claim_id")
     account_id = _validate_wallet_address(claim.account_id, "account_id")
@@ -925,6 +1019,35 @@ def apply_wallet_faucet_with_fee(
     return {"balance": new_balance, "treasury_balance": new_treasury}
 
 
+def list_web2_guard_requests(
+    conn: sqlite3.Connection,
+    *,
+    account_id: str,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict[str, object]]:
+    acct = _validate_wallet_address(account_id, "account_id")
+    lim = _validate_int(limit, "limit", 1, 500)
+    off = _validate_int(offset, "offset", 0)
+    rows = conn.execute(
+        "SELECT * FROM web2_guard_requests WHERE account_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (acct, lim, off),
+    ).fetchall()
+    output: list[dict[str, object]] = []
+    for row in rows:
+        record = {col: row[col] for col in row.keys()}
+        raw_headers = record.get("header_names") or "[]"
+        try:
+            record["header_names"] = json.loads(raw_headers)
+        except Exception:
+            record["header_names"] = []
+        record["response_truncated"] = bool(record.get("response_truncated"))
+        record["sealed_request_present"] = bool(record.get("sealed_request"))
+        record.pop("sealed_request", None)
+        output.append(record)
+    return output
+
+
 def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> dict[str, object] | None:
     if table not in {
         "evidence_runs",
@@ -937,6 +1060,7 @@ def load_by_id(conn: sqlite3.Connection, table: str, key: str, value: str) -> di
         "entertainment_events",
         "receipts",
         "fee_ledger",
+        "web2_guard_requests",
     }:
         raise StorageError("table not allowed")
     key_name = _validate_text(key, "key", r"[A-Za-z0-9_]{1,32}")

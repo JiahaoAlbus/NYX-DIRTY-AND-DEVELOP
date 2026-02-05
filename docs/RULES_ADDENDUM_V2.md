@@ -16,3 +16,13 @@ This addendum introduces auxiliary rules for the Testnet Portal v1 implementatio
 ## **NX-V2-4: Extension Security**
 - The browser extension MUST use WebCrypto for all cryptographic operations.
 - Private keys MUST be stored in encrypted form within the browser's secure storage.
+
+## **NX-V2-5: Production Key Hygiene**
+- Public/shared API keys MUST NOT be used in production.
+- Production keys MUST be stored in a secrets manager with least privilege access.
+- Production keys MUST be rotated before launch and on security incidents.
+
+## **NX-V2-6: Operational Safety (Mainnet)**
+- Production deployments MUST implement monitoring + alerting for API, DB, and wallet operations.
+- Production deployments MUST implement backup + restore procedures with defined RPO/RTO targets.
+- Production deployments MUST redact secrets and sensitive data from logs.

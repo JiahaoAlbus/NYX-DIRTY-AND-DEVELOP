@@ -45,6 +45,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$ENV_FILE" == ".env.example" && -f ".env.local" ]]; then
+  ENV_FILE=".env.local"
+fi
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
 if ! [[ "$SEED" =~ ^[0-9]+$ ]]; then
   echo "seed must be a non-negative integer" >&2
   exit 2
@@ -156,6 +167,10 @@ ensure_backend() {
   # Relax faucet IP limits for repeatable local verification runs.
   # Per-account limits and cooldown remain enforced unless overridden externally.
   export NYX_FAUCET_IP_MAX_CLAIMS_PER_24H="${NYX_FAUCET_IP_MAX_CLAIMS_PER_24H:-10000}"
+  export NYX_FAUCET_MAX_AMOUNT_PER_24H="${NYX_FAUCET_MAX_AMOUNT_PER_24H:-10000}"
+  export NYX_FAUCET_MAX_CLAIMS_PER_24H="${NYX_FAUCET_MAX_CLAIMS_PER_24H:-3}"
+  export NYX_GATEWAY_DB_PATH="${NYX_GATEWAY_DB_PATH:-$evidence_root/gateway.db}"
+  rm -f "$NYX_GATEWAY_DB_PATH" >/dev/null 2>&1 || true
 
   local host port
   host="$(python - <<PY
@@ -198,8 +213,8 @@ curl_get_json "$BASE_URL/version" "" "$evidence_dir/version.json" 200 || true
 if ! jq -e '.module_features.dapp.browser | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
   die "capabilities: dapp.browser must be enabled"
 fi
-if ! jq -e '.module_features.web2.guard | tostring | test("^disabled")' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
-  die "capabilities: web2.guard must remain disabled unless fully wired"
+if ! jq -e '.module_features.web2.guard | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1; then
+  die "capabilities: web2.guard must be enabled"
 fi
 
 if [[ -n "${NYX_0X_API_KEY:-}" ]]; then
@@ -217,6 +232,12 @@ else
   jq -e '.module_features.integrations.jupiter_quote | tostring | test("^disabled")' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
     || die "capabilities: integrations.jupiter_quote should be disabled when NYX_JUPITER_API_KEY is not set"
 fi
+
+jq -e '.module_features.integrations.magic_eden_solana | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
+  || die "capabilities: integrations.magic_eden_solana should be enabled"
+
+jq -e '.module_features.integrations.magic_eden_evm | tostring | test("^disabled") | not' "$evidence_dir/capabilities.json" >/dev/null 2>&1 \
+  || die "capabilities: integrations.magic_eden_evm should be enabled"
 
 log "Seed=$SEED"
 log "Run prefix=$RUN_ID_BASE"
@@ -381,6 +402,56 @@ else
   log "Integration: Jupiter quote skipped (NYX_JUPITER_API_KEY not set)"
 fi
 
+log "Integration: Magic Eden Solana collections"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collections?limit=20&offset=0" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_collections.json" 200 || die "magic eden collections failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_collections.json" >/dev/null 2>&1 \
+  || die "magic eden collections response invalid"
+
+symbol="$(jq -r '.data[0].symbol // empty' "$evidence_dir/integration_magic_eden_collections.json" 2>/dev/null || true)"
+if [[ -z "$symbol" ]]; then
+  die "magic eden collections missing symbol"
+fi
+
+log "Integration: Magic Eden Solana listings ($symbol)"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/collection_listings?symbol=$symbol&limit=20&offset=0" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_listings.json" 200 || die "magic eden listings failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data|type=="array")' "$evidence_dir/integration_magic_eden_listings.json" >/dev/null 2>&1 \
+  || die "magic eden listings response invalid"
+
+mint="$(jq -r '.data[0].tokenMint // .data[0].mint // empty' "$evidence_dir/integration_magic_eden_listings.json" 2>/dev/null || true)"
+if [[ -n "$mint" ]]; then
+  log "Integration: Magic Eden Solana token ($mint)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/solana/token?mint=$mint" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_token.json" 200 || die "magic eden token failed"
+  jq -e '.provider=="magic_eden" and .status==200' "$evidence_dir/integration_magic_eden_token.json" >/dev/null 2>&1 \
+    || die "magic eden token response invalid"
+else
+  log "Integration: Magic Eden token skipped (mint not found)"
+fi
+
+log "Integration: Magic Eden EVM collections search"
+curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections/search?chain=ethereum&pattern=azuki&limit=1" \
+  "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_search.json" 200 || die "magic eden evm search failed"
+jq -e '.provider=="magic_eden" and .status==200 and (.data.collections|type=="array")' "$evidence_dir/integration_magic_eden_evm_search.json" >/dev/null 2>&1 \
+  || die "magic eden evm search response invalid"
+
+evm_slug="$(jq -r '.data.collections[0].symbol // .data.collections[0].slug // empty' "$evidence_dir/integration_magic_eden_evm_search.json" 2>/dev/null || true)"
+evm_id="$(jq -r '.data.collections[0].id // empty' "$evidence_dir/integration_magic_eden_evm_search.json" 2>/dev/null || true)"
+if [[ -n "$evm_slug" ]]; then
+  log "Integration: Magic Eden EVM collections (slug=$evm_slug)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections?chain=ethereum&collection_slugs=$evm_slug" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_collections.json" 200 || die "magic eden evm collections failed"
+elif [[ -n "$evm_id" ]]; then
+  log "Integration: Magic Eden EVM collections (id=$evm_id)"
+  curl_get_json "$BASE_URL/integrations/v1/magic_eden/evm/collections?chain=ethereum&collection_ids=$evm_id" \
+    "$TOKEN_A" "$evidence_dir/integration_magic_eden_evm_collections.json" 200 || die "magic eden evm collections failed"
+else
+  die "magic eden evm collections missing slug/id"
+fi
+jq -e '.provider=="magic_eden" and .status==200 and (.data.collections|type=="array")' "$evidence_dir/integration_magic_eden_evm_collections.json" >/dev/null 2>&1 \
+  || die "magic eden evm collections response invalid"
+
 # -------------------------------------------------------------------
 # Mutations (Wallet/Exchange/Store/Chat/Airdrop) + Evidence Replay
 # -------------------------------------------------------------------
@@ -398,7 +469,7 @@ PY
 
 # Faucet limits are enforced server-side; by default each account can faucet once per 24h.
 next_run_id "wallet-faucet-a-nyxt"; FAUCET_A_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:1000,asset_id:"NYXT"}}')"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
 curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$TOKEN_A" "$body" "$evidence_dir/A_faucet.json" "200,429" || die "wallet faucet (A) failed"
 if jq -e '.status=="complete"' "$evidence_dir/A_faucet.json" >/dev/null 2>&1; then
   RUN_IDS+=("$FAUCET_A_RUN")
@@ -418,6 +489,17 @@ fi
 
 ADDR="$ACCOUNT_A" wallet_balances "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" || die "balances (A) failed"
 ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balances_1.json" || die "balances (B) failed"
+
+log "Web2 Guard allowlist"
+curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
+
+next_run_id "web2-guard-a"; WEB2_RUN="$NEXT_RUN_ID"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "https://httpbin.org/get" \
+  '{seed:$seed,run_id:$run_id,payload:{url:$url,method:"GET"}}')"
+curl_json "POST" "$BASE_URL/web2/v1/request" "$TOKEN_A" "$body" "$evidence_dir/A_web2_guard.json" 200 || die "web2 guard request failed"
+jq -e '.request_hash and .response_hash' "$evidence_dir/A_web2_guard.json" >/dev/null 2>&1 \
+  || die "web2 guard response invalid"
+RUN_IDS+=("$WEB2_RUN")
 
 next_run_id "wallet-transfer-a-to-b"; TRANSFER_RUN="$NEXT_RUN_ID"
 body="$(jq -n --argjson seed "$SEED" --arg run_id "$TRANSFER_RUN" --arg from "$ACCOUNT_A" --arg to "$ACCOUNT_B" \
@@ -603,6 +685,24 @@ summary_md="$evidence_root/SUMMARY.md"
     echo "- Jupiter quote: status=${s:-unknown} (\`$evidence_dir/integration_jupiter_quote.json\`)"
   else
     echo "- Jupiter quote: skipped"
+  fi
+  if [[ -f "$evidence_dir/integration_magic_eden_collections.json" ]]; then
+    s="$(jq -r '.status // empty' "$evidence_dir/integration_magic_eden_collections.json" 2>/dev/null || true)"
+    echo "- Magic Eden collections: status=${s:-unknown} (\`$evidence_dir/integration_magic_eden_collections.json\`)"
+  else
+    echo "- Magic Eden collections: skipped"
+  fi
+  if [[ -f "$evidence_dir/integration_magic_eden_listings.json" ]]; then
+    s="$(jq -r '.status // empty' "$evidence_dir/integration_magic_eden_listings.json" 2>/dev/null || true)"
+    echo "- Magic Eden listings: status=${s:-unknown} (\`$evidence_dir/integration_magic_eden_listings.json\`)"
+  else
+    echo "- Magic Eden listings: skipped"
+  fi
+  if [[ -f "$evidence_dir/integration_magic_eden_token.json" ]]; then
+    s="$(jq -r '.status // empty' "$evidence_dir/integration_magic_eden_token.json" 2>/dev/null || true)"
+    echo "- Magic Eden token: status=${s:-unknown} (\`$evidence_dir/integration_magic_eden_token.json\`)"
+  else
+    echo "- Magic Eden token: skipped"
   fi
   echo
   echo "## Runs (state mutations)"

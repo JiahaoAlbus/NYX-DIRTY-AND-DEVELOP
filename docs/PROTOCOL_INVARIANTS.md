@@ -78,3 +78,12 @@ Current web algorithm (v1):
   - The upstream response (or its hash + full response stored as an evidence artifact) MUST be included in the evidence bundle.
   - The evidence inputs MUST include provider name + canonical request parameters used to obtain the quote.
 - API keys MUST be provided via environment/deployment secrets and MUST NOT be committed into git.
+
+## 9) Web2 Guard invariants
+
+- Web2 Guard MUST accept only allowlisted HTTPS hosts + path prefixes.
+- Web2 Guard MUST reject IP literals, custom ports, and userinfo in URLs.
+- Web2 Guard MUST cap request bodies and response bytes; truncation MUST be flagged in metadata.
+- Web2 Guard MUST store only request/response hashes and ciphertext for secrets (when provided); plaintext secrets MUST NOT be stored.
+- Every Web2 Guard request MUST generate evidence with `request_hash`, `response_hash`, `response_status`, and `response_truncated`.
+- Web2 Guard MUST charge a non-zero fee routed to treasury and MUST fail with a clear error when balance is insufficient.

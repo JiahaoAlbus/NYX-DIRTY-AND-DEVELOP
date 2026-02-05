@@ -110,11 +110,23 @@ Legend:
 |---|---|---:|---:|---:|---|
 | 0x Quote (EVM) | `GET /integrations/v1/0x/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_0X_API_KEY` is set (`integrations.0x_quote`). |
 | Jupiter Quote (Solana) | `GET /integrations/v1/jupiter/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_JUPITER_API_KEY` is set (`integrations.jupiter_quote`). |
-| Magic Eden / PayEVM | N/A | N/A | N/A | 🔴 Disabled | Keys tracked for prod readiness, but endpoints/UI are not shipped yet (NO FAKE UI). |
+| Magic Eden collections (Solana) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | 🟡 Limited | Auth required; public upstream endpoint with optional `NYX_MAGIC_EDEN_API_KEY` for rate limits (`integrations.magic_eden_solana`). |
+| Magic Eden listings (Solana) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | 🟡 Limited | Auth required; requires `symbol` + pagination; upstream endpoint is public with optional API key. |
+| Magic Eden token (Solana) | `GET /integrations/v1/magic_eden/solana/token` | No | No | 🟡 Limited | Auth required; requires `mint`; upstream endpoint is public with optional API key. |
+| Magic Eden collections search (EVM) | `GET /integrations/v1/magic_eden/evm/collections/search` | No | No | 🟡 Limited | Auth required; `chain` + `pattern` (optional `limit/offset`). |
+| Magic Eden collections (EVM) | `GET /integrations/v1/magic_eden/evm/collections` | No | No | 🟡 Limited | Auth required; `chain` + `collection_slugs` or `collection_ids`. |
+| PayEVM | N/A | N/A | N/A | 🔴 Disabled | PayEVM not implemented (NO FAKE UI); requires official endpoint + webhook verification. |
+
+### J) Web2 Guard
+
+| UI Entry | Backend endpoint | MutatesState | Evidence | Status | Notes |
+|---|---|---:|---:|---:|---|
+| Web2 Guard | `GET /web2/v1/allowlist` | No | N/A | 🟢 | Allowlisted public Web2 endpoints. |
+| Web2 Guard request | `POST /web2/v1/request` | Yes | Yes | 🟢 | Deterministic evidence includes request/response hashes + fee routing. |
+| Web2 Guard history | `GET /web2/v1/requests` | No | N/A | 🟢 | Paginated request history per account. |
 
 ## Remaining disabled features (by design)
 
 | Module | Capability | Status | Reason |
 |---|---|---:|---|
-| Web2 Guard | `web2.guard` | 🔴 Disabled | Out of scope for testnet v1; requires deterministic signing/policy system. |
 | Fiat on-ramp | (no capability in backend) | 🔴 Disabled | No provider integration in this repo; not exposed as a primary flow. |

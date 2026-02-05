@@ -33,8 +33,14 @@ python -m nyx_backend_gateway.server --host 127.0.0.1 --port 8091 --env-file .en
 ```
 
 Optional (external integrations):
-- Set `NYX_0X_API_KEY` and `NYX_JUPITER_API_KEY` to enable `GET /integrations/v1/0x/quote` and `GET /integrations/v1/jupiter/quote`.
-- Key inventory + replacement checklist: `docs/PUBLIC_KEYS_AND_REPLACEMENTS.md`.
+- Set keys in `.env.local` (recommended) or export env vars directly.
+- `NYX_0X_API_KEY` → enables `GET /integrations/v1/0x/quote`.
+- `NYX_JUPITER_API_KEY` → enables `GET /integrations/v1/jupiter/quote`.
+- `NYX_MAGIC_EDEN_API_KEY` → optional (public endpoints work without it; key can improve rate limits).
+- Magic Eden EVM endpoints:
+  - `GET /integrations/v1/magic_eden/evm/collections/search`
+  - `GET /integrations/v1/magic_eden/evm/collections`
+- Key inventory + replacement checklist: `PUBLIC_KEYS_AND_REPLACEMENTS.md`.
 
 Health check:
 ```bash
@@ -54,6 +60,13 @@ Open the URL printed by Vite (default `http://localhost:5173`).
 
 Notes:
 - dApp Browser is capability-gated (`dapp.browser`) and can open dApps in a new tab (recommended for wallet extension injection).
+- Web2 Guard is capability-gated (`web2.guard`). It only allows allowlisted HTTPS endpoints and records request/response hashes in evidence.
+- Default allowlist includes 0x, Jupiter, Magic Eden, GitHub, CoinGecko, CoinCap, and HttpBin (see `/web2/v1/allowlist`).
+
+Web2 Guard quick check:
+```bash
+curl -sS http://127.0.0.1:8091/web2/v1/allowlist | jq .
+```
 
 ## 4) iOS (Simulator)
 
@@ -66,7 +79,25 @@ xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj -scheme NYXPortal -destinat
 Notes:
 - Wallet flows are native (balances/faucet/send).
 - Trade/Chat/Store/Proof are embedded web modules with session token injection.
+- Web2 Guard can be opened from Home → Web2 Guard (web module).
 - IPA export requires Apple Developer signing; this repo only produces a simulator `.app` by default.
+
+## 4b) iOS (Real Device / IPA)
+
+To produce an **installable iPhone IPA**, you must sign with an Apple Developer Team ID.
+
+```bash
+export NYX_IOS_TEAM_ID=YOUR_TEAM_ID
+export NYX_IOS_EXPORT_METHOD=development   # or ad-hoc / app-store / enterprise
+bash scripts/build_ios_ipa.sh
+```
+
+Output:
+- `release_artifacts/ios/NYXPortal.ipa`
+
+Install:
+- Xcode → Devices & Simulators → drag IPA, or
+- Apple Configurator / `ideviceinstaller` (for ad-hoc).
 
 ## 5) Build release artifacts (web + backend + iOS + proof)
 
