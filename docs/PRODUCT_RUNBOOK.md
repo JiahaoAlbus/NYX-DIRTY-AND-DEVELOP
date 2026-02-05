@@ -82,6 +82,23 @@ Notes:
 - Web2 Guard can be opened from Home → Web2 Guard (web module).
 - IPA export requires Apple Developer signing; this repo only produces a simulator `.app` by default.
 
+## 4b) iOS (Real Device / IPA)
+
+To produce an **installable iPhone IPA**, you must sign with an Apple Developer Team ID.
+
+```bash
+export NYX_IOS_TEAM_ID=YOUR_TEAM_ID
+export NYX_IOS_EXPORT_METHOD=development   # or ad-hoc / app-store / enterprise
+bash scripts/build_ios_ipa.sh
+```
+
+Output:
+- `release_artifacts/ios/NYXPortal.ipa`
+
+Install:
+- Xcode → Devices & Simulators → drag IPA, or
+- Apple Configurator / `ideviceinstaller` (for ad-hoc).
+
 ## 5) Build release artifacts (web + backend + iOS + proof)
 
 ```bash
