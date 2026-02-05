@@ -95,6 +95,7 @@
 | `python scripts/verify_e2ee_storage.py` | 校验后端存储无明文。 |
 | `bash scripts/nyx_fundraising_validate.sh` | 募资校验相关检查。 |
 | `python scripts/nyx_monitor_local.py` | 轻量监控（API/DB/证据/异常转账）。 |
+| `python scripts/nyx_metrics_exporter.py` | 指标导出器（Prometheus/JSON，强监控）。 |
 | `bash scripts/nyx_backup_encrypted.sh` | 强加密备份（AES‑256‑GCM）。 |
 | `bash scripts/nyx_restore_encrypted.sh` | 解密恢复备份。 |
 
@@ -119,7 +120,17 @@
 
 ---
 
-## 12) 环境变量（集成相关）
+## 12) 生产部署（免费/共用）
+
+| 命令 | 作用 |
+|---|---|
+| `sudo systemctl enable nyx-backend && sudo systemctl start nyx-backend` | 启动后端 systemd 服务（参考 `docs/DEPLOYMENT_FREE_TIER.md`）。 |
+| `sudo systemctl enable nyx-metrics && sudo systemctl start nyx-metrics` | 启动监控指标导出器服务。 |
+| `curl -sS http://127.0.0.1:9099/metrics | head -n 20` | 验证指标导出器输出。 |
+
+---
+
+## 13) 环境变量（集成相关）
 
 | 变量 | 作用 |
 |---|---|

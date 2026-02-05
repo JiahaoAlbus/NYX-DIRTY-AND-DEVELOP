@@ -61,7 +61,8 @@ cat <<EOF > ${RELEASE_DIR}/ios/INSTALL_IOS.md
    - export NYX_IOS_TEAM_ID=YOUR_TEAM_ID
    - export NYX_IOS_EXPORT_METHOD=development
    - bash scripts/build_ios_ipa.sh
-4. Install IPA via Xcode Devices & Simulators, Apple Configurator, or ideviceinstaller.
+4. If Team ID is unknown, sign in to Xcode (Settings → Accounts) and re-run; the script will try auto-detect.
+5. Install IPA via Xcode Devices & Simulators, Apple Configurator, or ideviceinstaller.
 EOF
 
 echo "--- Phase 5: Backend Packaging ---"

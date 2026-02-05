@@ -8,6 +8,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT_DIR="${NYX_BACKUP_OUT_DIR:-$ROOT/release_artifacts/backups}"
 PASSPHRASE="${NYX_BACKUP_PASSPHRASE:-}"
+PBKDF2_ITER="${NYX_BACKUP_PBKDF2_ITER:-1000000}"
+PBKDF2_DIGEST="${NYX_BACKUP_PBKDF2_DIGEST:-sha512}"
 KEY_FILE="${NYX_BACKUP_KEY_FILE:-}"
 
 if [[ -z "$PASSPHRASE" && -n "$KEY_FILE" && -f "$KEY_FILE" ]]; then
@@ -41,7 +43,7 @@ tar -czf "$TMP_TAR" \
 SHA256="$(sha256sum "$TMP_TAR" | awk '{print $1}')"
 
 echo "🔐 Encrypting..."
-openssl enc -aes-256-gcm -salt -pbkdf2 -iter 600000 \
+openssl enc -aes-256-gcm -salt -pbkdf2 -iter "$PBKDF2_ITER" -md "$PBKDF2_DIGEST" \
   -pass env:NYX_BACKUP_PASSPHRASE \
   -in "$TMP_TAR" -out "$OUT_FILE"
 
@@ -50,6 +52,8 @@ cat > "$MANIFEST" <<EOF
   "timestamp": "$TS",
   "backup_file": "$(basename "$OUT_FILE")",
   "sha256": "$SHA256",
+  "pbkdf2_iter": "$PBKDF2_ITER",
+  "pbkdf2_digest": "$PBKDF2_DIGEST",
   "db_path": "$DB_PATH",
   "runs_dir": "$RUNS_DIR",
   "evidence_dir": "$EVIDENCE_DIR",

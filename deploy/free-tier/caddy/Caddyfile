@@ -1,0 +1,12 @@
+{
+  auto_https on
+}
+
+nyx.example.com {
+  root * /opt/nyx/nyx-world/dist
+  file_server
+
+  reverse_proxy /api/* 127.0.0.1:8091
+  reverse_proxy /ws/* 127.0.0.1:8091
+  reverse_proxy /metrics 127.0.0.1:9099
+}
