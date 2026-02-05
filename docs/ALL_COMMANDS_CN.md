@@ -94,6 +94,9 @@
 | `node scripts/nyx_e2ee_dm_roundtrip.mjs` | E2EE DM 回环验证。 |
 | `python scripts/verify_e2ee_storage.py` | 校验后端存储无明文。 |
 | `bash scripts/nyx_fundraising_validate.sh` | 募资校验相关检查。 |
+| `python scripts/nyx_monitor_local.py` | 轻量监控（API/DB/证据/异常转账）。 |
+| `bash scripts/nyx_backup_encrypted.sh` | 强加密备份（AES‑256‑GCM）。 |
+| `bash scripts/nyx_restore_encrypted.sh` | 解密恢复备份。 |
 
 ---
 
