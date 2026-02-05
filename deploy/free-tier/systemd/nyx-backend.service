@@ -1,0 +1,15 @@
+[Unit]
+Description=NYX Backend Gateway
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/nyx
+Environment=PYTHONPATH=/opt/nyx/apps/nyx-backend-gateway/src:/opt/nyx/apps/nyx-backend/src
+Environment=NYX_GATEWAY_DB_PATH=/opt/nyx/apps/nyx-backend-gateway/data/nyx_gateway.db
+ExecStart=/usr/bin/python3 -m nyx_backend_gateway.server --host 0.0.0.0 --port 8091 --env-file /opt/nyx/.env
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

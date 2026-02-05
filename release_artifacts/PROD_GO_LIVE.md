@@ -32,15 +32,13 @@ This document defines **non‑negotiable** production requirements for a mainnet
 - **MUST** monitor DB health (connections, replication lag, disk).
 - **MUST** monitor wallet operations (unexpected drain, spikes, failed transfers).
 - **MUST** alert on replay verification failures and evidence generation errors.
-- **MUST** keep an incident runbook with on-call escalation.
-  - Baseline (free) implemented: `scripts/nyx_monitor_local.py`, `scripts/nyx_metrics_exporter.py` + `docs/OPS_RUNBOOK_FREE_TIER.md`.
+- **MUST** keep an incident runbook with on‑call escalation.
 
 ## 6) Backup + Disaster Recovery
 - **MUST** snapshot DB daily and retain at least 30 days.
 - **MUST** test restore procedures at least monthly.
 - **MUST** define RPO/RTO targets for API and evidence storage.
 - **MUST** store backups encrypted at rest and in a separate account/project.
-  - Baseline (free, strong encryption) implemented: `scripts/nyx_backup_encrypted.sh`, `scripts/nyx_restore_encrypted.sh`.
 
 ## 7) Security Review + Penetration Testing
 - **MUST** run dependency/SAST scans on every release candidate.

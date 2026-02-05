@@ -6,7 +6,7 @@
 
 ## 1) 监控/告警（免费）
 
-使用本仓库提供的轻量监控脚本（无需第三方付费服务）：
+### 1.1 轻量告警（阈值型）
 
 ```bash
 python scripts/nyx_monitor_local.py
@@ -22,7 +22,32 @@ python scripts/nyx_monitor_local.py
 - `NYX_MONITOR_MAX_NEGATIVE_BALANCES`：负余额阈值
 - `NYX_MONITOR_MAX_TRANSFER_AMOUNT`：单笔转账异常阈值
 
-**建议**：将 `python scripts/nyx_monitor_local.py` 写入 `cron` 或系统计划任务每 5 分钟执行。
+**建议**：将 `python scripts/nyx_monitor_local.py` 写入 `cron` 每 5 分钟执行。
+
+### 1.2 指标导出器（更强监控）
+
+提供 Prometheus 格式与 JSON 两种输出：
+
+```bash
+python scripts/nyx_metrics_exporter.py
+curl -sS http://127.0.0.1:9099/metrics | head -n 30
+curl -sS http://127.0.0.1:9099/metrics.json | jq .
+```
+
+支持环境变量：
+- `NYX_METRICS_LISTEN`：监听地址（默认 `127.0.0.1`）
+- `NYX_METRICS_PORT`：监听端口（默认 `9099`）
+- `NYX_METRICS_CACHE_SECONDS`：采集缓存秒数（默认 `10`）
+- `NYX_METRICS_TIMEOUT`：健康检查超时（默认 `3`）
+- `NYX_METRICS_BASE_URL`：后端地址（默认 `http://127.0.0.1:8091`）
+- `NYX_GATEWAY_DB_PATH`：数据库路径
+
+覆盖指标示例：
+- Wallet 余额/转账/费用
+- 订单/成交/证据回放
+- Store 购买/Listing
+- Chat/Portal 会话
+- Web2 Guard 错误统计
 
 ---
 
@@ -49,6 +74,10 @@ bash scripts/nyx_restore_encrypted.sh release_artifacts/backups/nyx-backup-XXXX.
 
 可通过 `NYX_BACKUP_PATHS` 增加额外目录。
 
+可选增强参数：
+- `NYX_BACKUP_PBKDF2_ITER`（默认 `1000000`）
+- `NYX_BACKUP_PBKDF2_DIGEST`（默认 `sha512`）
+
 ---
 
 ## 3) 生产部署（免费/自托管）
@@ -72,4 +101,7 @@ bash scripts/nyx_restore_encrypted.sh release_artifacts/backups/nyx-backup-XXXX.
 
 ---
 
-如需升级到商业监控（Prometheus/Grafana/Sentry/Datadog），我可以在下一步提供接入配置。
+部署与 systemd 模板：
+- `docs/DEPLOYMENT_FREE_TIER.md`
+
+如需升级到商业监控（Prometheus/Grafana/Sentry/Datadog），可以在下一步提供接入配置。
