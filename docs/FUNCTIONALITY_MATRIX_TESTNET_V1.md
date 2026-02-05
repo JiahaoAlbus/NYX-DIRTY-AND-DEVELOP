@@ -17,8 +17,8 @@ Backend declares (example):
 - `marketplace`: `listing`, `purchase`
 - `chat`: `e2ee`, `dm`
 - `dapp`: `browser` (**enabled**)
-- `web2`: `guard` (**disabled**)
-- `integrations`: `0x_quote`, `jupiter_quote`, `magic_eden`, `payevm` (capability-driven; see `/capabilities`)
+- `web2`: `guard` (**enabled**)
+- `integrations`: `0x_quote`, `jupiter_quote`, `magic_eden_solana`, `magic_eden_evm`, `payevm` (capability-driven; see `/capabilities`)
 
 ## Matrix
 
@@ -56,5 +56,8 @@ Backend declares (example):
 | dApp | Browser | Home card → `nyx-world/screens/DappBrowser.tsx` | N/A (client-side) | No | No | OK | Capability-enabled (`dapp.browser = enabled`). Opens in new tab by default; optional iframe embed may be blocked by CSP/XFO. |
 | Integrations | 0x quote (EVM) | (no UI yet) | `GET /integrations/v1/0x/quote` | No | No | Limited | Auth required; enabled only when `integrations.0x_quote` is not disabled. |
 | Integrations | Jupiter quote (Solana) | (no UI yet) | `GET /integrations/v1/jupiter/quote` | No | No | Limited | Auth required; enabled only when `integrations.jupiter_quote` is not disabled. |
+| Integrations | Magic Eden collections (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | Limited | Auth required; enabled only when `integrations.magic_eden_solana` is not disabled. |
+| Integrations | Magic Eden listings (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | Limited | Requires `symbol` + pagination; enabled only when `integrations.magic_eden_solana` is not disabled. |
+| Integrations | Magic Eden token (Solana) | (no UI yet) | `GET /integrations/v1/magic_eden/solana/token` | No | No | Limited | Requires `mint`; enabled only when `integrations.magic_eden_solana` is not disabled. |
 | Web2 | Guard | Home card → Web2 Guard | `GET /web2/v1/allowlist`, `POST /web2/v1/request`, `GET /web2/v1/requests` | Yes (request) | Yes | OK | Allowlisted HTTPS only; response hash captured in evidence; secrets stored as ciphertext. |
 | Fiat | On-ramp | (not exposed) | N/A | N/A | N/A | Disabled | No provider integration; screen is not part of the primary flow. |

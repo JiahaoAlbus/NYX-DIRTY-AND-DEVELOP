@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from nyx_backend_gateway.env import get_0x_api_key, get_jupiter_api_key
+from nyx_backend_gateway.env import get_0x_api_key, get_jupiter_api_key, get_magic_eden_api_key
 from nyx_backend_gateway.gateway import GatewayApiError
 
 
@@ -19,6 +19,7 @@ _SAFE_TEXT = re.compile(r"^[A-Za-z0-9:/_.-]{1,256}$")
 _SAFE_HEX_OR_WORD = re.compile(r"^[A-Za-z0-9_-]{1,256}$")
 _SAFE_SOL_MINT = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,64}$")
 _SAFE_EVM_ADDRESS = re.compile(r"^0x[a-fA-F0-9]{40}$")
+_SAFE_ME_SYMBOL = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _read_limited(resp, limit: int) -> bytes:
@@ -86,6 +87,44 @@ def _http_get_json(url: str, headers: dict[str, str]) -> dict[str, Any]:
             http_status=502,
             details={"status": int(status)},
         )
+    return {"status": int(status), "data": parsed}
+
+
+def _http_get_json_any(url: str, headers: dict[str, str]) -> dict[str, Any]:
+    req = Request(url, headers=headers, method="GET")
+    try:
+        with urlopen(req, timeout=_DEFAULT_TIMEOUT_SECONDS) as resp:
+            status = getattr(resp, "status", 200)
+            body = _read_limited(resp, _MAX_UPSTREAM_BYTES)
+    except HTTPError as exc:
+        body = b""
+        try:
+            body = _read_limited(exc, _MAX_UPSTREAM_BYTES)
+        except Exception:
+            body = b""
+        raise GatewayApiError(
+            "UPSTREAM_HTTP_ERROR",
+            f"upstream http error {exc.code}",
+            http_status=502,
+            details={"status": int(exc.code), "body": _safe_snippet(body)},
+        ) from exc
+    except URLError as exc:
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, socket.timeout):
+            raise GatewayApiError("UPSTREAM_TIMEOUT", "upstream timeout", http_status=504) from exc
+        raise GatewayApiError("UPSTREAM_UNAVAILABLE", "upstream unavailable", http_status=502) from exc
+    except socket.timeout as exc:
+        raise GatewayApiError("UPSTREAM_TIMEOUT", "upstream timeout", http_status=504) from exc
+
+    try:
+        parsed = json.loads(body.decode("utf-8"))
+    except Exception as exc:
+        raise GatewayApiError(
+            "UPSTREAM_BAD_JSON",
+            "upstream returned invalid json",
+            http_status=502,
+            details={"status": int(status), "body": _safe_snippet(body)},
+        ) from exc
     return {"status": int(status), "data": parsed}
 
 
@@ -294,3 +333,48 @@ def quote_jupiter(
         },
     )
     return {"provider": "jupiter", "request": params, **result}
+
+
+def _magic_eden_headers() -> dict[str, str]:
+    api_key = get_magic_eden_api_key()
+    if not api_key:
+        raise GatewayApiError("INTEGRATION_DISABLED", "magic eden integration disabled (missing api key)", http_status=503)
+    return {
+        "accept": "application/json",
+        "authorization": api_key,
+        "user-agent": "NYXGateway/2.0",
+    }
+
+
+def magic_eden_solana_collections(*, limit: int | None, offset: int | None) -> dict[str, Any]:
+    params: dict[str, str] = {}
+    if limit is not None:
+        params["limit"] = str(_optional_int(str(limit), name="limit", min_value=1, max_value=200))
+    if offset is not None:
+        params["offset"] = str(_optional_int(str(offset), name="offset", min_value=0, max_value=1_000_000))
+    url = "https://api-mainnet.magiceden.dev/v2/collections"
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    result = _http_get_json_any(url, headers=_magic_eden_headers())
+    return {"provider": "magic_eden", "network": "solana", "endpoint": "collections", **result}
+
+
+def magic_eden_solana_collection_listings(*, symbol: str, limit: int | None, offset: int | None) -> dict[str, Any]:
+    symbol = _require_nonempty_str(symbol, name="symbol", pattern=_SAFE_ME_SYMBOL)
+    params: dict[str, str] = {}
+    if limit is not None:
+        params["limit"] = str(_optional_int(str(limit), name="limit", min_value=1, max_value=200))
+    if offset is not None:
+        params["offset"] = str(_optional_int(str(offset), name="offset", min_value=0, max_value=1_000_000))
+    url = f"https://api-mainnet.magiceden.dev/v2/collections/{symbol}/listings"
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    result = _http_get_json_any(url, headers=_magic_eden_headers())
+    return {"provider": "magic_eden", "network": "solana", "endpoint": "collection_listings", "symbol": symbol, **result}
+
+
+def magic_eden_solana_token(*, mint: str) -> dict[str, Any]:
+    mint = _require_nonempty_str(mint, name="mint", pattern=_SAFE_SOL_MINT)
+    url = f"https://api-mainnet.magiceden.dev/v2/tokens/{mint}"
+    result = _http_get_json_any(url, headers=_magic_eden_headers())
+    return {"provider": "magic_eden", "network": "solana", "endpoint": "token", "mint": mint, **result}

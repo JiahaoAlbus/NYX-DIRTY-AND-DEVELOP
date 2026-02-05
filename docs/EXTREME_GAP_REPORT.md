@@ -110,7 +110,10 @@ Legend:
 |---|---|---:|---:|---:|---|
 | 0x Quote (EVM) | `GET /integrations/v1/0x/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_0X_API_KEY` is set (`integrations.0x_quote`). |
 | Jupiter Quote (Solana) | `GET /integrations/v1/jupiter/quote` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_JUPITER_API_KEY` is set (`integrations.jupiter_quote`). |
-| Magic Eden / PayEVM | N/A | N/A | N/A | 🔴 Disabled | Keys tracked for prod readiness, but endpoints/UI are not shipped yet (NO FAKE UI). |
+| Magic Eden collections (Solana) | `GET /integrations/v1/magic_eden/solana/collections` | No | No | 🟡 Limited | Auth required; enabled only when `NYX_MAGIC_EDEN_API_KEY` is set (`integrations.magic_eden_solana`). |
+| Magic Eden listings (Solana) | `GET /integrations/v1/magic_eden/solana/collection_listings` | No | No | 🟡 Limited | Requires `symbol` + pagination; enabled only when `NYX_MAGIC_EDEN_API_KEY` is set. |
+| Magic Eden token (Solana) | `GET /integrations/v1/magic_eden/solana/token` | No | No | 🟡 Limited | Requires `mint`; enabled only when `NYX_MAGIC_EDEN_API_KEY` is set. |
+| Magic Eden (EVM) / PayEVM | N/A | N/A | N/A | 🔴 Disabled | EVM integration endpoints not shipped; PayEVM not implemented (NO FAKE UI). |
 
 ### J) Web2 Guard
 

@@ -63,4 +63,5 @@ These endpoints are the current external API bases for integrations and the Web2
 ## Operational reminders
 
 - Do not store production keys in `.env.example`.
+- Prefer `.env.local` for developer keys (git-ignored) and a secrets manager for production.
 - Prefer runtime secrets (CI/CD secrets manager) and local `.env.local` files that are git-ignored.

@@ -60,6 +60,16 @@ This document lists all available backend endpoints, their methods, schemas, and
 | `/marketplace/listing` | POST | Publish new listing | Yes | No |
 | `/marketplace/purchase` | POST | Execute purchase | Yes | No |
 
+## Integrations Module
+
+| Route | Method | Description | Mutation? | Auth? |
+| :--- | :--- | :--- | :--- | :--- |
+| `/integrations/v1/0x/quote` | GET | 0x swap quote | No | Yes |
+| `/integrations/v1/jupiter/quote` | GET | Jupiter swap quote | No | Yes |
+| `/integrations/v1/magic_eden/solana/collections` | GET | Magic Eden Solana collections | No | Yes |
+| `/integrations/v1/magic_eden/solana/collection_listings` | GET | Magic Eden Solana collection listings | No | Yes |
+| `/integrations/v1/magic_eden/solana/token` | GET | Magic Eden Solana token detail | No | Yes |
+
 ## Chat Module
 
 | Route | Method | Description | Mutation? | Auth? |

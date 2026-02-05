@@ -11,6 +11,7 @@ Thumbs.db
 cswdz.env
 .env
 *.env
+.env.local
 docs/evidence/fundraising/latest/
 # Local IDEs
 .idea/
@@ -64,4 +65,3 @@ docs/evidence/
 release_artifacts/
 nyx_proof_package_*.zip
 nyx-testnet-proof-*.tar.gz
-

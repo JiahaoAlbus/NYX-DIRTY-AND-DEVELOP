@@ -63,13 +63,15 @@ def _capabilities() -> dict[str, object]:
     from nyx_backend_gateway.env import (
         get_0x_api_key,
         get_jupiter_api_key,
+        get_magic_eden_api_key,
     )
 
     integration_features = {
         "0x_quote": "enabled" if get_0x_api_key() else "disabled_missing_api_key",
         "jupiter_quote": "enabled" if get_jupiter_api_key() else "disabled_missing_api_key",
-        # Keys are tracked, but endpoints/UI are not shipped yet (NO FAKE UI).
-        "magic_eden": "disabled_not_implemented",
+        "magic_eden_solana": "enabled" if get_magic_eden_api_key() else "disabled_missing_api_key",
+        # EVM Magic Eden and PayEVM are not shipped yet (NO FAKE UI).
+        "magic_eden_evm": "disabled_not_implemented",
         "payevm": "disabled_not_implemented",
     }
     module_features = {
@@ -109,6 +111,9 @@ def _capabilities() -> dict[str, object]:
             "/chat/messages",
             "/integrations/v1/0x/quote",
             "/integrations/v1/jupiter/quote",
+            "/integrations/v1/magic_eden/solana/collections",
+            "/integrations/v1/magic_eden/solana/collection_listings",
+            "/integrations/v1/magic_eden/solana/token",
             "/web2/v1/allowlist",
             "/web2/v1/request",
             "/web2/v1/requests",
@@ -1495,6 +1500,48 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     slippage_bps=slippage_bps,
                     swap_mode=swap_mode,
                 )
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/collections":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_collections
+
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_solana_collections(limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/collection_listings":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_collection_listings
+
+                symbol = (query.get("symbol") or [""])[0]
+                limit_raw = (query.get("limit") or [""])[0].strip() or None
+                offset_raw = (query.get("offset") or [""])[0].strip() or None
+                limit = int(limit_raw) if limit_raw else None
+                offset = int(offset_raw) if offset_raw else None
+
+                result = magic_eden_solana_collection_listings(symbol=symbol, limit=limit, offset=offset)
+                self._send_json(result)
+            except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
+                self._send_error(exc, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/integrations/v1/magic_eden/solana/token":
+            try:
+                _ = self._require_auth()
+                from nyx_backend_gateway.integrations import magic_eden_solana_token
+
+                mint = (query.get("mint") or [""])[0]
+                result = magic_eden_solana_token(mint=mint)
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
