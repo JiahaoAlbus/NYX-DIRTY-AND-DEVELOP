@@ -49,6 +49,22 @@ curl -sS http://127.0.0.1:9099/metrics.json | jq .
 - Chat/Portal 会话
 - Web2 Guard 错误统计
 
+### 1.3 监控面板（Prometheus + Grafana，免费）
+
+提供**可视化面板**（免费、自托管）：
+
+```bash
+export GRAFANA_ADMIN_PASSWORD="your-strong-password"
+docker compose -f deploy/free-tier/monitoring/docker-compose.yml up -d
+```
+
+访问：
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+
+模板目录：
+- `deploy/free-tier/monitoring/README.md`
+
 ---
 
 ## 2) 备份 / 灾备（强加密）

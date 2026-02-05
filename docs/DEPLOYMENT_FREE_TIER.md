@@ -107,6 +107,21 @@ bash /opt/nyx/scripts/nyx_backup_encrypted.sh
 
 ---
 
+## 9) 监控面板（Prometheus + Grafana，免费）
+
+```bash
+export GRAFANA_ADMIN_PASSWORD="your-strong-password"
+docker compose -f deploy/free-tier/monitoring/docker-compose.yml up -d
+```
+
+Grafana: `http://localhost:3000`  
+Prometheus: `http://localhost:9090`
+
+监控模板详见：
+- `deploy/free-tier/monitoring/README.md`
+
+---
+
 ## 8) 关键环境变量
 
 ```bash
