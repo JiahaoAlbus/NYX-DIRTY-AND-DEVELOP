@@ -1,0 +1,87 @@
+{
+  "uid": "nyx-overview",
+  "title": "NYX Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API Health",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_api_health_ok" }],
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "title": "DB Integrity",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_db_integrity_ok" }],
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "title": "Wallet Accounts",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_wallet_accounts_total" }],
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 }
+    },
+    {
+      "type": "stat",
+      "title": "Transfers Total",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_wallet_transfers_total" }],
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Evidence Runs (Total)",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_evidence_runs_total" }],
+      "gridPos": { "x": 0, "y": 4, "w": 8, "h": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Receipts Replay Failures",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_receipts_replay_failed" }],
+      "gridPos": { "x": 8, "y": 4, "w": 8, "h": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Exchange Orders (by status)",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [
+        { "expr": "nyx_exchange_orders{status=\"open\"}", "legendFormat": "open" },
+        { "expr": "nyx_exchange_orders{status=\"filled\"}", "legendFormat": "filled" },
+        { "expr": "nyx_exchange_orders{status=\"cancelled\"}", "legendFormat": "cancelled" }
+      ],
+      "gridPos": { "x": 0, "y": 10, "w": 8, "h": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Store Listings (by status)",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [
+        { "expr": "nyx_store_listings{status=\"active\"}", "legendFormat": "active" },
+        { "expr": "nyx_store_listings{status=\"inactive\"}", "legendFormat": "inactive" }
+      ],
+      "gridPos": { "x": 8, "y": 10, "w": 8, "h": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Web2 Guard Errors (24h)",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_web2_guard_errors_24h" }],
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 6 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Chat Messages (24h)",
+      "datasource": { "type": "prometheus", "uid": "nyx-prom" },
+      "targets": [{ "expr": "nyx_chat_messages_24h" }],
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 6 }
+    }
+  ]
+}

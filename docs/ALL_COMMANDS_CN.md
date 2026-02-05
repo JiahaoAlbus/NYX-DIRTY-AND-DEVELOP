@@ -96,6 +96,7 @@
 | `bash scripts/nyx_fundraising_validate.sh` | 募资校验相关检查。 |
 | `python scripts/nyx_monitor_local.py` | 轻量监控（API/DB/证据/异常转账）。 |
 | `python scripts/nyx_metrics_exporter.py` | 指标导出器（Prometheus/JSON，强监控）。 |
+| `docker compose -f deploy/free-tier/monitoring/docker-compose.yml up -d` | 启动 Prometheus + Grafana 监控面板（免费/自托管）。 |
 | `bash scripts/nyx_backup_encrypted.sh` | 强加密备份（AES‑256‑GCM）。 |
 | `bash scripts/nyx_restore_encrypted.sh` | 解密恢复备份。 |
 
