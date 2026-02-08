@@ -1,16 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Globe, RefreshCw } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from "react";
+import { ExternalLink, Globe, RefreshCw } from "lucide-react";
+
+type NormalizedUrl = { ok: true; url: string } | { ok: false; reason: string };
 
 export const DappBrowser: React.FC = () => {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
-  const [mode, setMode] = useState<'tab' | 'embed'>('tab');
+  const [mode, setMode] = useState<"tab" | "embed">("tab");
   const [iframeKey, setIframeKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recents, setRecents] = useState<string[]>([]);
 
-  const recentsKey = 'nyx:dapp_recents:v1';
+  const recentsKey = "nyx:dapp_recents:v1";
 
   useEffect(() => {
     try {
@@ -18,7 +20,7 @@ export const DappBrowser: React.FC = () => {
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter((v) => typeof v === 'string' && v.length > 0).slice(0, 8);
+        const cleaned = parsed.filter((v) => typeof v === "string" && v.length > 0).slice(0, 8);
         setRecents(cleaned);
       }
     } catch {
@@ -26,18 +28,18 @@ export const DappBrowser: React.FC = () => {
     }
   }, []);
 
-  const normalize = (raw: string): { ok: true; url: string } | { ok: false; reason: string } => {
-    const trimmed = (raw || '').trim();
-    if (!trimmed) return { ok: false, reason: 'URL required.' };
+  const normalize = (raw: string): NormalizedUrl => {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) return { ok: false, reason: "URL required." };
     const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
     let parsed: URL;
     try {
       parsed = new URL(withScheme);
     } catch {
-      return { ok: false, reason: 'Invalid URL.' };
+      return { ok: false, reason: "Invalid URL." };
     }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return { ok: false, reason: 'Only http/https URLs are supported.' };
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return { ok: false, reason: "Only http/https URLs are supported." };
     }
     return { ok: true, url: parsed.toString() };
   };
@@ -53,12 +55,12 @@ export const DappBrowser: React.FC = () => {
   };
 
   const openNewTab = (target: string) => {
-    window.open(target, '_blank', 'noopener,noreferrer');
+    window.open(target, "_blank", "noopener,noreferrer");
   };
 
-  const go = (nextMode: 'tab' | 'embed') => {
+  const go = (nextMode: "tab" | "embed") => {
     const normalized = normalize(url);
-    if (!normalized.ok) {
+    if (normalized.ok === false) {
       setError(normalized.reason);
       return;
     }
@@ -66,7 +68,7 @@ export const DappBrowser: React.FC = () => {
     setActiveUrl(normalized.url);
     setMode(nextMode);
     persistRecent(normalized.url);
-    if (nextMode === 'tab') {
+    if (nextMode === "tab") {
       openNewTab(normalized.url);
     } else {
       setIsLoading(true);
@@ -76,11 +78,11 @@ export const DappBrowser: React.FC = () => {
 
   const quickLinks = useMemo(
     () => [
-      { label: 'Jupiter', url: 'https://jup.ag' },
-      { label: 'Uniswap', url: 'https://app.uniswap.org' },
-      { label: 'Magic Eden', url: 'https://magiceden.io' },
+      { label: "Jupiter", url: "https://jup.ag" },
+      { label: "Uniswap", url: "https://app.uniswap.org" },
+      { label: "Magic Eden", url: "https://magiceden.io" },
     ],
-    []
+    [],
   );
 
   return (
@@ -106,7 +108,7 @@ export const DappBrowser: React.FC = () => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') go('tab');
+                if (e.key === "Enter") go("tab");
               }}
             />
           </div>
@@ -114,14 +116,14 @@ export const DappBrowser: React.FC = () => {
 
         <div className="flex gap-2">
           <button
-            onClick={() => go('tab')}
+            onClick={() => go("tab")}
             className="flex-1 py-3 rounded-2xl bg-primary text-black font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl"
           >
             <ExternalLink size={16} />
             Open Tab
           </button>
           <button
-            onClick={() => go('embed')}
+            onClick={() => go("embed")}
             className="flex-1 py-3 rounded-2xl border border-primary/20 text-primary font-bold flex items-center justify-center gap-2 hover:bg-primary/10 transition-all"
           >
             Embed
@@ -144,7 +146,7 @@ export const DappBrowser: React.FC = () => {
                   setUrl(link.url);
                   setError(null);
                   setActiveUrl(link.url);
-                  setMode('tab');
+                  setMode("tab");
                   persistRecent(link.url);
                   openNewTab(link.url);
                 }}
@@ -168,7 +170,7 @@ export const DappBrowser: React.FC = () => {
                     setUrl(r);
                     setError(null);
                     setActiveUrl(r);
-                    setMode('tab');
+                    setMode("tab");
                     openNewTab(r);
                   }}
                   className="rounded-2xl border border-black/5 dark:border-white/10 bg-background-light dark:bg-background-dark px-4 py-3 text-left text-[10px] font-mono text-text-subtle hover:border-primary/30 transition-colors break-all"
@@ -187,7 +189,7 @@ export const DappBrowser: React.FC = () => {
           <div className="flex items-center justify-center h-[420px] text-text-subtle text-sm">
             Enter a URL to open a dApp.
           </div>
-        ) : mode === 'tab' ? (
+        ) : mode === "tab" ? (
           <div className="p-6 flex flex-col gap-4">
             <div className="text-sm font-bold">Opened in a new tab</div>
             <div className="text-[11px] text-text-subtle">
@@ -206,7 +208,7 @@ export const DappBrowser: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  setMode('embed');
+                  setMode("embed");
                   setIsLoading(true);
                   setIframeKey((k) => k + 1);
                 }}

@@ -122,7 +122,15 @@ async function requestJson<T>(path: string, options: RequestJsonOptions = {}): P
         signal: controller.signal,
       });
       const text = await response.text();
-      const payload: unknown = text.trim().length ? (() => { try { return JSON.parse(text); } catch { return { error: text }; } })() : {};
+      const payload: unknown = text.trim().length
+        ? (() => {
+            try {
+              return JSON.parse(text);
+            } catch {
+              return { error: text };
+            }
+          })()
+        : {};
 
       if (!response.ok) {
         let code = `HTTP_${response.status}`;
@@ -190,7 +198,7 @@ export async function createPortalAccount(handle: string, pubkey: string) {
       method: "POST",
       body: { handle, pubkey },
       retry: false,
-    }
+    },
   );
 }
 
@@ -222,26 +230,30 @@ export async function logoutPortal(accessToken: string) {
 export async function fetchPortalMe(accessToken: string) {
   return requestJson<{ account_id: string; handle: string; pubkey: string; created_at: number; status: string }>(
     "/portal/v1/me",
-    { token: accessToken, retry: false }
+    { token: accessToken, retry: false },
   );
 }
 
 export async function fetchPortalAccountById(accessToken: string, accountId: string) {
   return requestJson<{ account: { account_id: string; handle: string; public_jwk: JsonWebKey | null } }>(
     `/portal/v1/accounts/by_id?account_id=${encodeURIComponent(accountId)}`,
-    { token: accessToken, retry: false }
+    { token: accessToken, retry: false },
   );
 }
 
 export async function fetchActivity(accessToken: string, limit: number = 50, offset: number = 0) {
   return requestJson<{ account_id: string; receipts: Record<string, unknown>[]; limit: number; offset: number }>(
     `/portal/v1/activity?limit=${limit}&offset=${offset}`,
-    { token: accessToken }
+    { token: accessToken },
   );
 }
 
 export async function fetchEvidence(runId: string): Promise<EvidenceBundle> {
   return requestJson<EvidenceBundle>(`/evidence?run_id=${encodeURIComponent(runId)}`, { retry: true });
+}
+
+export async function listEvidenceRuns(): Promise<{ runs: { run_id: string; status: string }[] }> {
+  return requestJson<{ runs: { run_id: string; status: string }[] }>("/list", { retry: false });
 }
 
 export interface EvidenceReplayResultV1 {
@@ -297,7 +309,7 @@ export async function fetchWeb2Requests(token: string, limit: number = 25, offse
   qs.set("offset", String(offset));
   return requestJson<{ requests: Web2GuardRequestRow[]; limit: number; offset: number }>(
     `/web2/v1/requests?${qs.toString()}`,
-    { token }
+    { token },
   );
 }
 
@@ -305,7 +317,7 @@ export async function executeWeb2GuardRequest(
   token: string,
   seed: number,
   runId: string,
-  payload: { url: string; method?: string; body?: string | Record<string, unknown>; sealed_request?: string }
+  payload: { url: string; method?: string; body?: string | Record<string, unknown>; sealed_request?: string },
 ): Promise<Web2GuardResponse> {
   return requestJson<Web2GuardResponse>("/web2/v1/request", {
     method: "POST",
@@ -321,16 +333,17 @@ export async function fetchWalletBalance(address: string, assetId: string = "NYX
 }
 
 export async function fetchWalletBalancesV1(token: string, address: string) {
-  return requestJson<{ address: string; assets: { asset_id: string; name?: string }[]; balances: { asset_id: string; balance: number }[] }>(
-    `/wallet/v1/balances?address=${encodeURIComponent(address)}`,
-    { token }
-  );
+  return requestJson<{
+    address: string;
+    assets: { asset_id: string; name?: string }[];
+    balances: { asset_id: string; balance: number }[];
+  }>(`/wallet/v1/balances?address=${encodeURIComponent(address)}`, { token });
 }
 
 export async function fetchWalletTransfersV1(token: string, address: string, limit: number = 50, offset: number = 0) {
   return requestJson<{ address: string; transfers: any[]; limit: number; offset: number }>(
     `/wallet/v1/transfers?address=${encodeURIComponent(address)}&limit=${limit}&offset=${offset}`,
-    { token }
+    { token },
   );
 }
 
@@ -341,7 +354,7 @@ export async function transferWallet(
   fromAddress: string,
   toAddress: string,
   amount: number,
-  assetId: string = "NYXT"
+  assetId: string = "NYXT",
 ) {
   const body = {
     seed,
@@ -367,7 +380,7 @@ export async function faucetWallet(
   runId: string,
   address: string,
   amount: number = 1000,
-  assetId: string = "NYXT"
+  assetId: string = "NYXT",
 ) {
   const body = {
     seed,
@@ -391,7 +404,7 @@ export async function placeOrder(
   amount: number,
   price: number,
   assetIn: string,
-  assetOut: string
+  assetOut: string,
 ) {
   const payload = {
     seed,
@@ -442,7 +455,7 @@ export async function fetchMyOrdersV1(token: string, status: string = "open", li
   qs.set("offset", String(offset));
   return requestJson<{ orders: Record<string, unknown>[]; limit: number; offset: number; status: string }>(
     `/exchange/v1/my_orders?${qs.toString()}`,
-    { token }
+    { token },
   );
 }
 
@@ -452,7 +465,7 @@ export async function fetchMyTradesV1(token: string, limit: number = 50, offset:
   qs.set("offset", String(offset));
   return requestJson<{ trades: Record<string, unknown>[]; limit: number; offset: number }>(
     `/exchange/v1/my_trades?${qs.toString()}`,
-    { token }
+    { token },
   );
 }
 
@@ -485,7 +498,7 @@ export async function listChatMessages(accessToken: string, roomId: string, afte
   qs.set("limit", String(limit));
   return requestJson<{ messages: Record<string, unknown>[] }>(
     `/chat/v1/rooms/${encodeURIComponent(roomId)}/messages?${qs.toString()}`,
-    { token: accessToken }
+    { token: accessToken },
   );
 }
 
@@ -504,14 +517,14 @@ export async function searchPortalAccounts(accessToken: string, q: string, limit
   qs.set("limit", String(limit));
   return requestJson<{ accounts: { account_id: string; handle: string; public_jwk: JsonWebKey | null }[] }>(
     `/portal/v1/accounts/search?${qs.toString()}`,
-    { token: accessToken }
+    { token: accessToken },
   );
 }
 
 export async function fetchChatConversations(accessToken: string, limit: number = 50, offset: number = 0) {
   return requestJson<{ conversations: Record<string, unknown>[]; limit: number; offset: number }>(
     `/chat/v1/conversations?limit=${limit}&offset=${offset}`,
-    { token: accessToken }
+    { token: accessToken },
   );
 }
 
@@ -522,7 +535,7 @@ export async function fetchChatMessages(accessToken: string, channel: string, li
   qs.set("offset", String(offset));
   return requestJson<{ channel: string; messages: Record<string, unknown>[]; limit: number; offset: number }>(
     `/chat/messages?${qs.toString()}`,
-    { token: accessToken }
+    { token: accessToken },
   );
 }
 
@@ -548,7 +561,7 @@ async function loadOrCreateE2eeIdentity(): Promise<{ publicJwk: JsonWebKey; priv
           parsed.privateJwk,
           { name: "ECDH", namedCurve: "P-256" },
           false,
-          ["deriveKey", "deriveBits"]
+          ["deriveKey", "deriveBits"],
         );
         return { publicJwk: parsed.publicJwk, privateKey };
       }
@@ -579,14 +592,14 @@ async function deriveDmKey(otherPublicJwk: JsonWebKey): Promise<CryptoKey> {
     otherPublicJwk,
     { name: "ECDH", namedCurve: "P-256" },
     false,
-    []
+    [],
   );
   return window.crypto.subtle.deriveKey(
     { name: "ECDH", public: otherPublicKey },
     identity.privateKey,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt", "decrypt"]
+    ["encrypt", "decrypt"],
   );
 }
 
@@ -599,7 +612,11 @@ export async function ensureE2eeIdentity(accessToken: string): Promise<JsonWebKe
 export async function encryptMessage(otherPublicJwk: JsonWebKey, plaintext: string): Promise<string> {
   const key = await deriveDmKey(otherPublicJwk);
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(plaintext),
+  );
   return JSON.stringify({
     v: 1,
     alg: "ECDH-P256/AES-256-GCM",
@@ -627,7 +644,7 @@ export async function sendChatMessage(
   seed: number,
   runId: string,
   channel: string,
-  ciphertext: string
+  ciphertext: string,
 ) {
   const payload = {
     seed,
@@ -649,7 +666,7 @@ export async function listMarketplaceListings(limit: number = 50, offset: number
   qs.set("limit", String(limit));
   qs.set("offset", String(offset));
   return requestJson<{ listings: Record<string, unknown>[]; limit: number; offset: number }>(
-    `/marketplace/listings?${qs.toString()}`
+    `/marketplace/listings?${qs.toString()}`,
   );
 }
 
@@ -659,7 +676,7 @@ export async function searchMarketplaceListings(q: string, limit: number = 50, o
   qs.set("limit", String(limit));
   qs.set("offset", String(offset));
   return requestJson<{ listings: Record<string, unknown>[]; limit: number; offset: number; q: string }>(
-    `/marketplace/listings/search?${qs.toString()}`
+    `/marketplace/listings/search?${qs.toString()}`,
   );
 }
 
@@ -669,7 +686,7 @@ export async function fetchMyPurchasesV1(token: string, limit: number = 50, offs
   qs.set("offset", String(offset));
   return requestJson<{ purchases: Record<string, unknown>[]; limit: number; offset: number }>(
     `/marketplace/v1/my_purchases?${qs.toString()}`,
-    { token }
+    { token },
   );
 }
 
@@ -688,7 +705,7 @@ export async function publishListing(
   publisherId: string,
   sku: string,
   title: string,
-  price: number
+  price: number,
 ) {
   const payload = {
     seed,
@@ -705,7 +722,14 @@ export async function publishListing(
   });
 }
 
-export async function purchaseMarketplace(token: string, seed: number, runId: string, buyerId: string, listingId: string, qty: number) {
+export async function purchaseMarketplace(
+  token: string,
+  seed: number,
+  runId: string,
+  buyerId: string,
+  listingId: string,
+  qty: number,
+) {
   const payload = {
     seed,
     run_id: runId,

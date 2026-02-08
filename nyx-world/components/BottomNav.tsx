@@ -1,7 +1,7 @@
-import React from 'react';
-import { Screen } from '../types';
-import type { Capabilities } from '../capabilities';
-import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from '../capabilities';
+import React from "react";
+import { Screen } from "../types";
+import type { Capabilities } from "../capabilities";
+import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from "../capabilities";
 
 interface BottomNavProps {
   activeTab: Screen;
@@ -10,35 +10,37 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, capabilities }) => {
-  const getButtonClass = (isActive: boolean) => 
-    `flex flex-1 flex-col items-center gap-1 p-2 group transition-colors duration-300 ${isActive ? 'text-text-main dark:text-white' : 'text-text-subtle dark:text-gray-400 hover:text-text-main dark:hover:text-primary'}`;
+  const getButtonClass = (isActive: boolean) =>
+    `flex flex-1 flex-col items-center gap-1 p-2 group transition-colors duration-300 ${isActive ? "text-text-main dark:text-white" : "text-text-subtle dark:text-gray-400 hover:text-text-main dark:hover:text-primary"}`;
 
   const tabEnabled = (screen: Screen): { enabled: boolean; reason?: string } => {
     if (screen === Screen.HOME) return { enabled: true };
     if (screen === Screen.SETTINGS) return { enabled: true };
     if (screen === Screen.ACTIVITY) return { enabled: true };
     if (screen === Screen.EVIDENCE) return { enabled: true };
-    if (!capabilities) return { enabled: false, reason: 'Capabilities not loaded.' };
+    if (!capabilities) return { enabled: false, reason: "Capabilities not loaded." };
 
     if (screen === Screen.WALLET) {
-      const ok = isModuleUsable(capabilities, 'wallet');
-      return ok ? { enabled: true } : { enabled: false, reason: 'Wallet disabled.' };
+      const ok = isModuleUsable(capabilities, "wallet");
+      return ok ? { enabled: true } : { enabled: false, reason: "Wallet disabled." };
     }
     if (screen === Screen.EXCHANGE) {
-      const ok = isFeatureEnabled(capabilities, 'exchange', 'trading');
+      const ok = isFeatureEnabled(capabilities, "exchange", "trading");
       return ok
         ? { enabled: true }
-        : { enabled: false, reason: featureReasonText(featureStatus(capabilities, 'exchange', 'trading')) };
+        : { enabled: false, reason: featureReasonText(featureStatus(capabilities, "exchange", "trading")) };
     }
     if (screen === Screen.CHAT) {
-      const ok = isFeatureEnabled(capabilities, 'chat', 'dm');
-      return ok ? { enabled: true } : { enabled: false, reason: featureReasonText(featureStatus(capabilities, 'chat', 'dm')) };
-    }
-    if (screen === Screen.STORE) {
-      const ok = isFeatureEnabled(capabilities, 'marketplace', 'purchase');
+      const ok = isFeatureEnabled(capabilities, "chat", "dm");
       return ok
         ? { enabled: true }
-        : { enabled: false, reason: featureReasonText(featureStatus(capabilities, 'marketplace', 'purchase')) };
+        : { enabled: false, reason: featureReasonText(featureStatus(capabilities, "chat", "dm")) };
+    }
+    if (screen === Screen.STORE) {
+      const ok = isFeatureEnabled(capabilities, "marketplace", "purchase");
+      return ok
+        ? { enabled: true }
+        : { enabled: false, reason: featureReasonText(featureStatus(capabilities, "marketplace", "purchase")) };
     }
     return { enabled: true };
   };
@@ -48,7 +50,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
       <div className="flex items-center justify-between px-1 pt-2 pb-2">
         {/* World (Home) */}
         <button className={getButtonClass(activeTab === Screen.HOME)} onClick={() => onTabChange(Screen.HOME)}>
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.HOME ? 'filled text-primary' : ''}`}>public</span>
+          <span
+            className={`material-symbols-outlined text-[22px] ${activeTab === Screen.HOME ? "filled text-primary" : ""}`}
+          >
+            public
+          </span>
           <span className="text-[9px] font-medium">Home</span>
         </button>
 
@@ -57,12 +63,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           const guard = tabEnabled(Screen.WALLET);
           return (
             <button
-              className={`${getButtonClass(activeTab === Screen.WALLET)} ${guard.enabled ? '' : 'opacity-40 cursor-not-allowed'}`}
+              className={`${getButtonClass(activeTab === Screen.WALLET)} ${guard.enabled ? "" : "opacity-40 cursor-not-allowed"}`}
               onClick={() => guard.enabled && onTabChange(Screen.WALLET)}
               title={guard.enabled ? undefined : guard.reason}
               disabled={!guard.enabled}
             >
-              <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.WALLET ? 'filled text-primary' : ''}`}>account_balance_wallet</span>
+              <span
+                className={`material-symbols-outlined text-[22px] ${activeTab === Screen.WALLET ? "filled text-primary" : ""}`}
+              >
+                account_balance_wallet
+              </span>
               <span className="text-[9px] font-medium">Wallet</span>
             </button>
           );
@@ -73,12 +83,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           const guard = tabEnabled(Screen.EXCHANGE);
           return (
             <button
-              className={`${getButtonClass(activeTab === Screen.EXCHANGE)} ${guard.enabled ? '' : 'opacity-40 cursor-not-allowed'}`}
+              className={`${getButtonClass(activeTab === Screen.EXCHANGE)} ${guard.enabled ? "" : "opacity-40 cursor-not-allowed"}`}
               onClick={() => guard.enabled && onTabChange(Screen.EXCHANGE)}
               title={guard.enabled ? undefined : guard.reason}
               disabled={!guard.enabled}
             >
-              <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.EXCHANGE ? 'filled text-primary' : ''}`}>currency_exchange</span>
+              <span
+                className={`material-symbols-outlined text-[22px] ${activeTab === Screen.EXCHANGE ? "filled text-primary" : ""}`}
+              >
+                currency_exchange
+              </span>
               <span className="text-[9px] font-medium">Trade</span>
             </button>
           );
@@ -89,12 +103,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           const guard = tabEnabled(Screen.CHAT);
           return (
             <button
-              className={`${getButtonClass(activeTab === Screen.CHAT)} ${guard.enabled ? '' : 'opacity-40 cursor-not-allowed'}`}
+              className={`${getButtonClass(activeTab === Screen.CHAT)} ${guard.enabled ? "" : "opacity-40 cursor-not-allowed"}`}
               onClick={() => guard.enabled && onTabChange(Screen.CHAT)}
               title={guard.enabled ? undefined : guard.reason}
               disabled={!guard.enabled}
             >
-              <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.CHAT ? 'filled text-primary' : ''}`}>chat_bubble</span>
+              <span
+                className={`material-symbols-outlined text-[22px] ${activeTab === Screen.CHAT ? "filled text-primary" : ""}`}
+              >
+                chat_bubble
+              </span>
               <span className="text-[9px] font-medium">Chat</span>
             </button>
           );
@@ -105,12 +123,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           const guard = tabEnabled(Screen.STORE);
           return (
             <button
-              className={`${getButtonClass(activeTab === Screen.STORE)} ${guard.enabled ? '' : 'opacity-40 cursor-not-allowed'}`}
+              className={`${getButtonClass(activeTab === Screen.STORE)} ${guard.enabled ? "" : "opacity-40 cursor-not-allowed"}`}
               onClick={() => guard.enabled && onTabChange(Screen.STORE)}
               title={guard.enabled ? undefined : guard.reason}
               disabled={!guard.enabled}
             >
-              <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.STORE ? 'filled text-primary' : ''}`}>storefront</span>
+              <span
+                className={`material-symbols-outlined text-[22px] ${activeTab === Screen.STORE ? "filled text-primary" : ""}`}
+              >
+                storefront
+              </span>
               <span className="text-[9px] font-medium">Store</span>
             </button>
           );
@@ -118,19 +140,31 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
 
         {/* Activity */}
         <button className={getButtonClass(activeTab === Screen.ACTIVITY)} onClick={() => onTabChange(Screen.ACTIVITY)}>
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.ACTIVITY ? 'filled text-primary' : ''}`}>history</span>
+          <span
+            className={`material-symbols-outlined text-[22px] ${activeTab === Screen.ACTIVITY ? "filled text-primary" : ""}`}
+          >
+            history
+          </span>
           <span className="text-[9px] font-medium">Activity</span>
         </button>
 
         {/* Evidence */}
         <button className={getButtonClass(activeTab === Screen.EVIDENCE)} onClick={() => onTabChange(Screen.EVIDENCE)}>
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.EVIDENCE ? 'filled text-primary' : ''}`}>verified</span>
+          <span
+            className={`material-symbols-outlined text-[22px] ${activeTab === Screen.EVIDENCE ? "filled text-primary" : ""}`}
+          >
+            verified
+          </span>
           <span className="text-[9px] font-medium">Proof</span>
         </button>
 
         {/* Settings */}
         <button className={getButtonClass(activeTab === Screen.SETTINGS)} onClick={() => onTabChange(Screen.SETTINGS)}>
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === Screen.SETTINGS ? 'filled text-primary' : ''}`}>settings</span>
+          <span
+            className={`material-symbols-outlined text-[22px] ${activeTab === Screen.SETTINGS ? "filled text-primary" : ""}`}
+          >
+            settings
+          </span>
           <span className="text-[9px] font-medium">Set</span>
         </button>
       </div>

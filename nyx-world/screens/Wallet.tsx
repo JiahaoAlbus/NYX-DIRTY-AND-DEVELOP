@@ -180,11 +180,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
             onClick={() => {}}
           />
           <ActionButton icon="send" label="Send" onClick={() => setShowSend(true)} />
-          <ActionButton
-            icon="swap_horiz"
-            label="Swap"
-            onClick={() => onNavigate(Screen.EXCHANGE)}
-          />
+          <ActionButton icon="swap_horiz" label="Swap" onClick={() => onNavigate(Screen.EXCHANGE)} />
           <ActionButton icon="water_drop" label="Faucet" onClick={() => onNavigate(Screen.FAUCET as any)} />
         </div>
 
@@ -269,7 +265,9 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                       <div className="text-xs font-bold">
                         {isIncoming ? "Receive" : "Send"} {t.amount} {t.asset_id}
                       </div>
-                      <div className={`text-[10px] font-bold ${t.replay_ok ? "text-binance-green" : "text-binance-red"}`}>
+                      <div
+                        className={`text-[10px] font-bold ${t.replay_ok ? "text-binance-green" : "text-binance-red"}`}
+                      >
                         {t.replay_ok ? "Verified" : "Unverified"}
                       </div>
                     </div>
@@ -390,10 +388,17 @@ const ActionButton: React.FC<{
   disabled?: boolean;
   disabledReason?: string;
 }> = ({ icon, label, onClick, disabled, disabledReason }) => (
-  <button onClick={onClick} className="flex flex-col items-center gap-2 group" disabled={disabled} title={disabled ? disabledReason : ""}>
+  <button
+    onClick={onClick}
+    className="flex flex-col items-center gap-2 group"
+    disabled={disabled}
+    title={disabled ? disabledReason : ""}
+  >
     <div
       className={`size-12 rounded-full flex items-center justify-center shadow-lg transition-transform ${
-        disabled ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-background-dark group-hover:scale-110"
+        disabled
+          ? "bg-surface-light dark:bg-surface-dark text-text-subtle"
+          : "bg-primary text-background-dark group-hover:scale-110"
       }`}
     >
       <span className="material-symbols-outlined">{icon}</span>

@@ -19,7 +19,7 @@ export function hasModule(caps: Capabilities | null, moduleName: string): boolea
 export function featureStatus(
   caps: Capabilities | null,
   moduleName: string,
-  featureName: string
+  featureName: string,
 ): CapabilityStatus | null {
   if (!caps) return null;
   const moduleFeatures = caps.module_features?.[moduleName];

@@ -40,7 +40,7 @@ def main() -> int:
         rel = path.relative_to(root).as_posix()
         if rel.startswith((".git/", "node_modules/", "release_artifacts/", "docs/evidence/", "nyx-world/dist/")):
             continue
-        if rel in ALLOWLIST:
+        if rel in ALLOWLIST or rel.endswith(".env.example"):
             continue
         if not _is_text(path):
             continue

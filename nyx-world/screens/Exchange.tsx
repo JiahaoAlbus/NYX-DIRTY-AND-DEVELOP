@@ -222,7 +222,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
         amt,
         px,
         assetIn,
-        assetOut
+        assetOut,
       )) as RunResult;
       setLastAction(result);
       setToast(`Order placed (run: ${deterministicRunId})`);
@@ -428,7 +428,8 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                   state_hash: {String(lastAction.state_hash ?? "")}
                 </div>
                 <div className="text-[10px] text-text-subtle">
-                  fee_total: {String(lastAction.fee_total ?? "—")} • treasury: {String(lastAction.treasury_address ?? "—")}
+                  fee_total: {String(lastAction.fee_total ?? "—")} • treasury:{" "}
+                  {String(lastAction.treasury_address ?? "—")}
                 </div>
                 <button
                   onClick={() => copyText(String(lastAction.run_id ?? ""))}
@@ -465,7 +466,9 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               </div>
             )}
 
-            {!ordersError && orders.length === 0 && !ordersLoading && <div className="text-sm text-text-subtle">No orders.</div>}
+            {!ordersError && orders.length === 0 && !ordersLoading && (
+              <div className="text-sm text-text-subtle">No orders.</div>
+            )}
 
             <div className="flex flex-col gap-2">
               {orders.map((o) => (
@@ -544,7 +547,9 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               </div>
             )}
 
-            {!tradesError && trades.length === 0 && !tradesLoading && <div className="text-sm text-text-subtle">No trades.</div>}
+            {!tradesError && trades.length === 0 && !tradesLoading && (
+              <div className="text-sm text-text-subtle">No trades.</div>
+            )}
 
             <div className="flex flex-col gap-2">
               {trades.map((t) => (
@@ -559,7 +564,8 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                     <span className="text-text-subtle font-mono">{formatCompactId(t.trade_id)}</span>
                   </div>
                   <div className="mt-1 text-xs">
-                    amt: <span className="font-mono">{t.amount}</span> • px: <span className="font-mono">{t.price}</span>
+                    amt: <span className="font-mono">{t.amount}</span> • px:{" "}
+                    <span className="font-mono">{t.price}</span>
                   </div>
                   <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run: {t.run_id}</div>
                 </div>

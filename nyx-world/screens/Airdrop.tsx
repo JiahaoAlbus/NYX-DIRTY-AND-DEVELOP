@@ -1,6 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Gift, CheckCircle2, Circle, Trophy, ShieldCheck } from 'lucide-react';
-import { allocateRunId, ApiError, AirdropTaskV1, claimAirdropV1, fetchAirdropTasksV1, parseSeed, PortalSession } from '../api';
+import React, { useEffect, useMemo, useState } from "react";
+import { Gift, CheckCircle2, Circle, Trophy, ShieldCheck } from "lucide-react";
+import {
+  allocateRunId,
+  ApiError,
+  AirdropTaskV1,
+  claimAirdropV1,
+  fetchAirdropTasksV1,
+  parseSeed,
+  PortalSession,
+} from "../api";
 
 interface AirdropProps {
   seed: string;
@@ -15,15 +23,15 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
   const [status, setStatus] = useState<string | null>(null);
   const [lastClaim, setLastClaim] = useState<Record<string, unknown> | null>(null);
 
-  const baseRunId = useMemo(() => (runId || '').trim() || 'airdrop', [runId]);
+  const baseRunId = useMemo(() => (runId || "").trim() || "airdrop", [runId]);
 
   const loadTasks = async () => {
     if (!backendOnline) {
-      setStatus('Backend unavailable.');
+      setStatus("Backend unavailable.");
       return;
     }
     if (!session?.access_token) {
-      setStatus('Sign in required.');
+      setStatus("Sign in required.");
       return;
     }
     setLoading(true);
@@ -74,47 +82,64 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
       </div>
 
       <div className="flex flex-col gap-4">
-        <h3 className="font-bold px-2 flex items-center gap-2"><Gift size={18} className="text-primary" /> Available Tasks</h3>
+        <h3 className="font-bold px-2 flex items-center gap-2">
+          <Gift size={18} className="text-primary" /> Available Tasks
+        </h3>
         {tasks.length === 0 ? (
           <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-xs text-text-subtle">
-            {loading ? 'Loading tasks…' : backendOnline ? 'No tasks available.' : 'Backend unavailable.'}
+            {loading ? "Loading tasks…" : backendOnline ? "No tasks available." : "Backend unavailable."}
           </div>
-        ) : tasks.map(task => (
-          <div key={task.task_id} className="p-5 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex items-center justify-between group">
-            <div className="flex items-center gap-4">
-              <div className={`size-10 rounded-xl flex items-center justify-center ${task.claimed ? 'bg-binance-green/20 text-binance-green' : task.completed ? 'bg-primary/20 text-primary' : 'bg-black/5 dark:bg-white/5 text-text-subtle'}`}>
-                {task.claimed ? <CheckCircle2 size={24} /> : task.completed ? <Circle size={24} /> : <Circle size={24} />}
-              </div>
-              <div>
-                <div className="font-bold text-sm">{task.title}</div>
-                <div className="text-[10px] text-text-subtle">{task.description}</div>
-                <div className="text-xs text-primary">+{task.reward} NYXT</div>
-                {task.completion_run_id && (
-                  <div className="mt-1 flex items-center gap-1 text-[10px] font-mono text-text-subtle">
-                    <ShieldCheck size={12} className="text-binance-green" />
-                    completion_run_id: {task.completion_run_id}
-                  </div>
-                )}
-              </div>
-            </div>
-            <button 
-              onClick={() => handleClaim(task.task_id)}
-              disabled={!task.claimable || loading}
-              title={
-                task.claimed
-                  ? `Already claimed: ${task.claim_run_id ?? ''}`
-                  : task.completed
-                    ? undefined
-                    : 'Complete the task via real receipts first.'
-              }
-              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
-                task.claimable ? 'bg-primary text-black hover:scale-105 active:scale-95' : 'bg-surface-light dark:bg-surface-dark text-text-subtle opacity-70 cursor-not-allowed'
-              }`}
+        ) : (
+          tasks.map((task) => (
+            <div
+              key={task.task_id}
+              className="p-5 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex items-center justify-between group"
             >
-              {task.claimed ? 'Claimed' : task.claimable ? 'Claim' : task.completed ? 'Ready' : 'Incomplete'}
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center gap-4">
+                <div
+                  className={`size-10 rounded-xl flex items-center justify-center ${task.claimed ? "bg-binance-green/20 text-binance-green" : task.completed ? "bg-primary/20 text-primary" : "bg-black/5 dark:bg-white/5 text-text-subtle"}`}
+                >
+                  {task.claimed ? (
+                    <CheckCircle2 size={24} />
+                  ) : task.completed ? (
+                    <Circle size={24} />
+                  ) : (
+                    <Circle size={24} />
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-sm">{task.title}</div>
+                  <div className="text-[10px] text-text-subtle">{task.description}</div>
+                  <div className="text-xs text-primary">+{task.reward} NYXT</div>
+                  {task.completion_run_id && (
+                    <div className="mt-1 flex items-center gap-1 text-[10px] font-mono text-text-subtle">
+                      <ShieldCheck size={12} className="text-binance-green" />
+                      completion_run_id: {task.completion_run_id}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => handleClaim(task.task_id)}
+                disabled={!task.claimable || loading}
+                title={
+                  task.claimed
+                    ? `Already claimed: ${task.claim_run_id ?? ""}`
+                    : task.completed
+                      ? undefined
+                      : "Complete the task via real receipts first."
+                }
+                className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
+                  task.claimable
+                    ? "bg-primary text-black hover:scale-105 active:scale-95"
+                    : "bg-surface-light dark:bg-surface-dark text-text-subtle opacity-70 cursor-not-allowed"
+                }`}
+              >
+                {task.claimed ? "Claimed" : task.claimable ? "Claim" : task.completed ? "Ready" : "Incomplete"}
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
       {lastClaim && (
@@ -123,9 +148,13 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
           <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-[10px] text-text-subtle break-all">
             {"run_id" in lastClaim && <div>run_id: {String((lastClaim as any).run_id)}</div>}
             {"state_hash" in lastClaim && <div>state_hash: {String((lastClaim as any).state_hash)}</div>}
-            {"receipt_hashes" in lastClaim && <div>receipt_hashes: {JSON.stringify((lastClaim as any).receipt_hashes)}</div>}
+            {"receipt_hashes" in lastClaim && (
+              <div>receipt_hashes: {JSON.stringify((lastClaim as any).receipt_hashes)}</div>
+            )}
             {"fee_total" in lastClaim && <div>fee_total: {String((lastClaim as any).fee_total)}</div>}
-            {"treasury_address" in lastClaim && <div>treasury_address: {String((lastClaim as any).treasury_address)}</div>}
+            {"treasury_address" in lastClaim && (
+              <div>treasury_address: {String((lastClaim as any).treasury_address)}</div>
+            )}
             {"balance" in lastClaim && <div>balance(NYXT): {String((lastClaim as any).balance)}</div>}
           </div>
         </div>

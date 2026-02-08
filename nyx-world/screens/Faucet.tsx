@@ -19,7 +19,10 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
   const [lastRunId, setLastRunId] = useState("");
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
 
-  const canSubmit = useMemo(() => backendOnline && !!session && !!address.trim() && !loading, [backendOnline, session, address, loading]);
+  const canSubmit = useMemo(
+    () => backendOnline && !!session && !!address.trim() && !loading,
+    [backendOnline, session, address, loading],
+  );
 
   const handleRequest = async () => {
     if (!canSubmit || !session) return;
@@ -44,7 +47,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
       const treasury = (res as any).treasury_address;
       const newBalance = (res as any).balance;
       setStatus(
-        `Faucet success. +1000 ${assetId}. New balance: ${newBalance}. Fee: ${feeTotal ?? "?"} NYXT → ${treasury ?? "treasury"}.`
+        `Faucet success. +1000 ${assetId}. New balance: ${newBalance}. Fee: ${feeTotal ?? "?"} NYXT → ${treasury ?? "treasury"}.`,
       );
     } catch (err) {
       const message = (err as Error).message;
@@ -96,8 +99,8 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3 items-start">
             <Info size={16} className="text-primary shrink-0 mt-0.5" />
             <div className="text-[10px] text-text-subtle leading-relaxed">
-              Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns a
-              deterministic receipt and fee routing.
+              Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns
+              a deterministic receipt and fee routing.
             </div>
           </div>
 
@@ -105,7 +108,9 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
             onClick={handleRequest}
             disabled={!canSubmit}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${
-              !canSubmit ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black hover:scale-[1.02] active:scale-95"
+              !canSubmit
+                ? "bg-surface-light dark:bg-surface-dark text-text-subtle"
+                : "bg-primary text-black hover:scale-[1.02] active:scale-95"
             }`}
           >
             {loading ? (
@@ -147,4 +152,3 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
     </div>
   );
 };
-

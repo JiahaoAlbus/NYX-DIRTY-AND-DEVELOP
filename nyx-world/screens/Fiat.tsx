@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { ArrowUpDown, Landmark, CreditCard, ShieldCheck, ChevronRight } from 'lucide-react';
+import React, { useState } from "react";
+import { ArrowUpDown, Landmark, CreditCard, ShieldCheck, ChevronRight } from "lucide-react";
 
 export const Fiat: React.FC = () => {
-  const [fiatAmount, setFiatAmount] = useState('100');
-  const [cryptoAmount, setCryptoAmount] = useState('100');
+  const [fiatAmount, setFiatAmount] = useState("100");
+  const [cryptoAmount, setCryptoAmount] = useState("100");
 
   return (
     <div className="flex flex-col gap-6 text-text-main dark:text-white pb-24">
@@ -16,7 +16,7 @@ export const Fiat: React.FC = () => {
         <div className="flex flex-col gap-2 p-4 bg-background-light dark:bg-background-dark/60 rounded-2xl border border-black/5 dark:border-white/5">
           <label className="text-[10px] text-text-subtle uppercase">Pay</label>
           <div className="flex items-center justify-between">
-            <input 
+            <input
               className="bg-transparent text-2xl font-bold outline-none flex-1"
               value={fiatAmount}
               onChange={(e) => setFiatAmount(e.target.value)}
@@ -34,11 +34,7 @@ export const Fiat: React.FC = () => {
         <div className="flex flex-col gap-2 p-4 bg-background-light dark:bg-background-dark/60 rounded-2xl border border-black/5 dark:border-white/5">
           <label className="text-[10px] text-text-subtle uppercase">Receive</label>
           <div className="flex items-center justify-between">
-            <input 
-              className="bg-transparent text-2xl font-bold outline-none flex-1"
-              value={cryptoAmount}
-              readOnly
-            />
+            <input className="bg-transparent text-2xl font-bold outline-none flex-1" value={cryptoAmount} readOnly />
             <div className="flex items-center gap-2 bg-surface-light dark:bg-surface-dark px-3 py-1.5 rounded-xl border border-black/5 dark:border-white/5">
               <span className="font-bold text-sm">NYXT</span>
             </div>
@@ -82,7 +78,7 @@ export const Fiat: React.FC = () => {
       </div>
 
       <div className="mt-auto flex items-center justify-center gap-2 text-[10px] text-text-subtle p-4 bg-primary/5 rounded-2xl border border-primary/10">
-        <ShieldCheck size={14} className="text-primary" /> 
+        <ShieldCheck size={14} className="text-primary" />
         Security by NYX Deterministic Verification
       </div>
     </div>
