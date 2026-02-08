@@ -9,7 +9,7 @@ import ssl
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 from nyx_backend_gateway.errors import GatewayApiError, GatewayError
@@ -191,6 +191,10 @@ def _web2_match_allowlist(url: str, method: str) -> dict[str, object]:
         raise GatewayApiError("ALLOWLIST_DENY", "host required", http_status=400)
 
     hostname = parsed.hostname.lower()
+    normalized_path = unquote(parsed.path)
+    path_segments = [segment for segment in normalized_path.split("/") if segment]
+    if any(segment == ".." for segment in path_segments):
+        raise GatewayApiError("ALLOWLIST_DENY", "path traversal not allowed", http_status=400)
     try:
         ipaddress.ip_address(hostname)
         raise GatewayApiError("ALLOWLIST_DENY", "ip host not allowed", http_status=400)

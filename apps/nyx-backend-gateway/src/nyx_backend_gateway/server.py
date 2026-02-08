@@ -164,6 +164,17 @@ class RequestLimiter:
 class GatewayHandler(BaseHTTPRequestHandler):
     server_version = "NYXGateway/2.0"
 
+    def _send_security_headers(self) -> None:
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        self.send_header("Cache-Control", "no-store")
+
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         try:
             data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -173,6 +184,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self._send_security_headers()
             self.end_headers()
             self.wfile.write(data)
         except Exception as exc:
@@ -181,6 +193,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(error_data)))
+            self._send_security_headers()
             self.end_headers()
             self.wfile.write(error_data)
 
@@ -200,6 +213,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self._send_security_headers()
         self.end_headers()
 
     def _send_text(self, payload: str, status: HTTPStatus) -> None:
@@ -207,6 +221,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -214,6 +229,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(data)
 

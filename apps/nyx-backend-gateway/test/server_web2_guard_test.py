@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
+import nyx_backend_gateway.web2_guard as web2_guard
 
 
 class ServerWeb2GuardTests(unittest.TestCase):
@@ -93,7 +94,9 @@ class ServerWeb2GuardTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(isinstance(allow.get("allowlist"), list))
 
-        with patch.object(gateway, "_web2_request", return_value=(200, b'{"ok":true}', False, None)):
+        with patch.object(web2_guard, "_web2_resolve_public_host", return_value=None), patch.object(
+            web2_guard, "_web2_request", return_value=(200, b'{"ok":true}', False, None)
+        ):
             status, resp = self._post(
                 "/web2/v1/request",
                 {"seed": 123, "run_id": "run-web2-1", "payload": {"url": "https://api.github.com/zen", "method": "GET"}},
