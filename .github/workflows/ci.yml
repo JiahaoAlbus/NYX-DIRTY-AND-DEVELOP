@@ -177,6 +177,12 @@ jobs:
           # Limit CI to the core L0 identity unit tests; bridge tests pull in unfinished app suites.
           python -m unittest packages.l0-identity.test.identity_test
 
+      - name: Test Gateway (unit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s apps/nyx-backend-gateway/test -p "*_test.py"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -185,8 +191,24 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      # Minimal lint: syntax compile for L0 identity tests until a linter is selected.
-      - name: Lint L0 identity
+      - name: Setup Python
+        uses: actions/setup-python@82c7b1f587c6b3f0f2b5b037b3053ceca9a7a4c9 # v5.4.0
+        with:
+          python-version: "3.10"
+
+      - name: Setup Node
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: "20"
+
+      - name: Install Python linters
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install ruff black
+
+      - name: Lint Python (ruff/black)
         shell: bash
         run: |
           set -euo pipefail
@@ -194,7 +216,58 @@ jobs:
             echo "forced lint failure"
             exit 1
           fi
-          python -m compileall packages/l0-identity/test
+          ruff check apps/nyx-backend-gateway/src apps/nyx-backend-gateway/test
+          black --check apps/nyx-backend-gateway/src apps/nyx-backend-gateway/test
+
+      - name: Lint Web (prettier)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd nyx-world
+          npm ci
+          npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"
+
+      - name: Lint Shell Scripts (shellcheck)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/nyx_conformance.sh scripts/nyx_verify_all.sh scripts/build_release_artifacts.sh
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Python
+        uses: actions/setup-python@82c7b1f587c6b3f0f2b5b037b3053ceca9a7a4c9 # v5.4.0
+        with:
+          python-version: "3.10"
+
+      - name: Setup Node
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: "20"
+
+      - name: Typecheck Python (mypy)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install mypy
+          mypy apps/nyx-backend-gateway/src/nyx_backend_gateway
+
+      - name: Typecheck Web (tsc)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd nyx-world
+          npm ci
+          npx tsc --noEmit
 
   sast:
     name: SAST
@@ -218,7 +291,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.31.9
         with:
-          languages: python
+          languages: python, javascript
 
       - name: Analyze CodeQL
         uses: github/codeql-action/analyze@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.31.9
@@ -273,6 +346,26 @@ jobs:
         with:
           sarif_file: .artifacts/deps.sarif
 
+  secret-scan:
+    name: Secret Scan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Python
+        uses: actions/setup-python@82c7b1f587c6b3f0f2b5b037b3053ceca9a7a4c9 # v5.4.0
+        with:
+          python-version: "3.10"
+
+      - name: Secret scan (nyx_secret_scan)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/nyx_secret_scan.py
+
   conformance:
     name: Conformance (Frozen Rules Gate)
     runs-on: ubuntu-latest
@@ -303,3 +396,8 @@ jobs:
         shell: bash
         run: |
           bash conformance/run.sh
+
+      - name: NYX conformance suite
+        shell: bash
+        run: |
+          bash scripts/nyx_conformance.sh

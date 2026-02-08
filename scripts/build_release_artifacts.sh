@@ -7,6 +7,8 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RELEASE_DIR="release_artifacts"
 SEED=123
 RUN_ID="smoke-${TIMESTAMP}"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}"
+export TZ=UTC
 
 mkdir -p "${RELEASE_DIR}/web" "${RELEASE_DIR}/backend" "${RELEASE_DIR}/extension" "${RELEASE_DIR}/ios" "${RELEASE_DIR}/proof"
 
@@ -20,7 +22,11 @@ npm install
 npm run build
 cd ..
 rm -f "${RELEASE_DIR}/web/nyx-portal-dist.zip"
-zip -r "${RELEASE_DIR}/web/nyx-portal-dist.zip" nyx-world/dist
+find nyx-world/dist -type f -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
+(
+  cd nyx-world
+  find dist -type f | LC_ALL=C sort | zip -X -@ "../${RELEASE_DIR}/web/nyx-portal-dist.zip"
+)
 cat <<EOF > ${RELEASE_DIR}/web/INSTALL_WEB.md
 # NYX Portal Web Installation
 1. Extract nyx-portal-dist.zip
@@ -33,7 +39,7 @@ bash scripts/build_nyx_world.sh
 
 echo "--- Phase 3: Extension Build ---"
 rm -f "${RELEASE_DIR}/extension/nyx-extension.zip"
-zip -r "${RELEASE_DIR}/extension/nyx-extension.zip" packages/extension
+find packages/extension -type f | LC_ALL=C sort | zip -X -@ "${RELEASE_DIR}/extension/nyx-extension.zip"
 cat <<EOF > ${RELEASE_DIR}/extension/INSTALL_EXTENSION.md
 # NYX Extension Installation
 1. Extract nyx-extension.zip
@@ -66,7 +72,9 @@ cat <<EOF > ${RELEASE_DIR}/ios/INSTALL_IOS.md
 EOF
 
 echo "--- Phase 5: Backend Packaging ---"
-tar -czf "${RELEASE_DIR}/backend/nyx-backend.tar.gz" apps/nyx-backend apps/nyx-backend-gateway packages
+tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner -czf \
+  "${RELEASE_DIR}/backend/nyx-backend.tar.gz" \
+  apps/nyx-backend apps/nyx-backend-gateway packages
 cat <<EOF > ${RELEASE_DIR}/backend/INSTALL_BACKEND.md
 # NYX Backend Installation
 1. Extract nyx-backend.tar.gz
@@ -85,6 +93,8 @@ cat <<EOF > ${RELEASE_DIR}/RELEASE_NOTES_TESTNET_PORTAL_V1.md
 EOF
 
 cd ${RELEASE_DIR}
+python ../scripts/generate_sbom.py sbom.json
+python ../scripts/generate_manifest.py . manifest.json
 find . -type f -not -name "SHA256SUMS.txt" -exec sha256sum {} + > SHA256SUMS.txt
 cd ..
 
