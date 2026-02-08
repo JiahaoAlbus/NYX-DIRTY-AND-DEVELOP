@@ -220,6 +220,16 @@ def search_rooms(conn, query: str, limit: int = 50) -> list[dict[str, object]]:
 def post_message(conn, room_id: str, sender_account_id: str, body: str) -> tuple[dict[str, object], dict[str, object]]:
     if not isinstance(body, str) or not body or len(body) > 512:
         raise PortalError("message invalid")
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise PortalError("message must be e2ee json") from exc
+    if not isinstance(parsed, dict):
+        raise PortalError("message must be e2ee json")
+    if not isinstance(parsed.get("ciphertext"), str) or not parsed.get("ciphertext"):
+        raise PortalError("message missing ciphertext")
+    if not isinstance(parsed.get("iv"), str) or not parsed.get("iv"):
+        raise PortalError("message missing iv")
     last = conn.execute(
         "SELECT seq, chain_head FROM chat_messages WHERE room_id = ? ORDER BY seq DESC LIMIT 1",
         (room_id,),

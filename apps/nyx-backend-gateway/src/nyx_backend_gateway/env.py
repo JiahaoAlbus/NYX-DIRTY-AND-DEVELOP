@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from nyx_backend_gateway.storage import StorageError
+from nyx_backend_gateway.settings import SettingsError, get_settings
 
 
 def load_env_file(path: Path) -> None:
@@ -22,16 +23,15 @@ def load_env_file(path: Path) -> None:
             os.environ.setdefault(key, value)
 
 
+def _settings():
+    try:
+        return get_settings()
+    except SettingsError as exc:
+        raise StorageError(str(exc)) from exc
+
+
 def get_treasury_address() -> str:
-    address = os.environ.get("NYX_TESTNET_TREASURY_ADDRESS", "").strip()
-    if not address:
-        address = os.environ.get("NYX_TESTNET_FEE_ADDRESS", "").strip()
-    if not address:
-        # Default Testnet Treasury Address as per mission requirement
-        return "0x0Aa313fCE773786C8425a13B96DB64205c5edCBc"
-    if len(address) < 8:
-        raise StorageError("NYX_TESTNET_TREASURY_ADDRESS too short")
-    return address
+    return _settings().treasury_address
 
 
 def get_fee_address() -> str:
@@ -39,117 +39,48 @@ def get_fee_address() -> str:
 
 
 def get_platform_fee_bps() -> int:
-    raw = os.environ.get("NYX_PLATFORM_FEE_BPS", "").strip()
-    if not raw:
-        # Default 10 BPS (0.1%) matching Binance standard fee
-        return 10
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_PLATFORM_FEE_BPS must be int") from exc
-    if value < 0 or value > 10_000:
-        raise StorageError("NYX_PLATFORM_FEE_BPS out of bounds")
-    return value
+    return _settings().platform_fee_bps
 
 
 def get_protocol_fee_min() -> int | None:
-    raw = os.environ.get("NYX_PROTOCOL_FEE_MIN", "").strip()
-    if not raw:
-        return None
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_PROTOCOL_FEE_MIN must be int") from exc
-    if value < 0:
-        raise StorageError("NYX_PROTOCOL_FEE_MIN out of bounds")
-    return value
+    return _settings().protocol_fee_min
 
 
 def get_portal_session_secret() -> str:
-    secret = os.environ.get("NYX_PORTAL_SESSION_SECRET", "").strip()
-    if not secret:
-        return "testnet-session-secret"
-    if len(secret) < 12:
-        raise StorageError("NYX_PORTAL_SESSION_SECRET too short")
-    return secret
+    return _settings().portal_session_secret
 
 
 def get_portal_challenge_ttl_seconds() -> int:
-    raw = os.environ.get("NYX_PORTAL_CHALLENGE_TTL", "").strip()
-    if not raw:
-        return 300
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_PORTAL_CHALLENGE_TTL must be int") from exc
-    if value < 60 or value > 3600:
-        raise StorageError("NYX_PORTAL_CHALLENGE_TTL out of bounds")
-    return value
+    return _settings().portal_challenge_ttl
 
 
 def get_faucet_cooldown_seconds() -> int:
-    raw = os.environ.get("NYX_FAUCET_COOLDOWN_SECONDS", "").strip()
-    if not raw:
-        return 24 * 60 * 60
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_FAUCET_COOLDOWN_SECONDS must be int") from exc
-    if value < 0 or value > 30 * 24 * 60 * 60:
-        raise StorageError("NYX_FAUCET_COOLDOWN_SECONDS out of bounds")
-    return value
+    return _settings().faucet_cooldown_seconds
 
 
 def get_faucet_max_amount_per_24h() -> int:
-    raw = os.environ.get("NYX_FAUCET_MAX_AMOUNT_PER_24H", "").strip()
-    if not raw:
-        return 1_000
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_FAUCET_MAX_AMOUNT_PER_24H must be int") from exc
-    if value < 0 or value > 1_000_000_000:
-        raise StorageError("NYX_FAUCET_MAX_AMOUNT_PER_24H out of bounds")
-    return value
+    return _settings().faucet_max_amount_per_24h
 
 
 def get_faucet_max_claims_per_24h() -> int:
-    raw = os.environ.get("NYX_FAUCET_MAX_CLAIMS_PER_24H", "").strip()
-    if not raw:
-        return 1
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_FAUCET_MAX_CLAIMS_PER_24H must be int") from exc
-    if value < 0 or value > 1000:
-        raise StorageError("NYX_FAUCET_MAX_CLAIMS_PER_24H out of bounds")
-    return value
+    return _settings().faucet_max_claims_per_24h
 
 
 def get_faucet_ip_max_claims_per_24h() -> int:
-    raw = os.environ.get("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H", "").strip()
-    if not raw:
-        return 5
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise StorageError("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H must be int") from exc
-    if value < 0 or value > 10_000:
-        raise StorageError("NYX_FAUCET_IP_MAX_CLAIMS_PER_24H out of bounds")
-    return value
+    return _settings().faucet_ip_max_claims_per_24h
 
 
 def get_0x_api_key() -> str:
-    return os.environ.get("NYX_0X_API_KEY", "").strip()
+    return _settings().api_0x_key
 
 
 def get_jupiter_api_key() -> str:
-    return os.environ.get("NYX_JUPITER_API_KEY", "").strip()
+    return _settings().api_jupiter_key
 
 
 def get_magic_eden_api_key() -> str:
-    return os.environ.get("NYX_MAGIC_EDEN_API_KEY", "").strip()
+    return _settings().api_magic_eden_key
 
 
 def get_payevm_api_key() -> str:
-    return os.environ.get("NYX_PAYEVM_API_KEY", "").strip()
+    return _settings().api_payevm_key

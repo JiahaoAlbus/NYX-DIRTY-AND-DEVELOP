@@ -56,6 +56,34 @@ class EvidenceDeterminismTests(unittest.TestCase):
             second_json = json.loads((second_dir / "evidence.json").read_text(encoding="utf-8"))
             self.assertEqual(first_json, second_json)
 
+    def test_wallet_transfer_evidence_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs"
+            payload = {
+                "from_address": "acct-alpha",
+                "to_address": "acct-beta",
+                "amount": 5,
+                "asset_id": "NYXT",
+            }
+            first = run_evidence(
+                seed=123,
+                run_id="run-w1",
+                module="wallet",
+                action="transfer",
+                payload=payload,
+                base_dir=run_root,
+            )
+            second = run_evidence(
+                seed=123,
+                run_id="run-w2",
+                module="wallet",
+                action="transfer",
+                payload=payload,
+                base_dir=run_root,
+            )
+            self.assertEqual(first.state_hash, second.state_hash)
+            self.assertEqual(first.receipt_hashes, second.receipt_hashes)
+
 
 if __name__ == "__main__":
     unittest.main()

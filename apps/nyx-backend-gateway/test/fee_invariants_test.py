@@ -38,6 +38,26 @@ class FeeInvariantTests(unittest.TestCase):
             ledger.protocol_fee_total + ledger.platform_fee_amount,
         )
 
+    def test_nonzero_fee_for_state_mutations(self) -> None:
+        scenarios = [
+            ("wallet", "transfer", {"amount": 10}),
+            ("wallet", "faucet", {"amount": 100}),
+            ("wallet", "airdrop", {"amount": 100}),
+            ("exchange", "place_order", {"amount": 5, "price": 10}),
+            ("exchange", "cancel_order", {"amount": 1}),
+            ("marketplace", "listing_publish", {"price": 10}),
+            ("marketplace", "purchase_listing", {"qty": 1, "price": 10}),
+            ("chat", "message_event", {"amount": 1}),
+            ("web2", "guard_request", {"amount": 1}),
+        ]
+        for module, action, payload in scenarios:
+            ledger = route_fee(module, action, payload, f"run-{module}-{action}")
+            self.assertGreater(
+                ledger.total_paid,
+                0,
+                msg=f"{module}.{action} fee_total should be > 0",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

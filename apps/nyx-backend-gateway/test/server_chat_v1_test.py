@@ -85,7 +85,7 @@ class ServerChatV1Tests(unittest.TestCase):
         room_id = room.get("room_id")
         status, message = self._post(
             f"/chat/v1/rooms/{room_id}/messages",
-            {"body": "hello"},
+            {"body": json.dumps({"ciphertext": "abc123", "iv": "def456"})},
             token=token,
         )
         self.assertEqual(status, 200)
