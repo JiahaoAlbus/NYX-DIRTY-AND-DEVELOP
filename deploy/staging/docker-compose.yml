@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  nyx-gateway:
+    image: python:3.10-slim
+    working_dir: /app
+    volumes:
+      - ../..:/app:ro
+      - ./data:/data
+    environment:
+      - NYX_GATEWAY_DB_PATH=/data/nyx_gateway.db
+    env_file:
+      - ./nyx.env
+    command: ["python", "-m", "nyx_backend_gateway.server", "--host", "0.0.0.0", "--port", "8091", "--env-file", "/app/deploy/staging/nyx.env"]
+    ports:
+      - "8091:8091"

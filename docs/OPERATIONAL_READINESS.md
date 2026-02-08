@@ -63,3 +63,22 @@ Runbook references:
 
 - Maintain on-call rotation for production
 - Retain evidence logs for audit windows
+
+## 9) Runbooks
+
+### 9.1 Rolling restart (gateway)
+1. Verify `/healthz` is green on all instances.
+2. Restart one instance at a time.
+3. Confirm `/healthz` and `/version` on the restarted instance.
+4. Repeat for the next instance.
+
+### 9.2 Database migrations
+- `create_connection()` auto-applies schema migrations on startup.
+- **Before upgrades**: take a backup (see `scripts/nyx_backup_encrypted.sh`).
+- **After upgrades**: verify DB schema version and run `scripts/nyx_verify_all.sh`.
+
+### 9.3 Rollback
+1. Stop the gateway process.
+2. Restore the latest encrypted backup (`scripts/nyx_restore_encrypted.sh`).
+3. Redeploy the previous release artifact.
+4. Verify `/healthz`, `/capabilities`, and evidence replay.
