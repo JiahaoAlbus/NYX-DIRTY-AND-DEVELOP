@@ -1,9 +1,9 @@
-import _bootstrap
 import sqlite3
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.migrations import apply_migrations
 
 
@@ -13,12 +13,7 @@ class StorageMigrationTests(unittest.TestCase):
             db_path = Path(tmp) / "gateway.db"
             conn = sqlite3.connect(str(db_path))
             apply_migrations(conn)
-            tables = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            }
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
             expected = {
                 "meta",
                 "evidence_runs",

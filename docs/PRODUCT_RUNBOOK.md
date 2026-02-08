@@ -118,6 +118,18 @@ python scripts/nyx_monitor_local.py
 python scripts/nyx_metrics_exporter.py
 export NYX_BACKUP_PASSPHRASE="your-strong-passphrase"
 bash scripts/nyx_backup_encrypted.sh
+
+## 7) Staging / Prod (docker-compose)
+
+```bash
+# staging
+cp deploy/staging/nyx.env.example deploy/staging/nyx.env
+docker compose -f deploy/staging/docker-compose.yml up -d
+
+# prod (example skeleton)
+cp deploy/prod/nyx.env.example deploy/prod/nyx.env
+docker compose -f deploy/prod/docker-compose.yml up -d
+```
 ```
 
 Docs:

@@ -255,7 +255,14 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     const deterministicRunId = allocateRunId(runId, `marketplace-purchase-${buyListing.listing_id}`);
     setMutating(true);
     try {
-      const result = (await purchaseMarketplace(token, seedInt, deterministicRunId, accountId, buyListing.listing_id, qty)) as RunResult;
+      const result = (await purchaseMarketplace(
+        token,
+        seedInt,
+        deterministicRunId,
+        accountId,
+        buyListing.listing_id,
+        qty,
+      )) as RunResult;
       setLastAction(result);
       setToast(`Purchased (run: ${deterministicRunId})`);
       setBuyListing(null);
@@ -413,7 +420,9 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
                   <div className="text-sm font-bold truncate">{p.title ?? p.sku ?? "Purchase"}</div>
                   <div className="text-[10px] text-text-subtle">qty {p.qty}</div>
                 </div>
-                <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">purchase: {formatCompactId(p.purchase_id)}</div>
+                <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">
+                  purchase: {formatCompactId(p.purchase_id)}
+                </div>
                 <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run: {p.run_id}</div>
                 <div className="mt-2 flex items-center justify-between">
                   <button
@@ -541,7 +550,9 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
       {lastAction && (
         <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
           <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
-          <div className="text-[10px] font-mono text-text-subtle break-all">run_id: {String(lastAction.run_id ?? "")}</div>
+          <div className="text-[10px] font-mono text-text-subtle break-all">
+            run_id: {String(lastAction.run_id ?? "")}
+          </div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
             state_hash: {String(lastAction.state_hash ?? "")}
           </div>

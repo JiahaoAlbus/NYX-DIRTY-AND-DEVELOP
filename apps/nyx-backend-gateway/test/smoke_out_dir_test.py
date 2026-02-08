@@ -1,8 +1,9 @@
-import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import _bootstrap  # noqa: F401
 
 
 def test_smoke_out_dir_creates_marker():

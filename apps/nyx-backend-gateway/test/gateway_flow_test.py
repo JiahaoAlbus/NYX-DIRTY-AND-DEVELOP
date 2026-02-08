@@ -1,10 +1,10 @@
-import _bootstrap
 import hashlib
 import os
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.gateway import GatewayError, execute_run
 from nyx_backend_gateway.storage import apply_wallet_faucet, create_connection, load_by_id
 
@@ -156,7 +156,7 @@ class GatewayFlowTests(unittest.TestCase):
                 run_id=run_id,
                 module="chat",
                 action="message_event",
-                payload={"channel": "dm/acct-1/acct-2", "message": "{\"ciphertext\":\"AA==\",\"iv\":\"BB==\"}"},
+                payload={"channel": "dm/acct-1/acct-2", "message": '{"ciphertext":"AA==","iv":"BB=="}'},
                 caller_account_id="acct-1",
                 db_path=db_path,
                 run_root=run_root,

@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Screen } from '../types';
-import { fetchDiscoveryFeed } from '../api';
-import type { Capabilities } from '../capabilities';
-import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from '../capabilities';
-import { 
-  Zap, 
-  Droplets, 
-  ArrowLeftRight, 
-  ShoppingBag, 
-  MessageCircle, 
+import React, { useEffect, useState } from "react";
+import { Screen } from "../types";
+import { fetchDiscoveryFeed } from "../api";
+import type { Capabilities } from "../capabilities";
+import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from "../capabilities";
+import {
+  Zap,
+  Droplets,
+  ArrowLeftRight,
+  ShoppingBag,
+  MessageCircle,
   Wallet as WalletIcon,
   ShieldCheck,
   Globe,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface HomeProps {
   backendOnline: boolean;
@@ -24,12 +24,7 @@ interface HomeProps {
   onNavigate: (screen: Screen) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ 
-  backendOnline, 
-  onRefresh, 
-  onNavigate,
-  capabilities
-}) => {
+export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate, capabilities }) => {
   const [feed, setFeed] = useState<any[]>([]);
   const [feedError, setFeedError] = useState<string | null>(null);
 
@@ -73,11 +68,11 @@ export const Home: React.FC<HomeProps> = ({
         <div className="relative z-10 flex flex-col gap-2">
           <h2 className="text-2xl font-black text-black leading-tight">Secure Your Future with NYX</h2>
           <p className="text-xs font-bold text-black/60 uppercase tracking-widest">Deterministic Web3 Ecosystem</p>
-          <button 
+          <button
             onClick={() => canAirdrop && onNavigate(Screen.AIRDROP)}
             disabled={!canAirdrop}
             title={canAirdrop ? undefined : featureReasonText(featureStatus(capabilities, "wallet", "airdrop"))}
-            className={`mt-4 w-fit rounded-xl bg-black px-6 py-2.5 text-xs font-bold shadow-xl transition-all ${canAirdrop ? 'text-primary hover:scale-105 active:scale-95' : 'text-white/60 opacity-70 cursor-not-allowed'}`}
+            className={`mt-4 w-fit rounded-xl bg-black px-6 py-2.5 text-xs font-bold shadow-xl transition-all ${canAirdrop ? "text-primary hover:scale-105 active:scale-95" : "text-white/60 opacity-70 cursor-not-allowed"}`}
           >
             Claim Airdrop
           </button>
@@ -124,42 +119,44 @@ export const Home: React.FC<HomeProps> = ({
           onClick={() => onNavigate(Screen.STORE)}
         />
       </div>
-      
+
       {/* Ecosystem Modules */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between px-2">
           <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">Core Modules</h3>
-          <button onClick={onRefresh} className="text-[10px] text-primary font-bold">Refresh Status</button>
+          <button onClick={onRefresh} className="text-[10px] text-primary font-bold">
+            Refresh Status
+          </button>
         </div>
-        
+
         <div className="grid grid-cols-1 gap-3">
-          <ModuleCard 
-            icon={<WalletIcon className="text-primary" />} 
-            title="Web3 Wallet" 
+          <ModuleCard
+            icon={<WalletIcon className="text-primary" />}
+            title="Web3 Wallet"
             desc="Secure MetaMask-style asset management"
             disabled={!canWallet}
             disabledReason="Disabled by backend capabilities."
             onClick={() => onNavigate(Screen.WALLET)}
           />
-          <ModuleCard 
-            icon={<ArrowLeftRight className="text-binance-green" />} 
-            title="Exchange" 
+          <ModuleCard
+            icon={<ArrowLeftRight className="text-binance-green" />}
+            title="Exchange"
             desc="Pro-grade trading with deep liquidity"
             disabled={!canExchange}
             disabledReason={featureReasonText(featureStatus(capabilities, "exchange", "trading"))}
             onClick={() => onNavigate(Screen.EXCHANGE)}
           />
-          <ModuleCard 
-            icon={<MessageCircle className="text-blue-400" />} 
-            title="Chat" 
+          <ModuleCard
+            icon={<MessageCircle className="text-blue-400" />}
+            title="Chat"
             desc="Instagram-style P2P encrypted social"
             disabled={!canChat}
             disabledReason={featureReasonText(featureStatus(capabilities, "chat", "dm"))}
             onClick={() => onNavigate(Screen.CHAT)}
           />
-          <ModuleCard 
-            icon={<ShoppingBag className="text-orange-400" />} 
-            title="Store" 
+          <ModuleCard
+            icon={<ShoppingBag className="text-orange-400" />}
+            title="Store"
             desc="Deterministic marketplace for dApps"
             disabled={!canStore}
             disabledReason={featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))}
@@ -188,9 +185,11 @@ export const Home: React.FC<HomeProps> = ({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between px-2">
           <h3 className="font-black text-lg tracking-tight">Explore NYX</h3>
-          <button onClick={onRefresh} className="text-xs font-bold text-primary">Refresh</button>
+          <button onClick={onRefresh} className="text-xs font-bold text-primary">
+            Refresh
+          </button>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-3">
           {feed.length === 0 ? (
             <div className="col-span-2 rounded-3xl border border-black/5 dark:border-white/5 bg-surface-light dark:bg-surface-dark/40 p-6 text-xs text-text-subtle">
@@ -204,7 +203,9 @@ export const Home: React.FC<HomeProps> = ({
                       onClick={() => onNavigate(Screen.STORE)}
                       className="rounded-xl bg-primary px-3 py-2 text-[10px] font-bold text-black"
                       disabled={!canStore}
-                      title={canStore ? undefined : featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))}
+                      title={
+                        canStore ? undefined : featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))
+                      }
                     >
                       Open Store
                     </button>
@@ -227,10 +228,10 @@ export const Home: React.FC<HomeProps> = ({
                 onClick={() => canStore && onNavigate(Screen.STORE)}
                 disabled={!canStore}
                 title={canStore ? undefined : featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))}
-                className={`aspect-square rounded-2xl bg-surface-light dark:bg-surface-dark overflow-hidden relative group text-left ${canStore ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
+                className={`aspect-square rounded-2xl bg-surface-light dark:bg-surface-dark overflow-hidden relative group text-left ${canStore ? "cursor-pointer" : "opacity-60 cursor-not-allowed"}`}
               >
-                <img 
-                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${item.data.name || item.data.title}`} 
+                <img
+                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${item.data.name || item.data.title}`}
                   className="size-full object-cover group-hover:scale-110 transition-transform duration-500"
                   alt="feed-item"
                 />
@@ -247,26 +248,45 @@ export const Home: React.FC<HomeProps> = ({
   );
 };
 
-const Shortcut: React.FC<{ icon: React.ReactNode; label: string; disabled?: boolean; disabledReason?: string; onClick: () => void }> = ({ icon, label, disabled, disabledReason, onClick }) => (
+const Shortcut: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  onClick: () => void;
+}> = ({ icon, label, disabled, disabledReason, onClick }) => (
   <button
     onClick={() => !disabled && onClick()}
     disabled={disabled}
     title={disabled ? disabledReason : undefined}
-    className={`flex flex-col items-center gap-2 group ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    className={`flex flex-col items-center gap-2 group ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
   >
-    <div className={`size-12 rounded-2xl flex items-center justify-center border shadow-lg transition-all ${disabled ? 'bg-surface-light/50 dark:bg-surface-dark/20 text-text-subtle border-black/5 dark:border-white/5' : 'bg-surface-light dark:bg-surface-dark/40 text-primary border-black/5 dark:border-white/5 group-hover:bg-primary group-hover:text-black'}`}>
+    <div
+      className={`size-12 rounded-2xl flex items-center justify-center border shadow-lg transition-all ${disabled ? "bg-surface-light/50 dark:bg-surface-dark/20 text-text-subtle border-black/5 dark:border-white/5" : "bg-surface-light dark:bg-surface-dark/40 text-primary border-black/5 dark:border-white/5 group-hover:bg-primary group-hover:text-black"}`}
+    >
       {icon}
     </div>
-    <span className={`text-[10px] font-bold ${disabled ? 'text-text-subtle' : 'text-text-subtle group-hover:text-text-main dark:text-white'}`}>{label}</span>
+    <span
+      className={`text-[10px] font-bold ${disabled ? "text-text-subtle" : "text-text-subtle group-hover:text-text-main dark:text-white"}`}
+    >
+      {label}
+    </span>
   </button>
 );
 
-const ModuleCard: React.FC<{ icon: React.ReactNode; title: string; desc: string; disabled?: boolean; disabledReason?: string; onClick: () => void }> = ({ icon, title, desc, disabled, disabledReason, onClick }) => (
+const ModuleCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  disabled?: boolean;
+  disabledReason?: string;
+  onClick: () => void;
+}> = ({ icon, title, desc, disabled, disabledReason, onClick }) => (
   <button
     onClick={() => !disabled && onClick()}
     disabled={disabled}
     title={disabled ? disabledReason : undefined}
-    className={`flex items-center gap-4 p-4 rounded-3xl glass border border-black/5 dark:border-white/5 transition-all text-left group ${disabled ? 'bg-surface-light/40 dark:bg-surface-dark/10 opacity-60 cursor-not-allowed' : 'bg-surface-light dark:bg-surface-dark/20 hover:bg-surface-light/80 dark:hover:bg-surface-dark/40'}`}
+    className={`flex items-center gap-4 p-4 rounded-3xl glass border border-black/5 dark:border-white/5 transition-all text-left group ${disabled ? "bg-surface-light/40 dark:bg-surface-dark/10 opacity-60 cursor-not-allowed" : "bg-surface-light dark:bg-surface-dark/20 hover:bg-surface-light/80 dark:hover:bg-surface-dark/40"}`}
   >
     <div className="size-12 rounded-2xl bg-surface-light dark:bg-surface-dark flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
       {icon}
@@ -278,6 +298,8 @@ const ModuleCard: React.FC<{ icon: React.ReactNode; title: string; desc: string;
         <div className="mt-1 text-[10px] font-bold text-binance-red">{disabledReason}</div>
       )}
     </div>
-    <span className="material-symbols-outlined text-text-subtle opacity-0 group-hover:opacity-100 transition-all">chevron_right</span>
+    <span className="material-symbols-outlined text-text-subtle opacity-0 group-hover:opacity-100 transition-all">
+      chevron_right
+    </span>
   </button>
 );

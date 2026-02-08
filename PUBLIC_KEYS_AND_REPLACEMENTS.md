@@ -59,7 +59,7 @@ These endpoints are the current external API bases for integrations and the Web2
 
 ### Web2 Guard allowlist (shared)
 - Gatekept hosts include GitHub, CoinGecko, CoinCap, HttpBin, plus the endpoints above.
-- Update the allowlist in `apps/nyx-backend-gateway/src/nyx_backend_gateway/gateway.py` before production.
+- Update the allowlist in `apps/nyx-backend-gateway/src/nyx_backend_gateway/web2_guard.py` before production.
 
 ## Operational reminders
 

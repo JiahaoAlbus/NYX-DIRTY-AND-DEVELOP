@@ -5,7 +5,6 @@ import hashlib
 import hmac
 import json
 import time
-from dataclasses import dataclass
 from typing import Any
 
 from nyx_backend_gateway.env import get_portal_challenge_ttl_seconds, get_portal_session_secret
@@ -15,7 +14,6 @@ from nyx_backend_gateway.storage import (
     PortalAccount,
     PortalChallenge,
     PortalSession,
-    StorageError,
     consume_portal_challenge,
     insert_chat_message,
     insert_chat_room,
@@ -23,7 +21,6 @@ from nyx_backend_gateway.storage import (
     insert_portal_challenge,
     insert_portal_session,
     list_chat_messages,
-    list_chat_rooms,
     load_portal_account,
     load_portal_account_by_handle,
     load_portal_session,
@@ -165,7 +162,7 @@ def update_profile(conn, account_id: str, handle: str | None = None, bio: str | 
     account = load_account(conn, account_id)
     if account is None:
         raise PortalError("account not found")
-    
+
     new_handle = account.handle
     if handle is not None:
         new_handle = _validate_handle(handle)
@@ -173,17 +170,17 @@ def update_profile(conn, account_id: str, handle: str | None = None, bio: str | 
             existing = load_portal_account_by_handle(conn, new_handle)
             if existing is not None:
                 raise PortalError("handle unavailable")
-    
+
     new_bio = bio if bio is not None else account.bio
     if new_bio is not None and len(new_bio) > 256:
         raise PortalError("bio too long")
-    
+
     conn.execute(
         "UPDATE portal_accounts SET handle = ?, bio = ? WHERE account_id = ?",
         (new_handle, new_bio, account_id),
     )
     conn.commit()
-    return load_account(conn, account_id) # type: ignore
+    return load_account(conn, account_id)  # type: ignore
 
 
 def create_room(conn, name: str, is_public: bool = True) -> ChatRoom:
@@ -198,6 +195,7 @@ def create_room(conn, name: str, is_public: bool = True) -> ChatRoom:
 
 def list_rooms(conn, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
     from nyx_backend_gateway.storage import _validate_int
+
     lim = _validate_int(limit, "limit", 1, 500)
     off = _validate_int(offset, "offset", 0)
     rows = conn.execute(
@@ -209,6 +207,7 @@ def list_rooms(conn, limit: int = 50, offset: int = 0) -> list[dict[str, object]
 
 def search_rooms(conn, query: str, limit: int = 50) -> list[dict[str, object]]:
     from nyx_backend_gateway.storage import _validate_int
+
     lim = _validate_int(limit, "limit", 1, 500)
     rows = conn.execute(
         "SELECT room_id, name, created_at, is_public FROM chat_rooms WHERE name LIKE ? ORDER BY created_at ASC LIMIT ?",
@@ -220,6 +219,16 @@ def search_rooms(conn, query: str, limit: int = 50) -> list[dict[str, object]]:
 def post_message(conn, room_id: str, sender_account_id: str, body: str) -> tuple[dict[str, object], dict[str, object]]:
     if not isinstance(body, str) or not body or len(body) > 512:
         raise PortalError("message invalid")
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise PortalError("message must be e2ee json") from exc
+    if not isinstance(parsed, dict):
+        raise PortalError("message must be e2ee json")
+    if not isinstance(parsed.get("ciphertext"), str) or not parsed.get("ciphertext"):
+        raise PortalError("message missing ciphertext")
+    if not isinstance(parsed.get("iv"), str) or not parsed.get("iv"):
+        raise PortalError("message missing iv")
     last = conn.execute(
         "SELECT seq, chain_head FROM chat_messages WHERE room_id = ? ORDER BY seq DESC LIMIT 1",
         (room_id,),
@@ -253,7 +262,7 @@ def post_message(conn, room_id: str, sender_account_id: str, body: str) -> tuple
         created_at=created_at,
     )
     insert_chat_message(conn, record)
-    receipt = {
+    receipt: dict[str, object] = {
         "prev_digest": prev_digest,
         "msg_digest": msg_digest,
         "chain_head": chain_head,
@@ -301,13 +310,13 @@ def list_account_activity(conn, account_id: str, limit: int = 50, offset: int = 
         """,
         (account_id, account_id, account_id, account_id, account_id, account_id, limit, offset),
     ).fetchall()
-    
+
     results = []
     for row in rows:
         record = {col: row[col] for col in row.keys()}
         try:
             record["receipt_hashes"] = json.loads(record.get("receipt_hashes", "[]"))
-        except:
+        except (TypeError, ValueError):
             record["receipt_hashes"] = []
         results.append(record)
     return results

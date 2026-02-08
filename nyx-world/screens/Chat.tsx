@@ -139,7 +139,9 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
   const [searchQ, setSearchQ] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [searchResults, setSearchResults] = useState<{ account_id: string; handle: string; public_jwk: JsonWebKey | null }[]>([]);
+  const [searchResults, setSearchResults] = useState<
+    { account_id: string; handle: string; public_jwk: JsonWebKey | null }[]
+  >([]);
 
   const [toast, setToast] = useState("");
   const [lastAction, setLastAction] = useState<RunResult | null>(null);
@@ -210,7 +212,11 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
       const payload = await fetchPortalAccountById(token, activePeerId);
       const account = payload.account;
       if (account.public_jwk) {
-        const peer: PeerRecord = { account_id: account.account_id, handle: account.handle, public_jwk: account.public_jwk };
+        const peer: PeerRecord = {
+          account_id: account.account_id,
+          handle: account.handle,
+          public_jwk: account.public_jwk,
+        };
         savePeerToStorage(peer);
         setActivePeer(peer);
       } else {
@@ -430,9 +436,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
                   }`}
                 >
                   <div>{activePeer ? decrypted[m.message_id] || "Decrypting…" : "E2EE key missing"}</div>
-                  <div className="mt-1 text-[9px] opacity-60 font-mono break-all">
-                    run: {formatCompactId(m.run_id)}
-                  </div>
+                  <div className="mt-1 text-[9px] opacity-60 font-mono break-all">run: {formatCompactId(m.run_id)}</div>
                 </div>
               </div>
             );
@@ -470,7 +474,9 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
       {lastAction && (
         <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
           <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
-          <div className="text-[10px] font-mono text-text-subtle break-all">run_id: {String(lastAction.run_id ?? "")}</div>
+          <div className="text-[10px] font-mono text-text-subtle break-all">
+            run_id: {String(lastAction.run_id ?? "")}
+          </div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
             state_hash: {String(lastAction.state_hash ?? "")}
           </div>

@@ -1,9 +1,17 @@
-import _bootstrap
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
-from nyx_backend_gateway.storage import Listing, Purchase, create_connection, insert_listing, insert_purchase, list_listings, list_purchases
+import _bootstrap  # noqa: F401
+from nyx_backend_gateway.storage import (
+    Listing,
+    Purchase,
+    create_connection,
+    insert_listing,
+    insert_purchase,
+    list_listings,
+    list_purchases,
+)
 
 
 class MarketplaceStorageTests(unittest.TestCase):

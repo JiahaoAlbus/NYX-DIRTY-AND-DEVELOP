@@ -1,14 +1,14 @@
-import _bootstrap
 import base64
 import hmac
 import json
 import os
 import tempfile
 import threading
+import unittest
 from http.client import HTTPConnection
 from pathlib import Path
-import unittest
 
+import _bootstrap  # noqa: F401
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
 
@@ -70,7 +70,13 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
 
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-market-faucet-seller", "address": seller_id, "amount": 1000, "asset_id": "NYXT"},
+            {
+                "seed": 123,
+                "run_id": "run-market-faucet-seller",
+                "address": seller_id,
+                "amount": 1000,
+                "asset_id": "NYXT",
+            },
             token=seller_token,
         )
         self.assertEqual(status, 200)
@@ -118,7 +124,9 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         conn.close()
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        conn.request("GET", "/marketplace/v1/my_purchases?limit=10&offset=0", headers={"Authorization": f"Bearer {buyer_token}"})
+        conn.request(
+            "GET", "/marketplace/v1/my_purchases?limit=10&offset=0", headers={"Authorization": f"Bearer {buyer_token}"}
+        )
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)

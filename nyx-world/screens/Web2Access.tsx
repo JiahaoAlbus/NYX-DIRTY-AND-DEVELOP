@@ -1,15 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Eye,
-  EyeOff,
-  Globe,
-  Key,
-  Lock,
-  RefreshCw,
-  Send,
-  Shield,
-} from "lucide-react";
+import { AlertTriangle, Eye, EyeOff, Globe, Key, Lock, RefreshCw, Send, Shield } from "lucide-react";
 import {
   allocateRunId,
   ApiError,
@@ -267,7 +257,10 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
               />
-              <button onClick={() => setShowSecret(!showSecret)} className="text-text-subtle hover:text-text-main dark:text-white transition-colors">
+              <button
+                onClick={() => setShowSecret(!showSecret)}
+                className="text-text-subtle hover:text-text-main dark:text-white transition-colors"
+              >
                 {showSecret ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>

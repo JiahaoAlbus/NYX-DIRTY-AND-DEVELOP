@@ -1,15 +1,28 @@
-# NYX Testnet Portal
-Deterministic, verifiable portal infrastructure with wallet, exchange, chat, store, and evidence replay—wired to real testnet backends (mainnet-equivalent logic; testnet assets only).
+# NYX Testnet Portal (Mainnet-Equivalent Execution)
+Deterministic, verifiable portal infrastructure with wallet, exchange, chat, store, and evidence replay—wired to real testnet backends (mainnet-grade logic; testnet assets only).
+
+## What Runs Today (Truth)
+- Gateway API: `python -m nyx_backend_gateway.server` (default `http://127.0.0.1:8091`)
+- Web portal: `nyx-world` (Vite/React)
+- iOS app: `apps/nyx-ios` (SwiftUI shell + embedded WebBundle)
+- Extension: `packages/extension` (MV3, EIP‑1193 provider)
+- Evidence pipeline: `apps/nyx-backend` + gateway adapter
 
 ## What This Repo Is
-- A **full-stack testnet portal** with end-to-end evidence generation and replay.
-- A **mainnet-equivalent execution path** (fees, receipts, state hashes) while using testnet assets.
-- A **capabilities-driven UI** (no fake buttons; modules are gated by `/capabilities`).
+- **Full-stack testnet portal** with end-to-end evidence generation and replay.
+- **Mainnet-equivalent execution path** (fees, receipts, state hashes) using testnet assets.
+- **Capabilities-driven UI** (no fake buttons; modules gated by `/capabilities`).
 
 ## What This Repo Is NOT
 - **Not mainnet production**: compliance (KYC/AML, privacy/TOS), production secrets management, and enterprise SRE are required for mainnet.
 - **Not a custody product**: no HSM/secure enclave integration here.
 - **Not a PayEVM integration** (waiting on official endpoints + webhook spec).
+
+## Required Environment
+- Python 3.10+
+- Node.js + npm
+- jq
+- (Optional) Xcode for iOS simulator builds
 
 ## Developer Quickstart (Local)
 ```bash
@@ -22,6 +35,15 @@ npm run dev
 ```
 Open the URL printed by Vite (default `http://localhost:5173`).
 
+## Architecture Map
+See `docs/ARCHITECTURE_MAP.md` for component relationships and data flows.
+
+## Security Boundaries (Important)
+- Web2 access is **hostile** and must flow through the gateway allowlist.
+- Deterministic evidence/replay is enforced for all shared-state mutations.
+- No privileged bypass paths; no fee waivers on shared state.
+Full model: `docs/SECURITY_MODEL.md`.
+
 ## Full End-to-End Verification (Recommended)
 ```bash
 bash scripts/nyx_verify_all.sh --seed 123 --run-id extreme-testnet
@@ -30,11 +52,19 @@ bash scripts/nyx_pack_proof_artifacts.sh
 Evidence output: `docs/evidence/`  
 Proof bundle: `release_artifacts/proof/`
 
+## Run CI/Conformance Locally
+```bash
+bash scripts/nyx_conformance.sh
+```
+
 ## Build Release Artifacts
 ```bash
 bash scripts/build_release_artifacts.sh
 ```
-Outputs: `release_artifacts/` (web zip, backend tarball, extension zip, iOS simulator app, proof bundles, checksums).
+Outputs: `release_artifacts/` (web zip, backend tarball, extension zip, iOS simulator app, proof bundles, checksums, manifest, sbom).
+
+## Release Verification
+See `docs/RELEASE_VERIFY.md` for checksum and evidence verification steps.
 
 ## iOS
 Simulator:
@@ -75,6 +105,10 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 | `bash scripts/nyx_restore_encrypted.sh <enc> <out>` | Restore encrypted backup. |
 
 ## Documentation (Recommended)
+- Architecture map: `docs/ARCHITECTURE_MAP.md`
+- Security model: `docs/SECURITY_MODEL.md`
+- Compliance posture: `docs/COMPLIANCE_POSTURE.md`
+- Operational readiness: `docs/OPERATIONAL_READINESS.md`
 - Product runbook: `docs/PRODUCT_RUNBOOK.md`
 - Testnet functionality matrix: `docs/FUNCTIONALITY_MATRIX_TESTNET_V1.md`
 - Mainnet parity rules: `docs/MAINNET_PARITY.md`
@@ -84,7 +118,3 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 ## Governance / Safety
 Some paths are frozen. Break-glass only:
 `docs/SEALING_AND_BREAK_GLASS.md`
-
-## Security Boundary
-Mock/stdlib implementations only; not production-grade cryptography or HSM/keystore.
-Invariant summary: `docs/INVARIANTS_AND_GATES.md`.

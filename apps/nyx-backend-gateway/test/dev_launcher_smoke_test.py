@@ -8,6 +8,8 @@ import unittest
 from http.client import HTTPConnection
 from pathlib import Path
 
+import _bootstrap  # noqa: F401
+
 
 def _wait_for_port(host: str, port: int, timeout: float = 10.0) -> bool:
     deadline = time.time() + timeout
@@ -29,7 +31,7 @@ def _healthz_ok(port: int, timeout: float = 5.0) -> bool:
             resp = conn.getresponse()
             body = resp.read().decode("utf-8")
             conn.close()
-            if resp.status == 200 and "\"ok\":true" in body.replace(" ", ""):
+            if resp.status == 200 and '"ok":true' in body.replace(" ", ""):
                 return True
         except Exception:
             time.sleep(0.2)
@@ -86,7 +88,9 @@ class DevLauncherSmokeTests(unittest.TestCase):
                 "run_id": run_id,
                 "payload": {"address": "wallet-dev", "amount": 10},
             }
-            conn.request("POST", "/wallet/faucet", body=json.dumps(payload), headers={"Content-Type": "application/json"})
+            conn.request(
+                "POST", "/wallet/faucet", body=json.dumps(payload), headers={"Content-Type": "application/json"}
+            )
             try:
                 resp = conn.getresponse()
                 body = resp.read()
