@@ -494,7 +494,7 @@ log "Web2 Guard allowlist"
 curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
 
 next_run_id "web2-guard-a"; WEB2_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "https://httpbin.org/get" \
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "https://api.github.com/zen" \
   '{seed:$seed,run_id:$run_id,payload:{url:$url,method:"GET"}}')"
 curl_json "POST" "$BASE_URL/web2/v1/request" "$TOKEN_A" "$body" "$evidence_dir/A_web2_guard.json" 200 || die "web2 guard request failed"
 jq -e '.request_hash and .response_hash' "$evidence_dir/A_web2_guard.json" >/dev/null 2>&1 \
