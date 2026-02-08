@@ -73,7 +73,7 @@ echo "$evidence_root" > "docs/evidence/last_verify_path.txt"
 
 RUN_SESSION="${RUN_ID_BASE}-${timestamp}"
 
-log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$evidence_dir/verify.log" >/dev/null; }
+log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$evidence_dir/verify.log"; }
 die() { echo "FAIL: $*" | tee -a "$evidence_dir/verify.log" >&2; exit 1; }
 
 sanitize_action() { echo "$1" | sed -E 's/[^A-Za-z0-9_-]+/_/g'; }
@@ -169,6 +169,7 @@ ensure_backend() {
   export NYX_FAUCET_IP_MAX_CLAIMS_PER_24H="${NYX_FAUCET_IP_MAX_CLAIMS_PER_24H:-10000}"
   export NYX_FAUCET_MAX_AMOUNT_PER_24H="${NYX_FAUCET_MAX_AMOUNT_PER_24H:-10000}"
   export NYX_FAUCET_MAX_CLAIMS_PER_24H="${NYX_FAUCET_MAX_CLAIMS_PER_24H:-3}"
+  export NYX_FAUCET_COOLDOWN_SECONDS="${NYX_FAUCET_COOLDOWN_SECONDS:-0}"
   export NYX_GATEWAY_DB_PATH="${NYX_GATEWAY_DB_PATH:-$evidence_root/gateway.db}"
   rm -f "$NYX_GATEWAY_DB_PATH" >/dev/null 2>&1 || true
 
@@ -467,6 +468,37 @@ PY
 )" "$token" "$out" 200 || return 1
 }
 
+ensure_nyxt_balance() {
+  local account_id="$1" token="$2" out="$3" min_balance="$4"
+  local balance
+  balance="$(jq -r '.balances[] | select(.asset_id=="NYXT") | .balance' "$out" 2>/dev/null || echo "0")"
+  if [[ -z "$balance" || "$balance" == "null" ]]; then
+    balance=0
+  fi
+  if [[ "$balance" -ge "$min_balance" ]]; then
+    return 0
+  fi
+  log "NYXT balance low (${balance}), attempting faucet top-up"
+  next_run_id "wallet-faucet-topup-a"; TOPUP_RUN="$NEXT_RUN_ID"
+  local topup_body
+  topup_body="$(jq -n --argjson seed "$SEED" --arg run_id "$TOPUP_RUN" --arg address "$account_id" \
+    '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
+  curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$token" "$topup_body" "$evidence_dir/A_faucet_topup.json" "200,429" \
+    || die "wallet faucet top-up failed"
+  if jq -e '.status=="complete"' "$evidence_dir/A_faucet_topup.json" >/dev/null 2>&1; then
+    RUN_IDS+=("$TOPUP_RUN")
+  fi
+  ADDR="$account_id" wallet_balances "$account_id" "$token" "$out" || die "balances (A) after top-up failed"
+  balance="$(jq -r '.balances[] | select(.asset_id=="NYXT") | .balance' "$out" 2>/dev/null || echo "0")"
+  if [[ -z "$balance" || "$balance" == "null" ]]; then
+    balance=0
+  fi
+  if [[ "$balance" -lt "$min_balance" ]]; then
+    die "NYXT balance insufficient after top-up (${balance} < ${min_balance})"
+  fi
+  return 0
+}
+
 # Faucet limits are enforced server-side; by default each account can faucet once per 24h.
 next_run_id "wallet-faucet-a-nyxt"; FAUCET_A_RUN="$NEXT_RUN_ID"
 body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
@@ -489,6 +521,7 @@ fi
 
 ADDR="$ACCOUNT_A" wallet_balances "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" || die "balances (A) failed"
 ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balances_1.json" || die "balances (B) failed"
+ensure_nyxt_balance "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" 200
 
 log "Web2 Guard allowlist"
 curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
