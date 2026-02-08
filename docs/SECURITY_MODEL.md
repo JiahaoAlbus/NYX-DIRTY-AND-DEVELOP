@@ -22,12 +22,14 @@ This document describes trust boundaries, threat assumptions, and secure default
 - **Non-zero fee for shared-state mutations**: every mutation costs `fee_total > 0`.
 - **Determinism**: no non-deterministic sources in deterministic code paths.
 - **Web2 access**: allowlisted hosts only; bounded sizes and timeouts.
+- **Web2 SSRF hardening**: DNS rebinding checks + redirect blocking.
 
 ## 4) Key Custody Model
 
 - Testnet keys are for development only.
 - Production keys MUST be managed outside git (KMS/secret manager).
 - Session secrets must be strong in production; weak defaults allowed only in dev.
+- API uses bearer tokens (no cookies); if cookies are introduced, CSRF defenses are mandatory.
 
 ## 5) Configuration Hardening
 
@@ -40,12 +42,14 @@ This document describes trust boundaries, threat assumptions, and secure default
 - Never log raw secrets, API keys, or private keys.
 - Prefer request_id/run_id for traceability.
 - Web2 responses are hashed; raw bodies are not stored.
+- API responses include security headers (CSP, HSTS, X-Frame-Options, etc.).
 
 ## 7) Supply-Chain & Dependencies
 
 - Depend on pinned versions where possible.
 - SBOM generated for releases.
 - CodeQL and dependency review must run in CI.
+- Secret scanning runs in CI via `scripts/nyx_secret_scan.py`.
 
 ## 8) Security Boundaries (Explicit)
 

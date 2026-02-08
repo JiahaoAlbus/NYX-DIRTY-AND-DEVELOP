@@ -54,14 +54,14 @@ Proof bundle: `release_artifacts/proof/`
 
 ## Run CI/Conformance Locally
 ```bash
-bash conformance/run.sh
+bash scripts/nyx_conformance.sh
 ```
 
 ## Build Release Artifacts
 ```bash
 bash scripts/build_release_artifacts.sh
 ```
-Outputs: `release_artifacts/` (web zip, backend tarball, extension zip, iOS simulator app, proof bundles, checksums).
+Outputs: `release_artifacts/` (web zip, backend tarball, extension zip, iOS simulator app, proof bundles, checksums, manifest, sbom).
 
 ## Release Verification
 See `docs/RELEASE_VERIFY.md` for checksum and evidence verification steps.

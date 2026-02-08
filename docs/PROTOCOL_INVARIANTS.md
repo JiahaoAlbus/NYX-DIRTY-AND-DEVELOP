@@ -8,6 +8,12 @@ This document defines rules that MUST/MUST NOT hold across **backend**, **web**,
 - UI MUST NOT render a state-mutating action as “clickable” when its capability is missing or disabled.
 - When a capability is missing/disabled, UI MUST disable or hide the action and MUST surface a human-readable reason (tooltip/title + copy).
 
+## 1.5) Wallet != Identity
+
+- Account identity (handle/public key) MUST NOT be treated as the wallet address.
+- The derived `account_id` MUST remain distinct from the user-visible handle.
+- UI MUST NOT infer wallet address from handle alone; it must use authenticated account IDs or explicit wallet addresses.
+
 ## 2) NO FAKE UI
 
 - Any visible UI control that implies a state mutation MUST either:
@@ -83,6 +89,8 @@ Current web algorithm (v1):
 
 - Web2 Guard MUST accept only allowlisted HTTPS hosts + path prefixes.
 - Web2 Guard MUST reject IP literals, custom ports, and userinfo in URLs.
+- Web2 Guard MUST block DNS rebinding and deny hosts that resolve to private/loopback ranges.
+- Web2 Guard MUST reject redirects (no follow), including cross-host redirects.
 - Web2 Guard MUST cap request bodies and response bytes; truncation MUST be flagged in metadata.
 - Web2 Guard MUST store only request/response hashes and ciphertext for secrets (when provided); plaintext secrets MUST NOT be stored.
 - Every Web2 Guard request MUST generate evidence with `request_hash`, `response_hash`, `response_status`, and `response_truncated`.
