@@ -1,14 +1,14 @@
-import _bootstrap
 import base64
 import hmac
 import json
 import os
 import tempfile
 import threading
+import unittest
 from http.client import HTTPConnection
 from pathlib import Path
-import unittest
 
+import _bootstrap  # noqa: F401
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
 
@@ -58,9 +58,7 @@ class ServerWalletV1FaucetTests(unittest.TestCase):
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
         nonce = challenge.get("nonce")
-        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode(
-            "utf-8"
-        )
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
         status, verified = self._post(
             "/portal/v1/auth/verify",
             {"account_id": account_id, "nonce": nonce, "signature": signature},

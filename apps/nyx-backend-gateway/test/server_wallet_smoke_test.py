@@ -1,12 +1,12 @@
-import _bootstrap
 import json
 import os
 import tempfile
 import threading
+import unittest
 from http.client import HTTPConnection
 from pathlib import Path
-import unittest
 
+import _bootstrap  # noqa: F401
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
 
@@ -40,7 +40,9 @@ class ServerWalletSmokeTests(unittest.TestCase):
             "run_id": "wallet-faucet-1",
             "payload": {"address": "wallet-a", "amount": 1000},
         }
-        conn.request("POST", "/wallet/faucet", body=json.dumps(faucet_payload), headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST", "/wallet/faucet", body=json.dumps(faucet_payload), headers={"Content-Type": "application/json"}
+        )
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)
@@ -54,7 +56,9 @@ class ServerWalletSmokeTests(unittest.TestCase):
             "run_id": "wallet-transfer-1",
             "payload": {"from_address": "wallet-a", "to_address": "wallet-b", "amount": 10},
         }
-        conn.request("POST", "/wallet/transfer", body=json.dumps(transfer_payload), headers={"Content-Type": "application/json"})
+        conn.request(
+            "POST", "/wallet/transfer", body=json.dumps(transfer_payload), headers={"Content-Type": "application/json"}
+        )
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)

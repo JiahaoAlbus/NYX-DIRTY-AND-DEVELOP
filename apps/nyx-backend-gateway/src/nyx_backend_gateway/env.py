@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from nyx_backend_gateway.storage import StorageError
 from nyx_backend_gateway.settings import SettingsError, get_settings
+from nyx_backend_gateway.storage import StorageError
 
 
 def load_env_file(path: Path) -> None:

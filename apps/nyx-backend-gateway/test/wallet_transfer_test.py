@@ -1,9 +1,9 @@
-import _bootstrap
 import os
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.gateway import GatewayError, execute_wallet_transfer
 from nyx_backend_gateway.storage import apply_wallet_faucet, create_connection
 

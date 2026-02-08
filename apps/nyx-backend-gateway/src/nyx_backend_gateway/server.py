@@ -3,43 +3,38 @@ from __future__ import annotations
 import argparse
 import io
 import json
-from pathlib import Path
 import re
 import subprocess
 import time
 import zipfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from nyx_backend_gateway.env import load_env_file
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.portal as portal
+from nyx_backend_gateway.env import load_env_file
 from nyx_backend_gateway.gateway import (
-    GatewayError,
     GatewayApiError,
+    GatewayError,
+    _db_path,
+    _run_root,
     execute_run,
     execute_wallet_faucet,
     execute_wallet_transfer,
     fetch_wallet_balance,
-    _run_root,
-    _db_path,
 )
 from nyx_backend_gateway.storage import (
+    StorageError,
     create_connection,
     get_wallet_balance,
     list_entertainment_events,
     list_entertainment_items,
-    list_listings,
-    list_messages,
     list_orders,
     list_purchases,
-    list_receipts,
     list_trades,
-    load_by_id,
-    StorageError,
 )
-
 
 _MAX_BODY = 4096
 _RATE_LIMIT = 120
@@ -187,7 +182,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             self._send_security_headers()
             self.end_headers()
             self.wfile.write(data)
-        except Exception as exc:
+        except Exception:
             # Fallback for serialization errors
             error_data = json.dumps({"error": "internal serialization error"}).encode("utf-8")
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -310,6 +305,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 module = payload.get("module")
                 action = payload.get("action")
                 extra = payload.get("payload")
+                if not isinstance(module, str) or not module or isinstance(module, bool):
+                    raise GatewayError("module required")
+                if not isinstance(action, str) or not action or isinstance(action, bool):
+                    raise GatewayError("action required")
+                if extra is None:
+                    extra = {}
+                if not isinstance(extra, dict):
+                    raise GatewayError("payload must be object")
                 result = execute_run(
                     seed=seed,
                     run_id=run_id,
@@ -325,23 +328,28 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     "receipt_hashes": result.receipt_hashes,
                     "replay_ok": result.replay_ok,
                 }
-                if isinstance(module, str) and isinstance(action, str) and isinstance(extra, dict):
-                    if (module, action) in {
-                        ("exchange", "route_swap"),
-                        ("exchange", "place_order"),
-                        ("exchange", "cancel_order"),
-                        ("chat", "message_event"),
-                        ("marketplace", "listing_publish"),
-                        ("marketplace", "purchase_listing"),
-                    }:
-                        response.update(_fee_summary(module, action, extra, result.run_id))
+                if (module, action) in {
+                    ("exchange", "route_swap"),
+                    ("exchange", "place_order"),
+                    ("exchange", "cancel_order"),
+                    ("chat", "message_event"),
+                    ("marketplace", "listing_publish"),
+                    ("marketplace", "purchase_listing"),
+                }:
+                    response.update(_fee_summary(module, action, extra, result.run_id))
                 self._send_json(response)
                 return
             if self.path == "/portal/v1/accounts":
                 payload = self._parse_body()
+                handle = payload.get("handle")
+                pubkey = payload.get("pubkey")
+                if not isinstance(handle, str) or not handle:
+                    raise GatewayError("handle required")
+                if not isinstance(pubkey, str) or not pubkey:
+                    raise GatewayError("pubkey required")
                 conn = create_connection(_db_path())
                 try:
-                    account = portal.create_account(conn, payload.get("handle"), payload.get("pubkey"))
+                    account = portal.create_account(conn, handle, pubkey)
                 finally:
                     conn.close()
                 self._send_json(
@@ -443,6 +451,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 _ = self._require_auth()
                 payload = self._parse_body()
                 name = payload.get("name")
+                if not isinstance(name, str) or not name:
+                    raise GatewayError("name required")
                 is_public = payload.get("is_public", True)
                 conn = create_connection(_db_path())
                 try:
@@ -872,9 +882,10 @@ class GatewayHandler(BaseHTTPRequestHandler):
             if self.path == "/evidence/v1/replay":
                 _ = self._require_auth()
                 payload = self._parse_body()
-                run_id = payload.get("run_id")
-                if not isinstance(run_id, str) or not run_id or isinstance(run_id, bool):
+                run_id_value = payload.get("run_id")
+                if not isinstance(run_id_value, str) or not run_id_value or isinstance(run_id_value, bool):
                     raise GatewayError("run_id required")
+                run_id = run_id_value
                 backend_src = gateway._backend_src()
                 if str(backend_src) not in __import__("sys").path:
                     __import__("sys").path.insert(0, str(backend_src))
@@ -904,13 +915,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 rooms = portal.list_rooms(conn, limit=5)
                 listings = gateway.marketplace_list_active_listings(conn, limit=5)
                 conn.close()
-                self._send_json({
-                    "feed": [
-                        {"type": "room", "data": r} for r in rooms
-                    ] + [
-                        {"type": "listing", "data": l} for l in listings
-                    ]
-                })
+                self._send_json(
+                    {
+                        "feed": [{"type": "room", "data": r} for r in rooms]
+                        + [{"type": "listing", "data": listing} for listing in listings]
+                    }
+                )
             except Exception as exc:
                 self._send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
@@ -1008,7 +1018,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 conn = create_connection(_db_path())
                 receipts = portal.list_account_activity(conn, session.account_id, limit=limit, offset=offset)
                 conn.close()
-                self._send_json({"account_id": session.account_id, "receipts": receipts, "limit": limit, "offset": offset})
+                self._send_json(
+                    {"account_id": session.account_id, "receipts": receipts, "limit": limit, "offset": offset}
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
@@ -1173,8 +1185,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
             from nyx_backend.evidence import list_runs
 
             records = list_runs(base_dir=_run_root())
-            payload = [{"run_id": record.run_id, "status": record.status} for record in records]
-            self._send_json({"runs": payload})
+            runs_payload = [{"run_id": record.run_id, "status": record.status} for record in records]
+            self._send_json({"runs": runs_payload})
             return
         if path == "/wallet/v1/airdrop/tasks":
             try:
@@ -1314,7 +1326,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     orders.append(record)
                 conn.close()
                 self._send_json(
-                    {"account_id": session.account_id, "orders": orders, "limit": limit, "offset": offset, "status": status}
+                    {
+                        "account_id": session.account_id,
+                        "orders": orders,
+                        "limit": limit,
+                        "offset": offset,
+                        "status": status,
+                    }
                 )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1347,9 +1365,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     record["replay_ok"] = bool(record.get("replay_ok"))
                     trades.append(record)
                 conn.close()
-                self._send_json(
-                    {"account_id": session.account_id, "trades": trades, "limit": limit, "offset": offset}
-                )
+                self._send_json({"account_id": session.account_id, "trades": trades, "limit": limit, "offset": offset})
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
@@ -1464,7 +1480,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 for row in rows:
                     conversations.append({col: row[col] for col in row.keys()})
                 conn.close()
-                self._send_json({"account_id": session.account_id, "conversations": conversations, "limit": limit, "offset": offset})
+                self._send_json(
+                    {"account_id": session.account_id, "conversations": conversations, "limit": limit, "offset": offset}
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
@@ -1526,12 +1544,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 _ = self._require_auth()
                 from nyx_backend_gateway.integrations import magic_eden_solana_collections
 
-                limit_raw = (query.get("limit") or [""])[0].strip() or None
-                offset_raw = (query.get("offset") or [""])[0].strip() or None
-                limit = int(limit_raw) if limit_raw else None
-                offset = int(offset_raw) if offset_raw else None
+                limit_raw_value = (query.get("limit") or [""])[0].strip() or None
+                offset_raw_value = (query.get("offset") or [""])[0].strip() or None
+                limit_param = int(limit_raw_value) if limit_raw_value else None
+                offset_param = int(offset_raw_value) if offset_raw_value else None
 
-                result = magic_eden_solana_collections(limit=limit, offset=offset)
+                result = magic_eden_solana_collections(limit=limit_param, offset=offset_param)
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1542,12 +1560,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 from nyx_backend_gateway.integrations import magic_eden_solana_collection_listings
 
                 symbol = (query.get("symbol") or [""])[0]
-                limit_raw = (query.get("limit") or [""])[0].strip() or None
-                offset_raw = (query.get("offset") or [""])[0].strip() or None
-                limit = int(limit_raw) if limit_raw else None
-                offset = int(offset_raw) if offset_raw else None
+                limit_raw_value = (query.get("limit") or [""])[0].strip() or None
+                offset_raw_value = (query.get("offset") or [""])[0].strip() or None
+                limit_param = int(limit_raw_value) if limit_raw_value else None
+                offset_param = int(offset_raw_value) if offset_raw_value else None
 
-                result = magic_eden_solana_collection_listings(symbol=symbol, limit=limit, offset=offset)
+                result = magic_eden_solana_collection_listings(
+                    symbol=symbol,
+                    limit=limit_param,
+                    offset=offset_param,
+                )
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1570,12 +1592,17 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
                 chain = (query.get("chain") or [""])[0]
                 pattern = (query.get("pattern") or [""])[0]
-                limit_raw = (query.get("limit") or [""])[0].strip() or None
-                offset_raw = (query.get("offset") or [""])[0].strip() or None
-                limit = int(limit_raw) if limit_raw else None
-                offset = int(offset_raw) if offset_raw else None
+                limit_raw_value = (query.get("limit") or [""])[0].strip() or None
+                offset_raw_value = (query.get("offset") or [""])[0].strip() or None
+                limit_param = int(limit_raw_value) if limit_raw_value else None
+                offset_param = int(offset_raw_value) if offset_raw_value else None
 
-                result = magic_eden_evm_search_collections(chain=chain, pattern=pattern, limit=limit, offset=offset)
+                result = magic_eden_evm_search_collections(
+                    chain=chain,
+                    pattern=pattern,
+                    limit=limit_param,
+                    offset=offset_param,
+                )
                 self._send_json(result)
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError, ValueError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1583,7 +1610,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if path == "/integrations/v1/magic_eden/evm/collections":
             try:
                 _ = self._require_auth()
-                from nyx_backend_gateway.integrations import magic_eden_evm_collections, _split_csv
+                from nyx_backend_gateway.integrations import _split_csv, magic_eden_evm_collections
 
                 chain = (query.get("chain") or [""])[0]
                 slugs_raw = (query.get("collection_slugs") or [""])[0]
@@ -1662,12 +1689,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
             room_id = parts[4]
             try:
                 _ = self._require_auth()
-                after_raw = (query.get("after") or [""])[0] or None
-                limit_raw = (query.get("limit") or [""])[0] or None
-                after = int(after_raw) if after_raw else None
-                limit = int(limit_raw) if limit_raw else 50
+                after_raw_value = (query.get("after") or [""])[0] or None
+                limit_raw_value = (query.get("limit") or [""])[0] or None
+                after_value = int(after_raw_value) if after_raw_value else None
+                limit_value = int(limit_raw_value) if limit_raw_value else 50
                 conn = create_connection(_db_path())
-                messages = portal.list_messages(conn, room_id=room_id, after=after, limit=limit)
+                messages = portal.list_messages(conn, room_id=room_id, after=after_value, limit=limit_value)
                 conn.close()
                 self._send_json({"messages": messages})
             except Exception as exc:
@@ -1728,7 +1755,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     record["replay_ok"] = bool(record.get("replay_ok"))
                     purchases.append(record)
                 conn.close()
-                self._send_json({"account_id": session.account_id, "purchases": purchases, "limit": limit, "offset": offset})
+                self._send_json(
+                    {"account_id": session.account_id, "purchases": purchases, "limit": limit, "offset": offset}
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
@@ -1771,8 +1800,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self._send_text("not found", HTTPStatus.NOT_FOUND)
 
 
+class GatewayServer(ThreadingHTTPServer):
+    rate_limiter: RequestLimiter
+    account_limiter: RequestLimiter
+
+
 def run_server(host: str = "0.0.0.0", port: int = 8091) -> None:
-    server = ThreadingHTTPServer((host, port), GatewayHandler)
+    server = GatewayServer((host, port), GatewayHandler)
     server.rate_limiter = RequestLimiter(_RATE_LIMIT, _RATE_WINDOW_SECONDS)
     server.account_limiter = RequestLimiter(_ACCOUNT_RATE_LIMIT, _RATE_WINDOW_SECONDS)
     server.serve_forever()

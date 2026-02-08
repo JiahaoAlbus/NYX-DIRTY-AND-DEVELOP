@@ -1,9 +1,10 @@
-import _bootstrap
 import json
-import tempfile
-from pathlib import Path
 import sys
+import tempfile
 import unittest
+from pathlib import Path
+
+import _bootstrap  # noqa: F401
 
 _BACKEND_SRC = Path(__file__).resolve().parents[2] / "nyx-backend" / "src"
 if str(_BACKEND_SRC) not in sys.path:

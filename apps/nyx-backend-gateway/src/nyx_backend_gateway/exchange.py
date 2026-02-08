@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from typing import cast
 
 from nyx_backend_gateway.env import get_fee_address
 from nyx_backend_gateway.storage import (
@@ -12,8 +13,8 @@ from nyx_backend_gateway.storage import (
     insert_order,
     insert_trade,
     list_orders,
-    update_order_status,
     update_order_amount,
+    update_order_status,
 )
 
 
@@ -64,8 +65,8 @@ def place_order(conn, order: Order) -> ExchangeResult:
         insert_order(conn, order, commit=False)
 
         for row in _fetch_opposites(conn, order):
-            opposite_price = int(row["price"])
-            opposite_amount = int(row["amount"])
+            opposite_price = int(cast(int, row["price"]))
+            opposite_amount = int(cast(int, row["amount"]))
             opposite_id = str(row["order_id"])
             opposite_owner = str(row["owner_address"])
 

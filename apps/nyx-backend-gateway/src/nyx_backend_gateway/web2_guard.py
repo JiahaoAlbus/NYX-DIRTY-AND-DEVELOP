@@ -7,16 +7,17 @@ import logging
 import socket
 import ssl
 import time
-from typing import Any
+from typing import Any, TypedDict
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
-from nyx_backend_gateway.errors import GatewayApiError, GatewayError
+from nyx_backend_gateway.errors import GatewayApiError
 from nyx_backend_gateway.evidence_adapter import run_and_record
 from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.identifiers import deterministic_id
-from nyx_backend_gateway.paths import db_path as default_db_path, run_root as default_run_root
+from nyx_backend_gateway.paths import db_path as default_db_path
+from nyx_backend_gateway.paths import run_root as default_run_root
 from nyx_backend_gateway.storage import (
     Web2GuardRequest,
     apply_wallet_transfer,
@@ -28,7 +29,16 @@ from nyx_backend_gateway.storage import (
 )
 
 
-_WEB2_ALLOWLIST: list[dict[str, object]] = [
+class Web2AllowlistEntry(TypedDict):
+    id: str
+    label: str
+    base_url: str
+    host: str
+    path_prefix: str
+    methods: set[str]
+
+
+_WEB2_ALLOWLIST: list[Web2AllowlistEntry] = [
     {
         "id": "github",
         "label": "GitHub API",
@@ -164,9 +174,13 @@ def _coerce_sealed_request(value: object) -> str | None:
     if isinstance(value, str):
         sealed = value.strip()
     else:
-        raise GatewayApiError("PARAM_INVALID", "sealed_request invalid", http_status=400, details={"param": "sealed_request"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "sealed_request invalid", http_status=400, details={"param": "sealed_request"}
+        )
     if len(sealed) > _WEB2_MAX_SEALED_LEN:
-        raise GatewayApiError("PARAM_INVALID", "sealed_request too long", http_status=400, details={"param": "sealed_request"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "sealed_request too long", http_status=400, details={"param": "sealed_request"}
+        )
     return sealed
 
 
@@ -179,7 +193,7 @@ def _web2_request_hash(method: str, url: str, body: str, allowlist_id: str) -> s
     return digest
 
 
-def _web2_match_allowlist(url: str, method: str) -> dict[str, object]:
+def _web2_match_allowlist(url: str, method: str) -> Web2AllowlistEntry:
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise GatewayApiError("ALLOWLIST_DENY", "https required", http_status=400, details={"url": url})
@@ -223,7 +237,7 @@ def _web2_headers(method: str) -> dict[str, str]:
     return headers
 
 
-def _web2_normalized_url(url: str, allow_entry: dict[str, object]) -> str:
+def _web2_normalized_url(url: str, allow_entry: Web2AllowlistEntry) -> str:
     parsed = urlparse(url)
     safe_url = f"https://{allow_entry['host']}{parsed.path}"
     if parsed.query:
@@ -232,7 +246,7 @@ def _web2_normalized_url(url: str, allow_entry: dict[str, object]) -> str:
 
 
 class _NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise URLError("redirect_not_allowed")
 
 
@@ -255,7 +269,14 @@ def _web2_resolve_public_host(hostname: str) -> None:
     for info in infos:
         ip_str = info[4][0]
         ip = ipaddress.ip_address(ip_str)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
             raise GatewayApiError(
                 "ALLOWLIST_DENY",
                 "host resolves to private ip",
@@ -446,7 +467,9 @@ def execute_web2_guard_request(
     }
 
 
-def fetch_web2_guard_requests(*, account_id: str, limit: int = 50, offset: int = 0, db_path=None) -> list[dict[str, object]]:
+def fetch_web2_guard_requests(
+    *, account_id: str, limit: int = 50, offset: int = 0, db_path=None
+) -> list[dict[str, object]]:
     conn = create_connection(db_path or default_db_path())
     try:
         return list_web2_guard_requests(conn, account_id=account_id, limit=limit, offset=offset)

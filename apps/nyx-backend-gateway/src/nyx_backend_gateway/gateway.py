@@ -7,7 +7,11 @@ from typing import Any
 
 from nyx_backend_gateway.airdrop import (
     execute_airdrop_claim as airdrop_execute_airdrop_claim,
+)
+from nyx_backend_gateway.airdrop import (
     execute_airdrop_claim_v1 as airdrop_execute_airdrop_claim_v1,
+)
+from nyx_backend_gateway.airdrop import (
     list_airdrop_tasks_v1 as airdrop_list_tasks_v1,
 )
 from nyx_backend_gateway.assets import supported_assets as assets_supported_assets
@@ -25,25 +29,31 @@ from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.identifiers import deterministic_id, order_id
 from nyx_backend_gateway.marketplace import (
     list_active_listings as marketplace_list_active,
+)
+from nyx_backend_gateway.marketplace import (
     publish_listing as marketplace_publish_listing,
+)
+from nyx_backend_gateway.marketplace import (
     purchase_listing as marketplace_purchase_listing,
+)
+from nyx_backend_gateway.marketplace import (
     search_listings as marketplace_search,
 )
 from nyx_backend_gateway.models import GatewayResult
 from nyx_backend_gateway.storage import (
     EntertainmentEvent,
     EntertainmentItem,
-    FeeLedger,
     FaucetClaim,
+    FeeLedger,
     Order,
     apply_wallet_faucet_with_fee,
     apply_wallet_transfer,
     create_connection,
+    get_wallet_balance,
     insert_entertainment_event,
     insert_entertainment_item,
-    insert_fee_ledger,
     insert_faucet_claim,
-    get_wallet_balance,
+    insert_fee_ledger,
     load_by_id,
 )
 from nyx_backend_gateway.validation import (
@@ -58,7 +68,11 @@ from nyx_backend_gateway.validation import (
 )
 from nyx_backend_gateway.web2_guard import (
     execute_web2_guard_request as web2_execute_request,
+)
+from nyx_backend_gateway.web2_guard import (
     fetch_web2_guard_requests as web2_fetch_requests,
+)
+from nyx_backend_gateway.web2_guard import (
     list_web2_allowlist as web2_list_allowlist,
 )
 
@@ -325,10 +339,10 @@ def execute_wallet_transfer(
     asset_id = validated.get("asset_id", "NYXT")
     fee_record = route_fee("wallet", "transfer", validated, run_id)
     conn = create_connection(db_path or _db_path())
-    
+
     from_balance = get_wallet_balance(conn, validated["from_address"], asset_id)
     nyxt_balance = get_wallet_balance(conn, validated["from_address"], "NYXT")
-    
+
     if asset_id == "NYXT":
         if nyxt_balance < (validated["amount"] + fee_record.total_paid):
             raise GatewayError("insufficient balance for amount + fee")
@@ -395,7 +409,7 @@ def execute_wallet_faucet(
         conn=conn,
         base_dir=run_root or _run_root(),
     )
-    
+
     result = apply_wallet_faucet_with_fee(
         conn,
         address=address,
@@ -406,7 +420,7 @@ def execute_wallet_faucet(
         asset_id=asset_id,
     )
     insert_fee_ledger(conn, fee_record)
-    
+
     return (
         GatewayResult(
             run_id=run_id,

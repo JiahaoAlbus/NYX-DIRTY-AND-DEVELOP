@@ -7,7 +7,6 @@ from typing import Any
 from nyx_backend_gateway.assets import is_supported_asset
 from nyx_backend_gateway.errors import GatewayApiError, GatewayError
 
-
 _MAX_AMOUNT = 1_000_000
 _MAX_PRICE = 1_000_000
 _ENTERTAINMENT_MODES = {"pulse", "drift", "scan"}

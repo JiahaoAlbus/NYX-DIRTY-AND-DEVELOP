@@ -1,9 +1,9 @@
-import _bootstrap
 import base64
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway import portal
 from nyx_backend_gateway.storage import create_connection
 

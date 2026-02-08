@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import re
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 
 from nyx_backend_gateway.migrations import apply_migrations
@@ -349,8 +349,7 @@ def insert_portal_challenge(conn: sqlite3.Connection, challenge: PortalChallenge
     expires_at = _validate_int(challenge.expires_at, "expires_at", 1)
     used = _validate_int(challenge.used, "used", 0)
     conn.execute(
-        "INSERT INTO portal_challenges (account_id, nonce, expires_at, used) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT INTO portal_challenges (account_id, nonce, expires_at, used) " "VALUES (?, ?, ?, ?)",
         (account_id, nonce, expires_at, used),
     )
     conn.commit()
@@ -441,7 +440,9 @@ def insert_chat_message(conn: sqlite3.Connection, message: ChatMessage) -> None:
     conn.commit()
 
 
-def list_chat_messages(conn: sqlite3.Connection, room_id: str, after: int | None, limit: int) -> list[dict[str, object]]:
+def list_chat_messages(
+    conn: sqlite3.Connection, room_id: str, after: int | None, limit: int
+) -> list[dict[str, object]]:
     rid = _validate_text(room_id, "room_id", r"[A-Za-z0-9_-]{1,64}")
     lim = _validate_int(limit, "limit", 1)
     params: list[object] = [rid]
@@ -564,8 +565,7 @@ def insert_trade(conn: sqlite3.Connection, trade: Trade, *, commit: bool = True)
     price = _validate_int(trade.price, "price", 1)
     run_id = _validate_text(trade.run_id, "run_id")
     conn.execute(
-        "INSERT OR REPLACE INTO trades (trade_id, order_id, amount, price, run_id) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO trades (trade_id, order_id, amount, price, run_id) " "VALUES (?, ?, ?, ?, ?)",
         (trade_id, order_id, amount, price, run_id),
     )
     if commit:
@@ -595,7 +595,9 @@ def insert_message_event(conn: sqlite3.Connection, message: MessageEvent) -> Non
     conn.commit()
 
 
-def list_messages(conn: sqlite3.Connection, channel: str | None = None, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+def list_messages(
+    conn: sqlite3.Connection, channel: str | None = None, limit: int = 50, offset: int = 0
+) -> list[dict[str, object]]:
     lim = _validate_int(limit, "limit", 1, 500)
     off = _validate_int(offset, "offset", 0)
     clauses = []
@@ -653,7 +655,9 @@ def insert_purchase(conn: sqlite3.Connection, purchase: Purchase) -> None:
     conn.commit()
 
 
-def list_purchases(conn: sqlite3.Connection, listing_id: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, object]]:
+def list_purchases(
+    conn: sqlite3.Connection, listing_id: str | None = None, limit: int = 100, offset: int = 0
+) -> list[dict[str, object]]:
     lim = _validate_int(limit, "limit", 1, 1000)
     off = _validate_int(offset, "offset", 0)
     clauses = []
@@ -914,12 +918,12 @@ def apply_wallet_transfer(
         raise StorageError("from_address must differ")
     _ensure_wallet_account(conn, from_addr, asset)
     _ensure_wallet_account(conn, to_addr, asset)
-    _ensure_wallet_account(conn, treasury_addr, "NYXT") # Fees always in NYXT
-    
+    _ensure_wallet_account(conn, treasury_addr, "NYXT")  # Fees always in NYXT
+
     current = get_wallet_balance(conn, from_addr, asset)
     if current < amt:
         raise StorageError(f"insufficient {asset} balance")
-    
+
     # Handle fee separately if it's in NYXT
     if asset == "NYXT":
         if current < (amt + fee):
@@ -934,11 +938,11 @@ def apply_wallet_transfer(
 
     new_to = get_wallet_balance(conn, to_addr, asset) + amt
     new_treasury = get_wallet_balance(conn, treasury_addr, "NYXT") + fee
-    
+
     set_wallet_balance(conn, from_addr, new_from, asset)
     set_wallet_balance(conn, to_addr, new_to, asset)
     set_wallet_balance(conn, treasury_addr, new_treasury, "NYXT")
-    
+
     insert_wallet_transfer(
         conn,
         WalletTransfer(
@@ -988,19 +992,19 @@ def apply_wallet_faucet_with_fee(
     fee = _validate_int(fee_total, "fee_total", 0)
     asset = _validate_text(asset_id, "asset_id", r"[A-Z0-9]{3,12}")
     treasury_addr = _validate_wallet_address(treasury_address, "treasury_address")
-    
+
     _ensure_wallet_account(conn, addr, asset)
     _ensure_wallet_account(conn, treasury_addr, "NYXT")
-    
+
     current = get_wallet_balance(conn, addr, asset)
     treasury_current = get_wallet_balance(conn, treasury_addr, "NYXT")
-    
+
     new_balance = current + amt
     new_treasury = treasury_current + fee
-    
+
     set_wallet_balance(conn, addr, new_balance, asset)
     set_wallet_balance(conn, treasury_addr, new_treasury, "NYXT")
-    
+
     transfer_id = _validate_text(f"faucet-{run_id}", "transfer_id")
     insert_wallet_transfer(
         conn,

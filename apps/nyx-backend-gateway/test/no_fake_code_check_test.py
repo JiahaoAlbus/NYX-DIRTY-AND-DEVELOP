@@ -1,7 +1,8 @@
+import re
 import unittest
 from pathlib import Path
-import re
 
+import _bootstrap  # noqa: F401
 
 RUNTIME_DIRS = [
     Path(__file__).resolve().parents[2] / "src" / "nyx_backend_gateway",

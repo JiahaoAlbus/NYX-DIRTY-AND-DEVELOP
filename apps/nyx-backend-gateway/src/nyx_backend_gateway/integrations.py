@@ -11,7 +11,6 @@ from urllib.request import Request, urlopen
 from nyx_backend_gateway.env import get_0x_api_key, get_jupiter_api_key, get_magic_eden_api_key
 from nyx_backend_gateway.gateway import GatewayApiError
 
-
 _DEFAULT_TIMEOUT_SECONDS = 10
 _MAX_UPSTREAM_BYTES = 250_000
 
@@ -193,7 +192,9 @@ def _require_nonempty_str(value: str, *, name: str, pattern: re.Pattern[str] | N
     return raw
 
 
-def _optional_int(value: str | None, *, name: str, min_value: int | None = None, max_value: int | None = None) -> int | None:
+def _optional_int(
+    value: str | None, *, name: str, min_value: int | None = None, max_value: int | None = None
+) -> int | None:
     if value is None:
         return None
     raw = value.strip()
@@ -283,7 +284,17 @@ def _0x_base_url(network: str | None, chain_id: int | None) -> str:
     return "https://api.0x.org"
 
 
-def quote_0x(*, network: str | None, chain_id: int | None, sell_token: str, buy_token: str, sell_amount: str | None, buy_amount: str | None, taker_address: str | None, slippage_bps: int | None) -> dict[str, Any]:
+def quote_0x(
+    *,
+    network: str | None,
+    chain_id: int | None,
+    sell_token: str,
+    buy_token: str,
+    sell_amount: str | None,
+    buy_amount: str | None,
+    taker_address: str | None,
+    slippage_bps: int | None,
+) -> dict[str, Any]:
     api_key = get_0x_api_key()
     if not api_key:
         raise GatewayApiError("INTEGRATION_DISABLED", "0x integration disabled (missing api key)", http_status=503)
@@ -334,15 +345,23 @@ def quote_0x(*, network: str | None, chain_id: int | None, sell_token: str, buy_
             details={"param": "sell_amount|buy_amount"},
         )
     if sell_amount is not None and not sell_amount.isdigit():
-        raise GatewayApiError("PARAM_INVALID", "sell_amount must be integer string", http_status=400, details={"param": "sell_amount"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "sell_amount must be integer string", http_status=400, details={"param": "sell_amount"}
+        )
     if buy_amount is not None and not buy_amount.isdigit():
-        raise GatewayApiError("PARAM_INVALID", "buy_amount must be integer string", http_status=400, details={"param": "buy_amount"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "buy_amount must be integer string", http_status=400, details={"param": "buy_amount"}
+        )
 
     taker_address = (taker_address or "").strip() or None
     if taker_address is None:
-        raise GatewayApiError("PARAM_REQUIRED", "taker_address required for 0x v2", http_status=400, details={"param": "taker_address"})
+        raise GatewayApiError(
+            "PARAM_REQUIRED", "taker_address required for 0x v2", http_status=400, details={"param": "taker_address"}
+        )
     if not _SAFE_EVM_ADDRESS.fullmatch(taker_address):
-        raise GatewayApiError("PARAM_INVALID", "taker_address invalid", http_status=400, details={"param": "taker_address"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "taker_address invalid", http_status=400, details={"param": "taker_address"}
+        )
     if int(taker_address, 16) <= 0xFFFF:
         raise GatewayApiError(
             "PARAM_INVALID",
@@ -351,14 +370,21 @@ def quote_0x(*, network: str | None, chain_id: int | None, sell_token: str, buy_
             details={"param": "taker_address"},
         )
 
-    params: dict[str, str] = {"chainId": str(chain_id), "sellToken": sell_token, "buyToken": buy_token, "taker": taker_address}
+    params: dict[str, str] = {
+        "chainId": str(chain_id),
+        "sellToken": sell_token,
+        "buyToken": buy_token,
+        "taker": taker_address,
+    }
     if sell_amount is not None:
         params["sellAmount"] = sell_amount
     if buy_amount is not None:
         params["buyAmount"] = buy_amount
     if slippage_bps is not None:
         if slippage_bps < 0 or slippage_bps > 10_000:
-            raise GatewayApiError("PARAM_INVALID", "slippage_bps out of bounds", http_status=400, details={"param": "slippage_bps"})
+            raise GatewayApiError(
+                "PARAM_INVALID", "slippage_bps out of bounds", http_status=400, details={"param": "slippage_bps"}
+            )
         params["slippagePercentage"] = f"{slippage_bps / 10_000:.6f}".rstrip("0").rstrip(".")
 
     base = _0x_base_url(network, chain_id)
@@ -391,12 +417,16 @@ def quote_jupiter(
     output_mint = _require_nonempty_str(output_mint, name="output_mint", pattern=_SAFE_SOL_MINT)
     amount = _require_nonempty_str(amount, name="amount", pattern=_SAFE_HEX_OR_WORD)
     if not amount.isdigit():
-        raise GatewayApiError("PARAM_INVALID", "amount must be integer string", http_status=400, details={"param": "amount"})
+        raise GatewayApiError(
+            "PARAM_INVALID", "amount must be integer string", http_status=400, details={"param": "amount"}
+        )
 
     params: dict[str, str] = {"inputMint": input_mint, "outputMint": output_mint, "amount": amount}
     if slippage_bps is not None:
         if slippage_bps < 0 or slippage_bps > 10_000:
-            raise GatewayApiError("PARAM_INVALID", "slippage_bps out of bounds", http_status=400, details={"param": "slippage_bps"})
+            raise GatewayApiError(
+                "PARAM_INVALID", "slippage_bps out of bounds", http_status=400, details={"param": "slippage_bps"}
+            )
         params["slippageBps"] = str(slippage_bps)
     if swap_mode:
         swap_mode = swap_mode.strip()
@@ -452,7 +482,13 @@ def magic_eden_solana_collection_listings(*, symbol: str, limit: int | None, off
     if params:
         url = f"{url}?{urlencode(params)}"
     result = _http_get_json_any(url, headers=_magic_eden_headers())
-    return {"provider": "magic_eden", "network": "solana", "endpoint": "collection_listings", "symbol": symbol, **result}
+    return {
+        "provider": "magic_eden",
+        "network": "solana",
+        "endpoint": "collection_listings",
+        "symbol": symbol,
+        **result,
+    }
 
 
 def magic_eden_solana_token(*, mint: str) -> dict[str, Any]:
@@ -462,7 +498,9 @@ def magic_eden_solana_token(*, mint: str) -> dict[str, Any]:
     return {"provider": "magic_eden", "network": "solana", "endpoint": "token", "mint": mint, **result}
 
 
-def magic_eden_evm_search_collections(*, chain: str, pattern: str, limit: int | None, offset: int | None) -> dict[str, Any]:
+def magic_eden_evm_search_collections(
+    *, chain: str, pattern: str, limit: int | None, offset: int | None
+) -> dict[str, Any]:
     chain = _require_magic_eden_chain(chain)
     pattern = _require_nonempty_str(pattern, name="pattern", pattern=_SAFE_ME_PATTERN)
     payload: dict[str, Any] = {"chain": chain, "pattern": pattern}

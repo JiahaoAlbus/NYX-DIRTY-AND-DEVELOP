@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 from nyx_backend_gateway.errors import GatewayError

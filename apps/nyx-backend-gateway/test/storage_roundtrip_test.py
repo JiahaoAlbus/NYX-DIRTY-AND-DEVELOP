@@ -1,8 +1,8 @@
-import _bootstrap
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.storage import (
     EvidenceRun,
     FeeLedger,

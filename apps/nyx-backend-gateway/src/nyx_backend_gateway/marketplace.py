@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from nyx_backend_gateway.errors import GatewayError
 from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.identifiers import deterministic_id
@@ -88,7 +90,7 @@ def purchase_listing(conn, run_id: str, payload: dict[str, object], caller_accou
     if str(listing_record.get("status") or "active") != "active":
         raise GatewayError("listing not available")
 
-    total_price = int(listing_record["price"]) * int(validated["qty"])
+    total_price = int(cast(int, listing_record["price"])) * int(cast(int, validated["qty"]))
     fee_record = route_fee("marketplace", "purchase_listing", validated, run_id)
     if caller_account_id:
         nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")

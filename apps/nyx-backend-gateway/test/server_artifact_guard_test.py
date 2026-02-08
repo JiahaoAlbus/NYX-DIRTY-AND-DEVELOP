@@ -1,14 +1,14 @@
-import _bootstrap
 import base64
 import hmac
 import json
 import os
 import tempfile
 import threading
+import unittest
 from http.client import HTTPConnection
 from pathlib import Path
-import unittest
 
+import _bootstrap  # noqa: F401
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
 
@@ -56,7 +56,9 @@ class ServerArtifactGuardTests(unittest.TestCase):
         challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         nonce = challenge.get("nonce")
         signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
-        verified = self._post("/portal/v1/auth/verify", {"account_id": account_id, "nonce": nonce, "signature": signature})
+        verified = self._post(
+            "/portal/v1/auth/verify", {"account_id": account_id, "nonce": nonce, "signature": signature}
+        )
         return account_id, verified.get("access_token")
 
     def test_artifact_path_traversal_rejected(self) -> None:

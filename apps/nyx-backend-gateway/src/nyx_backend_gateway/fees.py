@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from nyx_backend_gateway.env import get_fee_address, get_platform_fee_bps
 from nyx_backend_gateway.storage import FeeLedger

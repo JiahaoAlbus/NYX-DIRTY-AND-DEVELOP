@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any
+from typing import Any, cast
 
 from nyx_backend_gateway.errors import GatewayApiError, GatewayError
 from nyx_backend_gateway.evidence_adapter import run_and_record
 from nyx_backend_gateway.fees import route_fee
 from nyx_backend_gateway.identifiers import deterministic_id
 from nyx_backend_gateway.models import GatewayResult
-from nyx_backend_gateway.paths import db_path as default_db_path, run_root as default_run_root
+from nyx_backend_gateway.paths import db_path as default_db_path
+from nyx_backend_gateway.paths import run_root as default_run_root
 from nyx_backend_gateway.storage import (
     AirdropClaim,
     FeeLedger,
@@ -17,10 +18,8 @@ from nyx_backend_gateway.storage import (
     create_connection,
     insert_airdrop_claim,
     insert_fee_ledger,
-    insert_faucet_claim,
 )
 from nyx_backend_gateway.validation import validate_address_text
-
 
 _AIRDROP_TASKS_V1: list[dict[str, object]] = [
     {
@@ -100,7 +99,7 @@ def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
                 "task_id": task_id,
                 "title": str(task["title"]),
                 "description": str(task["description"]),
-                "reward": int(task["reward"]),
+                "reward": int(cast(int, task["reward"])),
                 "completed": completed,
                 "completion_run_id": completion_run_id,
                 "claimed": claimed_flag,
@@ -133,7 +132,7 @@ def execute_airdrop_claim_v1(
     task = task_map.get(task_id)
     if task is None:
         raise GatewayApiError("TASK_UNKNOWN", "task_id not supported", http_status=404, details={"task_id": task_id})
-    reward = int(task["reward"])
+    reward = int(cast(int, task["reward"]))
 
     conn = create_connection(db_path or default_db_path())
     try:
@@ -173,7 +172,9 @@ def execute_airdrop_claim_v1(
             completion_run_id = str(row["run_id"]) if row is not None else None
 
         if completion_run_id is None:
-            raise GatewayApiError("TASK_INCOMPLETE", "task not completed", http_status=409, details={"task_id": task_id})
+            raise GatewayApiError(
+                "TASK_INCOMPLETE", "task not completed", http_status=409, details={"task_id": task_id}
+            )
 
         fee_record = route_fee("wallet", "airdrop", {"amount": reward}, run_id)
         outcome = run_and_record(
@@ -209,7 +210,12 @@ def execute_airdrop_claim_v1(
         )
         conn.commit()
         return (
-            GatewayResult(run_id=run_id, state_hash=outcome.state_hash, receipt_hashes=outcome.receipt_hashes, replay_ok=outcome.replay_ok),
+            GatewayResult(
+                run_id=run_id,
+                state_hash=outcome.state_hash,
+                receipt_hashes=outcome.receipt_hashes,
+                replay_ok=outcome.replay_ok,
+            ),
             int(faucet_result["balance"]),
             fee_record,
             {"task_id": task_id, "reward": reward, "completion_run_id": completion_run_id},
@@ -269,7 +275,12 @@ def execute_airdrop_claim(
     insert_fee_ledger(conn, fee_record)
 
     return (
-        GatewayResult(run_id=run_id, state_hash=outcome.state_hash, receipt_hashes=outcome.receipt_hashes, replay_ok=outcome.replay_ok),
+        GatewayResult(
+            run_id=run_id,
+            state_hash=outcome.state_hash,
+            receipt_hashes=outcome.receipt_hashes,
+            replay_ok=outcome.replay_ok,
+        ),
         result,
         fee_record,
     )

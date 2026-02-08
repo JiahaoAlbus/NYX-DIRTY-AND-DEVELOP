@@ -1,8 +1,8 @@
-import _bootstrap
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.exchange import place_order
 from nyx_backend_gateway.storage import Order, apply_wallet_faucet, create_connection, list_orders, list_trades
 

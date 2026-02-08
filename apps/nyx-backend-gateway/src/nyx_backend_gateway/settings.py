@@ -4,7 +4,7 @@ import os
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 
 class SettingsError(ValueError):
@@ -36,13 +36,13 @@ class Settings:
     api_payevm_key: str
 
 
-def _require_env_choice(value: str) -> str:
+def _require_env_choice(value: str) -> Literal["dev", "staging", "prod"]:
     normalized = value.strip().lower()
     if not normalized:
         return "dev"
     if normalized not in _ENV_CHOICES:
         raise SettingsError("NYX_ENV must be dev, staging, or prod")
-    return normalized
+    return cast(Literal["dev", "staging", "prod"], normalized)
 
 
 def _require_int(name: str, default: int, *, min_value: int, max_value: int) -> int:
@@ -168,9 +168,7 @@ def get_settings() -> Settings:
     api_magic_eden_key = _validate_generic_key(
         "NYX_MAGIC_EDEN_API_KEY", os.environ.get("NYX_MAGIC_EDEN_API_KEY", "").strip()
     )
-    api_payevm_key = _validate_generic_key(
-        "NYX_PAYEVM_API_KEY", os.environ.get("NYX_PAYEVM_API_KEY", "").strip()
-    )
+    api_payevm_key = _validate_generic_key("NYX_PAYEVM_API_KEY", os.environ.get("NYX_PAYEVM_API_KEY", "").strip())
 
     return Settings(
         env=env,

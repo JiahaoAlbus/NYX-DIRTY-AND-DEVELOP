@@ -1,7 +1,7 @@
-import _bootstrap
 import os
 import unittest
 
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway.fees import route_fee
 
 

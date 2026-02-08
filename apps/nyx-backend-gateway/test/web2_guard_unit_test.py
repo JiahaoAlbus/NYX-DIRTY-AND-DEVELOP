@@ -1,8 +1,8 @@
-import _bootstrap
 import unittest
 
-from nyx_backend_gateway.errors import GatewayApiError
+import _bootstrap  # noqa: F401
 from nyx_backend_gateway import web2_guard
+from nyx_backend_gateway.errors import GatewayApiError
 
 
 class Web2GuardUnitTests(unittest.TestCase):

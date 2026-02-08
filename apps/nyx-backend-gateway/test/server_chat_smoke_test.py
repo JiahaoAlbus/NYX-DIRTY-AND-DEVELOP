@@ -1,14 +1,14 @@
-import _bootstrap
 import base64
 import hmac
 import json
 import os
 import tempfile
 import threading
+import unittest
 from http.client import HTTPConnection
 from pathlib import Path
-import unittest
 
+import _bootstrap  # noqa: F401
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.server as server
 
