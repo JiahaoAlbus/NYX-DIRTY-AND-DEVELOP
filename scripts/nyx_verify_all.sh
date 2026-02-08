@@ -493,13 +493,27 @@ ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balan
 log "Web2 Guard allowlist"
 curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
 
-next_run_id "web2-guard-a"; WEB2_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "https://api.github.com/zen" \
-  '{seed:$seed,run_id:$run_id,payload:{url:$url,method:"GET"}}')"
-curl_json "POST" "$BASE_URL/web2/v1/request" "$TOKEN_A" "$body" "$evidence_dir/A_web2_guard.json" 200 || die "web2 guard request failed"
-jq -e '.request_hash and .response_hash' "$evidence_dir/A_web2_guard.json" >/dev/null 2>&1 \
-  || die "web2 guard response invalid"
-RUN_IDS+=("$WEB2_RUN")
+web2_ok=0
+for web2_url in "https://api.github.com/zen" "https://api.coingecko.com/api/v3/ping" "https://api.coincap.io/v2/assets?limit=1"; do
+  next_run_id "web2-guard-a"
+  WEB2_RUN="$NEXT_RUN_ID"
+  body="$(jq -n --argjson seed "$SEED" --arg run_id "$WEB2_RUN" --arg url "$web2_url" \
+    '{seed:$seed,run_id:$run_id,payload:{url:$url,method:"GET"}}')"
+  if curl_json "POST" "$BASE_URL/web2/v1/request" "$TOKEN_A" "$body" "$evidence_dir/A_web2_guard.json" 200; then
+    if jq -e '.request_hash and .response_hash' "$evidence_dir/A_web2_guard.json" >/dev/null 2>&1; then
+      RUN_IDS+=("$WEB2_RUN")
+      web2_ok=1
+      break
+    fi
+    log "web2 guard response missing hashes for ${web2_url}"
+  else
+    log "web2 guard request failed for ${web2_url}"
+  fi
+done
+
+if [[ "$web2_ok" -ne 1 ]]; then
+  die "web2 guard request failed"
+fi
 
 next_run_id "wallet-transfer-a-to-b"; TRANSFER_RUN="$NEXT_RUN_ID"
 body="$(jq -n --argjson seed "$SEED" --arg run_id "$TRANSFER_RUN" --arg from "$ACCOUNT_A" --arg to "$ACCOUNT_B" \
@@ -721,7 +735,7 @@ summary_md="$evidence_root/SUMMARY.md"
   echo "## Proof export"
   echo
   echo "- proof.zip (account A): \`$evidence_dir/proof_${ACCOUNT_A}.zip\`"
-  echo "- sha256: \`$(cat "$evidence_dir/proof_${ACCOUNT_A}.zip.sha256" | awk '{print $1}')\`"
+  echo "- sha256: \`$(awk '{print $1}' "$evidence_dir/proof_${ACCOUNT_A}.zip.sha256")\`"
 } > "$summary_md"
 
 log "PASS: all verifications completed"

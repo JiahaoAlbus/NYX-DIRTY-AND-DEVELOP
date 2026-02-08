@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Configuration
-VERSION="v1.0.0-testnet"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RELEASE_DIR="release_artifacts"
 SEED=123
