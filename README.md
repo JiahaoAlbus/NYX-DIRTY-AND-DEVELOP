@@ -106,6 +106,7 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 
 ## Documentation (Recommended)
 - Architecture map: `docs/ARCHITECTURE_MAP.md`
+- Repo truth: `docs/REPO_TRUTH.md`
 - Security model: `docs/SECURITY_MODEL.md`
 - Compliance posture: `docs/COMPLIANCE_POSTURE.md`
 - Operational readiness: `docs/OPERATIONAL_READINESS.md`

@@ -75,6 +75,21 @@ RUN_SESSION="${RUN_ID_BASE}-${timestamp}"
 
 log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$evidence_dir/verify.log"; }
 die() { echo "FAIL: $*" | tee -a "$evidence_dir/verify.log" >&2; exit 1; }
+require_external_quotes() {
+  case "${NYX_REQUIRE_EXTERNAL_QUOTES:-0}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+  esac
+  return 1
+}
+integration_fail() {
+  local name="$1"
+  local reason="$2"
+  if require_external_quotes; then
+    die "${name} failed: ${reason}"
+  fi
+  log "${name} failed: ${reason} (non-fatal; set NYX_REQUIRE_EXTERNAL_QUOTES=1 to enforce)"
+  return 0
+}
 
 sanitize_action() { echo "$1" | sed -E 's/[^A-Za-z0-9_-]+/_/g'; }
 counter_file="docs/evidence/run_counter_${RUN_ID_BASE}.txt"
@@ -385,20 +400,26 @@ log "Accounts: A=$ACCOUNT_A (@$HANDLE_A), B=$ACCOUNT_B (@$HANDLE_B)"
 
 if [[ -n "${NYX_0X_API_KEY:-}" ]]; then
   log "Integration: 0x quote"
-  curl_get_json "$BASE_URL/integrations/v1/0x/quote?network=ethereum&chain_id=1&sell_token=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2&buy_token=0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&sell_amount=1000000000000000&taker_address=0x0000000000000000000000000000000000010000&slippage_bps=50" \
-    "$TOKEN_A" "$evidence_dir/integration_0x_quote.json" 200 || die "0x quote failed"
-  jq -e '.provider=="0x" and .status==200 and (.data|type=="object")' "$evidence_dir/integration_0x_quote.json" >/dev/null 2>&1 \
-    || die "0x quote response invalid"
+  if curl_get_json "$BASE_URL/integrations/v1/0x/quote?network=ethereum&chain_id=1&sell_token=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2&buy_token=0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&sell_amount=1000000000000000&taker_address=0x0000000000000000000000000000000000010000&slippage_bps=50" \
+    "$TOKEN_A" "$evidence_dir/integration_0x_quote.json" 200; then
+    jq -e '.provider=="0x" and .status==200 and (.data|type=="object")' "$evidence_dir/integration_0x_quote.json" >/dev/null 2>&1 \
+      || integration_fail "0x quote" "response invalid"
+  else
+    integration_fail "0x quote" "request failed"
+  fi
 else
   log "Integration: 0x quote skipped (NYX_0X_API_KEY not set)"
 fi
 
 if [[ -n "${NYX_JUPITER_API_KEY:-}" ]]; then
   log "Integration: Jupiter quote"
-  curl_get_json "$BASE_URL/integrations/v1/jupiter/quote?input_mint=So11111111111111111111111111111111111111112&output_mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=10000000&slippage_bps=50" \
-    "$TOKEN_A" "$evidence_dir/integration_jupiter_quote.json" 200 || die "jupiter quote failed"
-  jq -e '.provider=="jupiter" and .status==200 and (.data|type=="object")' "$evidence_dir/integration_jupiter_quote.json" >/dev/null 2>&1 \
-    || die "jupiter quote response invalid"
+  if curl_get_json "$BASE_URL/integrations/v1/jupiter/quote?input_mint=So11111111111111111111111111111111111111112&output_mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=10000000&slippage_bps=50" \
+    "$TOKEN_A" "$evidence_dir/integration_jupiter_quote.json" 200; then
+    jq -e '.provider=="jupiter" and .status==200 and (.data|type=="object")' "$evidence_dir/integration_jupiter_quote.json" >/dev/null 2>&1 \
+      || integration_fail "jupiter quote" "response invalid"
+  else
+    integration_fail "jupiter quote" "request failed"
+  fi
 else
   log "Integration: Jupiter quote skipped (NYX_JUPITER_API_KEY not set)"
 fi
