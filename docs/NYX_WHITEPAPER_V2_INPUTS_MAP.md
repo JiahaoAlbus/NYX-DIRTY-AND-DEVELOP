@@ -273,29 +273,29 @@ Version Anchor
 - `packages/wallet-kernel/test/unit_wallet_kernel_test.py` — Evidence — Module logic for the package domain.
 
 ## Implementation Modules (Apps)
-- `apps/nyx-first-app/src/nyx_first_app/__init__.py` — Implementation — Package export surface and public API wiring.
-- `apps/nyx-first-app/src/nyx_first_app/app.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-first-app/src/nyx_first_app/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
-- `apps/nyx-first-app/src/nyx_first_app/models.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-first-app/test/__init__.py` — Evidence — Package export surface and public API wiring.
-- `apps/nyx-first-app/test/app_determinism_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_invalid_args_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_no_secret_leak_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_smoke_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-reference-client/src/nyx_reference_client/__init__.py` — Implementation — Package export surface and public API wiring.
-- `apps/nyx-reference-client/src/nyx_reference_client/app.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-reference-client/src/nyx_reference_client/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
-- `apps/nyx-reference-client/src/nyx_reference_client/models.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/src/nyx_first_app/__init__.py` — Implementation — Package export surface and public API wiring.
+- `attic/apps/nyx-first-app/src/nyx_first_app/app.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-first-app/src/nyx_first_app/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
+- `attic/apps/nyx-first-app/src/nyx_first_app/models.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/__init__.py` — Evidence — Package export surface and public API wiring.
+- `attic/apps/nyx-first-app/test/app_determinism_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_invalid_args_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_no_secret_leak_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_smoke_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/__init__.py` — Implementation — Package export surface and public API wiring.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/app.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/models.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
 
 ## Evidence: Tests and Drills
-- `apps/nyx-first-app/test/app_determinism_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_invalid_args_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_no_secret_leak_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-first-app/test/app_smoke_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_determinism_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_invalid_args_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_no_secret_leak_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/test/app_smoke_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
 - `packages/conformance-v1/test/guard_no_false_negative_test.py` — Evidence — Module logic for the package domain.
 - `packages/conformance-v1/test/guard_no_false_positive_regression_test.py` — Evidence — Module logic for the package domain.
 - `packages/conformance-v1/test/guard_no_frozen_gate_sequence_test.py` — Evidence — Module logic for the package domain.
@@ -378,13 +378,13 @@ Version Anchor
 - `packages/wallet-kernel/test/unit_wallet_kernel_test.py` — Evidence — Module logic for the package domain.
 
 ## Evidence: Demo and CLI Entry Points
-- `apps/nyx-first-app/src/nyx_first_app/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
-- `apps/nyx-reference-client/src/nyx_reference_client/__init__.py` — Implementation — Package export surface and public API wiring.
-- `apps/nyx-reference-client/src/nyx_reference_client/app.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-reference-client/src/nyx_reference_client/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
-- `apps/nyx-reference-client/src/nyx_reference_client/models.py` — Implementation — Module logic for the package domain.
-- `apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
-- `apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-first-app/src/nyx_first_app/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/__init__.py` — Implementation — Package export surface and public API wiring.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/app.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/cli.py` — Implementation — Deterministic CLI entrypoint for evidence runs.
+- `attic/apps/nyx-reference-client/src/nyx_reference_client/models.py` — Implementation — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/client_smoke_test.py` — Evidence — Module logic for the package domain.
+- `attic/apps/nyx-reference-client/test/determinism_guard_test.py` — Evidence — Module logic for the package domain.
 - `packages/e2e-demo/src/e2e_demo/__init__.py` — Evidence — Package export surface and public API wiring.
 - `packages/e2e-demo/src/e2e_demo/canonical.py` — Evidence — Canonical encoding helpers with type checks.
 - `packages/e2e-demo/src/e2e_demo/hashing.py` — Evidence — SHA-256 helpers and framing utilities.
@@ -435,4 +435,4 @@ Version Anchor
 - Router receipt replay determinism: `packages/l3-router/src/l3_router/replay.py`.
 - Fee enforcement: `packages/l2-economics/src/engine.py` and router fee binding `packages/l3-router/src/l3_router/fee_binding.py`.
 - Evidence suite: property, bounded, and conformance drills under `packages/l3-router/test` and `packages/conformance-v1/src/conformance_v1/drills.py`.
-- Deterministic demo outputs: `packages/e2e-private-transfer/src/e2e_private_transfer/run_demo.py` and `apps/nyx-reference-client/src/nyx_reference_client/cli.py`.
+- Deterministic demo outputs: `packages/e2e-private-transfer/src/e2e_private_transfer/run_demo.py` and `attic/apps/nyx-reference-client/src/nyx_reference_client/cli.py`.

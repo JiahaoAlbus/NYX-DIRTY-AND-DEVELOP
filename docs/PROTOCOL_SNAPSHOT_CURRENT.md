@@ -95,7 +95,7 @@ Deterministic Demos / Reference Clients
   - Outputs: fee_total, tx_hash prefix, block_hash prefix, state_root prefix, receipt_hash prefix, replay_ok.
 - E2E demo: `packages/e2e-demo/src/e2e_demo/run_demo.py`
   - Outputs: commitment prefix, fee total, tx hash prefix, block hash prefix, state root prefix, receipt hash prefix, replay_ok.
-- Reference client CLI: `apps/nyx-reference-client/src/nyx_reference_client/cli.py`
+- Reference client CLI: `attic/apps/nyx-reference-client/src/nyx_reference_client/cli.py`
   - Outputs: state_hash, receipt_chain, replay_ok.
 
 Canonical Verification Commands

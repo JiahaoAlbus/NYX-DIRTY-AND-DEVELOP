@@ -23,6 +23,8 @@ This document describes trust boundaries, threat assumptions, and secure default
 - **Determinism**: no non-deterministic sources in deterministic code paths.
 - **Web2 access**: allowlisted hosts only; bounded sizes and timeouts.
 - **Web2 SSRF hardening**: DNS rebinding checks + redirect blocking.
+- **Wallet ≠ identity**: `account_id` and `wallet_address` are distinct; auth tokens bind to identity only.
+- **Compliance gating (optional)**: external compliance decisions occur before deterministic execution and are not part of evidence.
 
 ## 4) Key Custody Model
 
@@ -36,6 +38,8 @@ This document describes trust boundaries, threat assumptions, and secure default
 - `NYX_ENV=dev|staging|prod` controls strictness.
 - `NYX_PORTAL_SESSION_SECRET` must be long in staging/prod.
 - API keys are optional, but if set must pass format validation.
+- `NYX_COMPLIANCE_ENABLED` + `NYX_COMPLIANCE_URL` enable compliance gating (fail-closed by default).
+- `NYX_OTEL_ENABLED=true` enables OpenTelemetry spans (exported to stdout by default).
 
 ## 6) Logging & Redaction
 

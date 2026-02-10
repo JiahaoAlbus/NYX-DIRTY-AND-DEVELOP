@@ -12,21 +12,21 @@ Anchor
 
 | Path | Classification | Purpose |
 | --- | --- | --- |
-| `apps/nyx-first-app/src/nyx_first_app/__init__.py` | Implementation | Package export surface and public API wiring. |
-| `apps/nyx-first-app/src/nyx_first_app/app.py` | Implementation | Module logic for the package domain. |
-| `apps/nyx-first-app/src/nyx_first_app/cli.py` | Implementation | Deterministic CLI entrypoint for evidence runs. |
-| `apps/nyx-first-app/src/nyx_first_app/models.py` | Implementation | Module logic for the package domain. |
-| `apps/nyx-first-app/test/__init__.py` | Evidence | Package export surface and public API wiring. |
-| `apps/nyx-first-app/test/app_determinism_test.py` | Evidence | Module logic for the package domain. |
-| `apps/nyx-first-app/test/app_invalid_args_test.py` | Evidence | Module logic for the package domain. |
-| `apps/nyx-first-app/test/app_no_secret_leak_test.py` | Evidence | Module logic for the package domain. |
-| `apps/nyx-first-app/test/app_smoke_test.py` | Evidence | Module logic for the package domain. |
-| `apps/nyx-reference-client/src/nyx_reference_client/__init__.py` | Implementation | Package export surface and public API wiring. |
-| `apps/nyx-reference-client/src/nyx_reference_client/app.py` | Implementation | Module logic for the package domain. |
-| `apps/nyx-reference-client/src/nyx_reference_client/cli.py` | Implementation | Deterministic CLI entrypoint for evidence runs. |
-| `apps/nyx-reference-client/src/nyx_reference_client/models.py` | Implementation | Module logic for the package domain. |
-| `apps/nyx-reference-client/test/client_smoke_test.py` | Evidence | Module logic for the package domain. |
-| `apps/nyx-reference-client/test/determinism_guard_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/src/nyx_first_app/__init__.py` | Implementation | Package export surface and public API wiring. |
+| `attic/apps/nyx-first-app/src/nyx_first_app/app.py` | Implementation | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/src/nyx_first_app/cli.py` | Implementation | Deterministic CLI entrypoint for evidence runs. |
+| `attic/apps/nyx-first-app/src/nyx_first_app/models.py` | Implementation | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/test/__init__.py` | Evidence | Package export surface and public API wiring. |
+| `attic/apps/nyx-first-app/test/app_determinism_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/test/app_invalid_args_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/test/app_no_secret_leak_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-first-app/test/app_smoke_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-reference-client/src/nyx_reference_client/__init__.py` | Implementation | Package export surface and public API wiring. |
+| `attic/apps/nyx-reference-client/src/nyx_reference_client/app.py` | Implementation | Module logic for the package domain. |
+| `attic/apps/nyx-reference-client/src/nyx_reference_client/cli.py` | Implementation | Deterministic CLI entrypoint for evidence runs. |
+| `attic/apps/nyx-reference-client/src/nyx_reference_client/models.py` | Implementation | Module logic for the package domain. |
+| `attic/apps/nyx-reference-client/test/client_smoke_test.py` | Evidence | Module logic for the package domain. |
+| `attic/apps/nyx-reference-client/test/determinism_guard_test.py` | Evidence | Module logic for the package domain. |
 | `conformance/README.md` | Normative Spec | Conformance is the enforcement layer for the NYX constitution and frozen rules. |
 | `conformance/ROADMAP.md` | Normative Spec | Phase 0: Pattern gate (current) |
 | `conformance/frozen-manifest.sha256` | Operations | Conformance data or rule manifest. |

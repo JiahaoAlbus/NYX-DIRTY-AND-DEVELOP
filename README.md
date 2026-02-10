@@ -17,6 +17,7 @@ Deterministic, verifiable portal infrastructure with wallet, exchange, chat, sto
 - **Not mainnet production**: compliance (KYC/AML, privacy/TOS), production secrets management, and enterprise SRE are required for mainnet.
 - **Not a custody product**: no HSM/secure enclave integration here.
 - **Not a PayEVM integration** (waiting on official endpoints + webhook spec).
+- **Not a dumping ground for legacy apps**: all non-production modules live under `attic/` and are excluded from CI/release.
 
 ## Required Environment
 - Python 3.10+
@@ -42,6 +43,7 @@ See `docs/ARCHITECTURE_MAP.md` for component relationships and data flows.
 - Web2 access is **hostile** and must flow through the gateway allowlist.
 - Deterministic evidence/replay is enforced for all shared-state mutations.
 - No privileged bypass paths; no fee waivers on shared state.
+- Portal auth uses HMAC bearer tokens; `account_id` (identity) is distinct from `wallet_address`.
 Full model: `docs/SECURITY_MODEL.md`.
 
 ## Full End-to-End Verification (Recommended)
@@ -79,6 +81,10 @@ bash scripts/build_ios_ipa.sh
 ```
 
 ## Monitoring (Free, Strong)
+Built-in Prometheus endpoints:
+- Gateway: `http://127.0.0.1:8091/metrics`
+- Evidence backend: `http://127.0.0.1:8090/metrics`
+
 Metrics exporter:
 ```bash
 python scripts/nyx_metrics_exporter.py
@@ -103,6 +109,7 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 | `python scripts/nyx_metrics_exporter.py` | Metrics endpoint for Prometheus/Grafana. |
 | `bash scripts/nyx_backup_encrypted.sh` | Strong encrypted backup (AES-256-GCM + PBKDF2). |
 | `bash scripts/nyx_restore_encrypted.sh <enc> <out>` | Restore encrypted backup. |
+| `python scripts/nyx_economic_simulation.py --out-dir docs/economics` | Simulate fee economics for trade/airdrop flows and write charts/tables. |
 
 ## Documentation (Recommended)
 - Architecture map: `docs/ARCHITECTURE_MAP.md`

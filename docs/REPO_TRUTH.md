@@ -13,10 +13,12 @@ This file is the canonical snapshot of **what runs today**, **what is authoritat
   export PYTHONPATH="$(pwd)/apps/nyx-backend-gateway/src:$(pwd)/apps/nyx-backend/src"
   python -m nyx_backend_gateway.server --host 127.0.0.1 --port 8091 --env-file .env.example
   ```
+- Metrics: `http://127.0.0.1:8091/metrics`
 
 ### Backend evidence engine
 - Module: `apps/nyx-backend/src/nyx_backend/server.py`
 - Used by gateway for evidence generation and deterministic replay.
+- Metrics: `http://127.0.0.1:8090/metrics`
 
 ### Web Portal (production UI)
 - Directory: `nyx-world/`
@@ -60,11 +62,13 @@ This file is the canonical snapshot of **what runs today**, **what is authoritat
 - `docs/` (security/ops/runbooks)
 
 ### Reference / legacy / non-production
-- `apps/nyx-web/` (reference static UI assets)
-- `apps/reference-ui/`, `apps/reference-ui-backend/` (reference-only)
-- `apps/nyx-first-app/` (sample app, not production)
-- `apps/nyx-reference-client/` (reference client)
-- `NYX-DIRTY-AND-DEVELOP/` (duplicate snapshot; see `docs/DEAD_CODE_REPORT.md`)
+- `attic/apps/nyx-web/` (reference static UI assets)
+- `attic/apps/reference-ui/`, `attic/apps/reference-ui-backend/` (reference-only)
+- `attic/apps/nyx-first-app/` (sample app, not production)
+- `attic/apps/nyx-reference-client/` (reference client)
+- `attic/NYX-DIRTY-AND-DEVELOP/` (duplicate snapshot; see `docs/DEAD_CODE_REPORT.md`)
+
+All `attic/` modules are excluded from CI and release packaging by design.
 
 ## Languages used
 - Python (gateway/backend, tests, scripts)
@@ -82,6 +86,7 @@ This file is the canonical snapshot of **what runs today**, **what is authoritat
 ## Known limitations / stubs
 - PayEVM is disabled pending official endpoints + webhook verification spec (see `docs/EXTREME_GAP_REPORT.md`).
 - Mainnet compliance (KYC/AML, privacy/TOS, enterprise secrets management) is documented but not enforced in code here (see `docs/PROD_GO_LIVE.md`).
+- Compliance hook exists but is disabled by default (`NYX_COMPLIANCE_ENABLED=false`).
 - External quote integrations are best-effort in `scripts/nyx_verify_all.sh` unless `NYX_REQUIRE_EXTERNAL_QUOTES=1` is set.
 
 ## Invariants enforced by tests
