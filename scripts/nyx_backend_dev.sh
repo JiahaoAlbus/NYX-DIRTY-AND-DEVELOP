@@ -113,4 +113,12 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "READY http://${HOST}:${PORT}"
+
+if [ -n "${NYX_DEV_EXIT_AFTER_SECONDS:-}" ]; then
+  sleep "${NYX_DEV_EXIT_AFTER_SECONDS}"
+  kill "$SERVER_PID" >/dev/null 2>&1 || true
+  wait "$SERVER_PID" >/dev/null 2>&1 || true
+  exit 0
+fi
+
 wait "$SERVER_PID"

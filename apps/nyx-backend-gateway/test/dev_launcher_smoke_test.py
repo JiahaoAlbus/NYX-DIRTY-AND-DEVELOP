@@ -1,3 +1,5 @@
+import base64
+import hmac
 import json
 import os
 import socket
@@ -5,6 +7,7 @@ import subprocess
 import sys
 import time
 import unittest
+import signal
 from http.client import HTTPConnection
 from pathlib import Path
 
@@ -61,6 +64,7 @@ class DevLauncherSmokeTests(unittest.TestCase):
         env.setdefault("NYX_PROTOCOL_FEE_MIN", "1")
         env["NYX_DEV_NO_VENV"] = "1"
         env["PYTHONUNBUFFERED"] = "1"
+        env["NYX_DEV_EXIT_AFTER_SECONDS"] = "8"
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))
             port = sock.getsockname()[1]
@@ -69,27 +73,66 @@ class DevLauncherSmokeTests(unittest.TestCase):
         proc = subprocess.Popen(
             ["bash", str(script)],
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             text=True,
+            start_new_session=True,
         )
         try:
             if not _wait_for_port("127.0.0.1", port, timeout=10.0):
                 proc.terminate()
-                out, err = proc.communicate(timeout=2)
-                self.fail(f"backend dev launcher did not bind 127.0.0.1:{port}\n{out}\n{err}")
+                self.fail(f"backend dev launcher did not bind 127.0.0.1:{port}")
             if not _healthz_ok(port, timeout=5.0):
                 proc.terminate()
-                out, err = proc.communicate(timeout=2)
-                self.fail(f"backend did not become healthy\n{out}\n{err}")
+                self.fail("backend did not become healthy")
+            key = f"portal-dev-launcher-{port}-0001".encode("utf-8")
+            pubkey = base64.b64encode(key).decode("utf-8")
+            handle = f"dev{port}"
+            conn = HTTPConnection("127.0.0.1", port, timeout=10)
+            conn.request(
+                "POST",
+                "/portal/v1/accounts",
+                body=json.dumps({"handle": handle, "pubkey": pubkey}),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = resp.read().decode("utf-8")
+            self.assertEqual(resp.status, 200, body)
+            account = json.loads(body)
+            account_id = account.get("account_id")
+            wallet_address = account.get("wallet_address")
+            conn.request(
+                "POST",
+                "/portal/v1/auth/challenge",
+                body=json.dumps({"account_id": account_id}),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = resp.read().decode("utf-8")
+            self.assertEqual(resp.status, 200, body)
+            nonce = json.loads(body).get("nonce")
+            signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+            conn.request(
+                "POST",
+                "/portal/v1/auth/verify",
+                body=json.dumps({"account_id": account_id, "nonce": nonce, "signature": signature}),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = conn.getresponse()
+            body = resp.read().decode("utf-8")
+            self.assertEqual(resp.status, 200, body)
+            token = json.loads(body).get("access_token")
             conn = HTTPConnection("127.0.0.1", port, timeout=10)
             payload = {
                 "seed": 123,
                 "run_id": run_id,
-                "payload": {"address": "wallet-dev", "amount": 10},
+                "payload": {"address": wallet_address, "amount": 10},
             }
             conn.request(
-                "POST", "/wallet/faucet", body=json.dumps(payload), headers={"Content-Type": "application/json"}
+                "POST",
+                "/wallet/faucet",
+                body=json.dumps(payload),
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
             )
             try:
                 resp = conn.getresponse()
@@ -100,18 +143,19 @@ class DevLauncherSmokeTests(unittest.TestCase):
                 conn.close()
             except Exception as exc:
                 proc.terminate()
-                try:
-                    out, err = proc.communicate(timeout=2)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    out, err = proc.communicate()
-                self.fail(f"faucet request failed: {exc}\n{out}\n{err}")
+                self.fail(f"faucet request failed: {exc}")
         finally:
-            proc.terminate()
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except Exception:
+                proc.terminate()
             try:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except Exception:
+                    proc.kill()
 
 
 if __name__ == "__main__":

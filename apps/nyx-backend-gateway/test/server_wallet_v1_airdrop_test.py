@@ -63,11 +63,12 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self, handle: str, key: bytes) -> tuple[str, str]:
+    def _auth_token(self, handle: str, key: bytes) -> tuple[str, str, str]:
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": handle, "pubkey": pubkey})
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
         nonce = challenge.get("nonce")
@@ -77,31 +78,31 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return account_id, verified.get("access_token")
+        return account_id, wallet_address, verified.get("access_token")
 
     def test_airdrop_tasks_and_claim(self) -> None:
         status, _ = self._get("/wallet/v1/airdrop/tasks")
         self.assertEqual(status, 401)
 
-        a_id, a_token = self._auth_token("airdrop_a", b"airdrop-key-a-0001-0001-0001")
-        b_id, b_token = self._auth_token("airdrop_b", b"airdrop-key-b-0002-0002-0002")
+        a_id, a_wallet, a_token = self._auth_token("airdrop_a", b"airdrop-key-a-0001-0001-0001")
+        b_id, b_wallet, b_token = self._auth_token("airdrop_b", b"airdrop-key-b-0002-0002-0002")
 
         # Fund accounts for fees and actions
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 1, "run_id": "a-nyxt", "address": a_id, "amount": 3000, "asset_id": "NYXT"},
+            {"seed": 1, "run_id": "a-nyxt", "address": a_wallet, "amount": 3000, "asset_id": "NYXT"},
             token=a_token,
         )
         self.assertEqual(status, 200)
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 2, "run_id": "b-nyxt", "address": b_id, "amount": 3000, "asset_id": "NYXT"},
+            {"seed": 2, "run_id": "b-nyxt", "address": b_wallet, "amount": 3000, "asset_id": "NYXT"},
             token=b_token,
         )
         self.assertEqual(status, 200)
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 3, "run_id": "b-echo", "address": b_id, "amount": 50, "asset_id": "ECHO"},
+            {"seed": 3, "run_id": "b-echo", "address": b_wallet, "amount": 50, "asset_id": "ECHO"},
             token=b_token,
         )
         self.assertEqual(status, 200)
@@ -114,7 +115,7 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
                 "run_id": "listing-1",
                 "module": "marketplace",
                 "action": "listing_publish",
-                "payload": {"publisher_id": a_id, "sku": "sku-1", "title": "Test Item", "price": 5},
+                "payload": {"publisher_id": a_wallet, "sku": "sku-1", "title": "Test Item", "price": 5},
             },
             token=a_token,
         )
@@ -130,7 +131,7 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
                 "run_id": "purchase-1",
                 "module": "marketplace",
                 "action": "purchase_listing",
-                "payload": {"buyer_id": b_id, "listing_id": listing_id, "qty": 1},
+                "payload": {"buyer_id": b_wallet, "listing_id": listing_id, "qty": 1},
             },
             token=b_token,
         )
@@ -159,7 +160,7 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
                 "module": "exchange",
                 "action": "place_order",
                 "payload": {
-                    "owner_address": a_id,
+                    "owner_address": a_wallet,
                     "side": "BUY",
                     "asset_in": "NYXT",
                     "asset_out": "ECHO",
@@ -178,7 +179,7 @@ class ServerWalletV1AirdropTests(unittest.TestCase):
                 "module": "exchange",
                 "action": "place_order",
                 "payload": {
-                    "owner_address": b_id,
+                    "owner_address": b_wallet,
                     "side": "SELL",
                     "asset_in": "ECHO",
                     "asset_out": "NYXT",

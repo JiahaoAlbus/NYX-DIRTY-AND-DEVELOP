@@ -1,3 +1,5 @@
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -33,47 +35,66 @@ class ServerWalletSmokeTests(unittest.TestCase):
         self.httpd.server_close()
         self.tmp.cleanup()
 
-    def test_wallet_faucet_and_transfer(self) -> None:
+    def _post(self, path: str, payload: dict, token: str | None = None) -> tuple[int, dict]:
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        faucet_payload = {
-            "seed": 123,
-            "run_id": "wallet-faucet-1",
-            "payload": {"address": "wallet-a", "amount": 1000},
-        }
-        conn.request(
-            "POST", "/wallet/faucet", body=json.dumps(faucet_payload), headers={"Content-Type": "application/json"}
-        )
+        body = json.dumps(payload, separators=(",", ":"))
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        conn.request("POST", path, body=body, headers=headers)
         response = conn.getresponse()
         data = response.read()
-        self.assertEqual(response.status, 200)
-        parsed = json.loads(data.decode("utf-8"))
-        self.assertEqual(parsed.get("status"), "complete")
         conn.close()
+        return response.status, json.loads(data.decode("utf-8"))
 
-        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        transfer_payload = {
-            "seed": 123,
-            "run_id": "wallet-transfer-1",
-            "payload": {"from_address": "wallet-a", "to_address": "wallet-b", "amount": 10},
-        }
-        conn.request(
-            "POST", "/wallet/transfer", body=json.dumps(transfer_payload), headers={"Content-Type": "application/json"}
+    def _auth_token(self) -> tuple[str, str]:
+        key = b"portal-wallet-smoke-0001"
+        pubkey = base64.b64encode(key).decode("utf-8")
+        status, created = self._post("/portal/v1/accounts", {"handle": "wallet_smoke", "pubkey": pubkey})
+        self.assertEqual(status, 200)
+        account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
+        status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
+        self.assertEqual(status, 200)
+        nonce = challenge.get("nonce")
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        status, verified = self._post(
+            "/portal/v1/auth/verify",
+            {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
-        response = conn.getresponse()
-        data = response.read()
-        self.assertEqual(response.status, 200)
-        parsed = json.loads(data.decode("utf-8"))
+        self.assertEqual(status, 200)
+        return wallet_address, verified.get("access_token")
+
+    def test_wallet_faucet_and_transfer(self) -> None:
+        wallet_address, token = self._auth_token()
+        status, parsed = self._post(
+            "/wallet/faucet",
+            {"seed": 123, "run_id": "wallet-faucet-1", "payload": {"address": wallet_address, "amount": 1000}},
+            token=token,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(parsed.get("status"), "complete")
+
+        status, parsed = self._post(
+            "/wallet/transfer",
+            {
+                "seed": 123,
+                "run_id": "wallet-transfer-1",
+                "payload": {"from_address": wallet_address, "to_address": "wallet-b", "amount": 10},
+            },
+            token=token,
+        )
+        self.assertEqual(status, 200)
         self.assertEqual(parsed.get("status"), "complete")
         self.assertIn("fee_total", parsed)
-        conn.close()
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        conn.request("GET", "/wallet/balance?address=wallet-a")
+        conn.request("GET", f"/wallet/v1/balances?address={wallet_address}", headers={"Authorization": f"Bearer {token}"})
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)
         parsed = json.loads(data.decode("utf-8"))
-        self.assertIn("balance", parsed)
+        self.assertIn("balances", parsed)
         conn.close()
 
 

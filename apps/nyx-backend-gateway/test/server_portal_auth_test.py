@@ -77,6 +77,8 @@ class ServerPortalAuthTests(unittest.TestCase):
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
         self.assertTrue(account_id)
+        wallet_address = created.get("wallet_address")
+        self.assertTrue(wallet_address)
 
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
@@ -95,6 +97,7 @@ class ServerPortalAuthTests(unittest.TestCase):
         status, me = self._get_auth("/portal/v1/me", token)
         self.assertEqual(status, 200)
         self.assertEqual(me.get("account_id"), account_id)
+        self.assertEqual(me.get("wallet_address"), wallet_address)
 
         status, reuse = self._post(
             "/portal/v1/auth/verify",

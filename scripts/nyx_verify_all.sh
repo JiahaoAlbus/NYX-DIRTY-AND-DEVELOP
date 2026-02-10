@@ -384,6 +384,10 @@ PUBKEY_A="$(portal_pubkey "A")"
 ACCOUNT_A="$(create_or_reuse_portal_account "A" "$HANDLE_A" "$PUBKEY_A" "A")"
 TOKEN_A="$(portal_login "$ACCOUNT_A" "$PUBKEY_A" "A")"
 curl_get_json "$BASE_URL/portal/v1/me" "$TOKEN_A" "$evidence_dir/A_me.json" 200 || die "portal me (A) failed"
+WALLET_A="$(jq -r '.wallet_address // empty' "$evidence_dir/A_me.json")"
+if [[ -z "$WALLET_A" || "$WALLET_A" == "null" ]]; then
+  die "wallet_address missing for account A"
+fi
 
 LABEL="B" RUN_ID_BASE="$RUN_ID_BASE" RUN_SESSION="$RUN_SESSION" export RUN_ID_BASE RUN_SESSION LABEL
 HANDLE_B="$(portal_handle "B")"
@@ -391,8 +395,12 @@ PUBKEY_B="$(portal_pubkey "B")"
 ACCOUNT_B="$(create_or_reuse_portal_account "B" "$HANDLE_B" "$PUBKEY_B" "B")"
 TOKEN_B="$(portal_login "$ACCOUNT_B" "$PUBKEY_B" "B")"
 curl_get_json "$BASE_URL/portal/v1/me" "$TOKEN_B" "$evidence_dir/B_me.json" 200 || die "portal me (B) failed"
+WALLET_B="$(jq -r '.wallet_address // empty' "$evidence_dir/B_me.json")"
+if [[ -z "$WALLET_B" || "$WALLET_B" == "null" ]]; then
+  die "wallet_address missing for account B"
+fi
 
-log "Accounts: A=$ACCOUNT_A (@$HANDLE_A), B=$ACCOUNT_B (@$HANDLE_B)"
+log "Accounts: A=$ACCOUNT_A (@$HANDLE_A, wallet=$WALLET_A), B=$ACCOUNT_B (@$HANDLE_B, wallet=$WALLET_B)"
 
 # -------------------------------------------------------------------
 # External integrations (read-only)
@@ -513,7 +521,7 @@ PY
 }
 
 ensure_nyxt_balance() {
-  local account_id="$1" token="$2" out="$3" min_balance="$4"
+  local wallet_addr="$1" token="$2" out="$3" min_balance="$4"
   local balance
   balance="$(jq -r '.balances[] | select(.asset_id=="NYXT") | .balance' "$out" 2>/dev/null || echo "0")"
   if [[ -z "$balance" || "$balance" == "null" ]]; then
@@ -525,14 +533,14 @@ ensure_nyxt_balance() {
   log "NYXT balance low (${balance}), attempting faucet top-up"
   next_run_id "wallet-faucet-topup-a"; TOPUP_RUN="$NEXT_RUN_ID"
   local topup_body
-  topup_body="$(jq -n --argjson seed "$SEED" --arg run_id "$TOPUP_RUN" --arg address "$account_id" \
+  topup_body="$(jq -n --argjson seed "$SEED" --arg run_id "$TOPUP_RUN" --arg address "$wallet_addr" \
     '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
   curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$token" "$topup_body" "$evidence_dir/A_faucet_topup.json" "200,429" \
     || die "wallet faucet top-up failed"
   if jq -e '.status=="complete"' "$evidence_dir/A_faucet_topup.json" >/dev/null 2>&1; then
     RUN_IDS+=("$TOPUP_RUN")
   fi
-  ADDR="$account_id" wallet_balances "$account_id" "$token" "$out" || die "balances (A) after top-up failed"
+  ADDR="$wallet_addr" wallet_balances "$wallet_addr" "$token" "$out" || die "balances (A) after top-up failed"
   balance="$(jq -r '.balances[] | select(.asset_id=="NYXT") | .balance' "$out" 2>/dev/null || echo "0")"
   if [[ -z "$balance" || "$balance" == "null" ]]; then
     balance=0
@@ -545,7 +553,7 @@ ensure_nyxt_balance() {
 
 # Faucet limits are enforced server-side; by default each account can faucet once per 24h.
 next_run_id "wallet-faucet-a-nyxt"; FAUCET_A_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$ACCOUNT_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_A_RUN" --arg address "$WALLET_A" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:5000,asset_id:"NYXT"}}')"
 curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$TOKEN_A" "$body" "$evidence_dir/A_faucet.json" "200,429" || die "wallet faucet (A) failed"
 if jq -e '.status=="complete"' "$evidence_dir/A_faucet.json" >/dev/null 2>&1; then
   RUN_IDS+=("$FAUCET_A_RUN")
@@ -555,7 +563,7 @@ else
 fi
 
 next_run_id "wallet-faucet-b-echo"; FAUCET_B_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_B_RUN" --arg address "$ACCOUNT_B" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:1000,asset_id:"ECHO"}}')"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$FAUCET_B_RUN" --arg address "$WALLET_B" '{seed:$seed,run_id:$run_id,payload:{address:$address,amount:1000,asset_id:"ECHO"}}')"
 curl_json "POST" "$BASE_URL/wallet/v1/faucet" "$TOKEN_B" "$body" "$evidence_dir/B_faucet.json" "200,429" || die "wallet faucet (B) failed"
 if jq -e '.status=="complete"' "$evidence_dir/B_faucet.json" >/dev/null 2>&1; then
   RUN_IDS+=("$FAUCET_B_RUN")
@@ -563,9 +571,9 @@ else
   log "B faucet not completed (likely cooldown): $(jq -c '.error' "$evidence_dir/B_faucet.json" 2>/dev/null || cat "$evidence_dir/B_faucet.json")"
 fi
 
-ADDR="$ACCOUNT_A" wallet_balances "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" || die "balances (A) failed"
-ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balances_1.json" || die "balances (B) failed"
-ensure_nyxt_balance "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" 200
+ADDR="$WALLET_A" wallet_balances "$WALLET_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" || die "balances (A) failed"
+ADDR="$WALLET_B" wallet_balances "$WALLET_B" "$TOKEN_B" "$evidence_dir/B_balances_1.json" || die "balances (B) failed"
+ensure_nyxt_balance "$WALLET_A" "$TOKEN_A" "$evidence_dir/A_balances_1.json" 200
 
 log "Web2 Guard allowlist"
 curl_get_json "$BASE_URL/web2/v1/allowlist" "" "$evidence_dir/web2_allowlist.json" 200 || die "web2 allowlist failed"
@@ -593,23 +601,23 @@ if [[ "$web2_ok" -ne 1 ]]; then
 fi
 
 next_run_id "wallet-transfer-a-to-b"; TRANSFER_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$TRANSFER_RUN" --arg from "$ACCOUNT_A" --arg to "$ACCOUNT_B" \
-  '{seed:$seed,run_id:$run_id,payload:{from_address:$from,to_address:$to,amount:300,asset_id:"NYXT"}}')"
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$TRANSFER_RUN" --arg from "$WALLET_A" --arg to "$WALLET_B" \
+  '{seed:$seed,run_id:$run_id,payload:{from_address:$from,to_address:$to,amount:1500,asset_id:"NYXT"}}')"
 curl_json "POST" "$BASE_URL/wallet/v1/transfer" "$TOKEN_A" "$body" "$evidence_dir/A_transfer.json" 200 || die "wallet transfer A->B failed"
 RUN_IDS+=("$TRANSFER_RUN")
 
-ADDR="$ACCOUNT_A" wallet_balances "$ACCOUNT_A" "$TOKEN_A" "$evidence_dir/A_balances_2.json" || die "balances (A) after transfer failed"
-ADDR="$ACCOUNT_B" wallet_balances "$ACCOUNT_B" "$TOKEN_B" "$evidence_dir/B_balances_2.json" || die "balances (B) after transfer failed"
+ADDR="$WALLET_A" wallet_balances "$WALLET_A" "$TOKEN_A" "$evidence_dir/A_balances_2.json" || die "balances (A) after transfer failed"
+ADDR="$WALLET_B" wallet_balances "$WALLET_B" "$TOKEN_B" "$evidence_dir/B_balances_2.json" || die "balances (B) after transfer failed"
 
 # Exchange: B places SELL (needs NYXT for fee) then A places BUY; should match into trades.
 next_run_id "exchange-sell-b"; SELL_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$SELL_RUN" --arg owner "$ACCOUNT_B" \
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$SELL_RUN" --arg owner "$WALLET_B" \
   '{seed:$seed,run_id:$run_id,module:"exchange",action:"place_order",payload:{owner_address:$owner,side:"SELL",amount:100,price:1,asset_in:"ECHO",asset_out:"NYXT"}}')"
 curl_json "POST" "$BASE_URL/run" "$TOKEN_B" "$body" "$evidence_dir/B_exchange_sell.json" 200 || die "exchange sell (B) failed"
 RUN_IDS+=("$SELL_RUN")
 
 next_run_id "exchange-buy-a"; BUY_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$BUY_RUN" --arg owner "$ACCOUNT_A" \
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$BUY_RUN" --arg owner "$WALLET_A" \
   '{seed:$seed,run_id:$run_id,module:"exchange",action:"place_order",payload:{owner_address:$owner,side:"BUY",amount:100,price:1,asset_in:"NYXT",asset_out:"ECHO"}}')"
 curl_json "POST" "$BASE_URL/run" "$TOKEN_A" "$body" "$evidence_dir/A_exchange_buy.json" 200 || die "exchange buy (A) failed"
 RUN_IDS+=("$BUY_RUN")
@@ -626,7 +634,7 @@ PY
 TITLE="Item"
 
 next_run_id "marketplace-publish-b"; PUBLISH_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$PUBLISH_RUN" --arg publisher "$ACCOUNT_B" --arg sku "$SKU" --arg title "$TITLE" \
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$PUBLISH_RUN" --arg publisher "$WALLET_B" --arg sku "$SKU" --arg title "$TITLE" \
   '{seed:$seed,run_id:$run_id,module:"marketplace",action:"listing_publish",payload:{publisher_id:$publisher,sku:$sku,title:$title,price:10}}')"
 curl_json "POST" "$BASE_URL/run" "$TOKEN_B" "$body" "$evidence_dir/B_listing_publish.json" 200 || die "listing_publish (B) failed"
 RUN_IDS+=("$PUBLISH_RUN")
@@ -639,7 +647,7 @@ fi
 echo "$LISTING_ID" > "$evidence_dir/listing_id.txt"
 
 next_run_id "marketplace-purchase-a"; PURCHASE_RUN="$NEXT_RUN_ID"
-body="$(jq -n --argjson seed "$SEED" --arg run_id "$PURCHASE_RUN" --arg buyer "$ACCOUNT_A" --arg listing_id "$LISTING_ID" \
+body="$(jq -n --argjson seed "$SEED" --arg run_id "$PURCHASE_RUN" --arg buyer "$WALLET_A" --arg listing_id "$LISTING_ID" \
   '{seed:$seed,run_id:$run_id,module:"marketplace",action:"purchase_listing",payload:{buyer_id:$buyer,listing_id:$listing_id,qty:1}}')"
 curl_json "POST" "$BASE_URL/run" "$TOKEN_A" "$body" "$evidence_dir/A_purchase.json" 200 || die "purchase_listing (A) failed"
 RUN_IDS+=("$PURCHASE_RUN")
