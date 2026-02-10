@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from nyx_backend_gateway import compliance
 from nyx_backend_gateway.airdrop import (
     execute_airdrop_claim as airdrop_execute_airdrop_claim,
 )
@@ -77,8 +78,8 @@ from nyx_backend_gateway.web2_guard import (
 )
 
 
-def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
-    return airdrop_list_tasks_v1(conn, account_id)
+def list_airdrop_tasks_v1(conn, account_id: str, wallet_address: str) -> list[dict[str, object]]:
+    return airdrop_list_tasks_v1(conn, account_id, wallet_address)
 
 
 def execute_airdrop_claim_v1(
@@ -86,6 +87,7 @@ def execute_airdrop_claim_v1(
     seed: int,
     run_id: str,
     account_id: str,
+    wallet_address: str,
     payload: dict[str, Any],
     db_path: Path | None = None,
     run_root: Path | None = None,
@@ -94,6 +96,7 @@ def execute_airdrop_claim_v1(
         seed=seed,
         run_id=run_id,
         account_id=account_id,
+        wallet_address=wallet_address,
         payload=payload,
         db_path=db_path or _db_path(),
         run_root=run_root or _run_root(),
@@ -167,6 +170,7 @@ def execute_run(
     module: str,
     action: str,
     payload: dict[str, Any] | None,
+    caller_wallet_address: str | None = None,
     caller_account_id: str | None = None,
     db_path: Path | None = None,
     run_root: Path | None = None,
@@ -180,7 +184,7 @@ def execute_run(
     # Verify ownership for state-mutating actions
     if module == "exchange" and action == "place_order":
         payload = validate_place_order(payload)
-        if caller_account_id and payload.get("owner_address") != caller_account_id:
+        if caller_wallet_address and payload.get("owner_address") != caller_wallet_address:
             raise GatewayError("owner_address mismatch")
     if module == "exchange" and action == "cancel_order":
         payload = validate_cancel(payload)
@@ -191,16 +195,35 @@ def execute_run(
         if not caller_account_id:
             raise GatewayError("auth required")
         payload = validate_purchase_payload(payload)
-        if caller_account_id and payload.get("buyer_id") != caller_account_id:
+        if caller_wallet_address and payload.get("buyer_id") != caller_wallet_address:
             raise GatewayError("buyer_id mismatch")
     if module == "marketplace" and action == "listing_publish":
         if not caller_account_id:
             raise GatewayError("auth required")
         payload = validate_listing_payload(payload)
-        if caller_account_id and payload.get("publisher_id") != caller_account_id:
+        if caller_wallet_address and payload.get("publisher_id") != caller_wallet_address:
             raise GatewayError("publisher_id mismatch")
     if module == "entertainment" and action == "state_step":
         payload = validate_entertainment_payload(payload)
+
+    if (module, action) in {
+        ("exchange", "place_order"),
+        ("exchange", "cancel_order"),
+        ("exchange", "route_swap"),
+        ("chat", "message_event"),
+        ("marketplace", "listing_publish"),
+        ("marketplace", "purchase_listing"),
+        ("dapp", "sign_request"),
+        ("entertainment", "state_step"),
+    }:
+        compliance.require_clearance(
+            account_id=caller_account_id,
+            wallet_address=caller_wallet_address,
+            module=module,
+            action=action,
+            run_id=run_id,
+            metadata={"payload": payload},
+        )
 
     conn = create_connection(db_path or _db_path())
     run_root = run_root or _run_root()
@@ -223,8 +246,8 @@ def execute_run(
             fee_record = route_fee(module, action, payload, run_id)
 
         if module == "exchange" and action == "place_order":
-            if fee_record is not None and caller_account_id:
-                nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+            if fee_record is not None and caller_wallet_address:
+                nyxt_balance = get_wallet_balance(conn, caller_wallet_address, "NYXT")
                 required = int(fee_record.total_paid)
                 if payload.get("asset_in") == "NYXT":
                     required += int(payload.get("amount", 0) or 0)
@@ -246,11 +269,11 @@ def execute_run(
                 raise GatewayError(str(exc)) from exc
         if module == "exchange" and action == "cancel_order":
             try:
-                if caller_account_id:
+                if caller_wallet_address:
                     record = load_by_id(conn, "orders", "order_id", payload["order_id"])
                     if record is None:
                         raise GatewayError("order_id not found")
-                    if str(record.get("owner_address")) != caller_account_id:
+                    if str(record.get("owner_address")) != caller_wallet_address:
                         raise GatewayError("order_id ownership mismatch")
                     if str(record.get("status") or "open") != "open":
                         raise GatewayError("order not cancellable")
@@ -258,12 +281,12 @@ def execute_run(
             except ExchangeError as exc:
                 raise GatewayError(str(exc)) from exc
         if fee_record is not None and module == "exchange" and action in {"place_order", "cancel_order"}:
-            if not caller_account_id:
+            if not caller_wallet_address:
                 raise GatewayError("auth required")
             apply_wallet_transfer(
                 conn,
                 transfer_id=deterministic_id("fee", run_id),
-                from_address=caller_account_id,
+                from_address=caller_wallet_address,
                 to_address=fee_record.fee_address,
                 asset_id="NYXT",
                 amount=0,
@@ -276,13 +299,15 @@ def execute_run(
             if not caller_account_id:
                 raise GatewayError("auth required")
             if fee_record is not None:
-                nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+                if not caller_wallet_address:
+                    raise GatewayError("auth required")
+                nyxt_balance = get_wallet_balance(conn, caller_wallet_address, "NYXT")
                 if nyxt_balance < int(fee_record.total_paid):
                     raise GatewayError("insufficient NYXT balance for fee")
                 apply_wallet_transfer(
                     conn,
                     transfer_id=deterministic_id("fee", run_id),
-                    from_address=caller_account_id,
+                    from_address=caller_wallet_address,
                     to_address=fee_record.fee_address,
                     asset_id="NYXT",
                     amount=0,
@@ -293,9 +318,9 @@ def execute_run(
                 insert_fee_ledger(conn, fee_record)
             chat_record_message_event(conn, run_id, payload, caller_account_id)
         if module == "marketplace" and action == "listing_publish":
-            marketplace_publish_listing(conn, run_id, payload, caller_account_id)
+            marketplace_publish_listing(conn, run_id, payload, caller_wallet_address)
         if module == "marketplace" and action == "purchase_listing":
-            marketplace_purchase_listing(conn, run_id, payload, caller_account_id)
+            marketplace_purchase_listing(conn, run_id, payload, caller_wallet_address)
         if module == "entertainment" and action == "state_step":
             _ensure_entertainment_items(conn)
             item_record = load_by_id(conn, "entertainment_items", "item_id", payload["item_id"])
@@ -332,11 +357,23 @@ def execute_wallet_transfer(
     seed: int,
     run_id: str,
     payload: dict[str, Any],
+    account_id: str | None = None,
+    wallet_address: str | None = None,
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
     validated = validate_wallet_transfer(payload)
+    if wallet_address and validated.get("from_address") != wallet_address:
+        raise GatewayError("from_address mismatch")
     asset_id = validated.get("asset_id", "NYXT")
+    compliance.require_clearance(
+        account_id=account_id,
+        wallet_address=wallet_address,
+        module="wallet",
+        action="transfer",
+        run_id=run_id,
+        metadata={"asset_id": asset_id, "amount": validated.get("amount")},
+    )
     fee_record = route_fee("wallet", "transfer", validated, run_id)
     conn = create_connection(db_path or _db_path())
 
@@ -390,14 +427,26 @@ def execute_wallet_faucet(
     seed: int,
     run_id: str,
     payload: dict[str, Any],
+    account_id: str | None = None,
+    wallet_address: str | None = None,
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> tuple[GatewayResult, dict[str, int], FeeLedger]:
     validated = validate_wallet_faucet(payload)
     address = validated["address"]
+    if wallet_address and address != wallet_address:
+        raise GatewayError("address mismatch")
     amount = int(validated.get("amount", 1000))
     asset_id = validated.get("asset_id", "NYXT")
 
+    compliance.require_clearance(
+        account_id=account_id,
+        wallet_address=wallet_address,
+        module="wallet",
+        action="faucet",
+        run_id=run_id,
+        metadata={"asset_id": asset_id, "amount": amount},
+    )
     fee_record = route_fee("wallet", "faucet", validated, run_id)
     conn = create_connection(db_path or _db_path())
     outcome = run_and_record(
@@ -439,16 +488,17 @@ def execute_wallet_faucet_v1(
     run_id: str,
     payload: dict[str, Any],
     account_id: str,
+    wallet_address: str,
     client_ip: str | None = None,
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> tuple[GatewayResult, int, FeeLedger]:
     validated = validate_wallet_faucet(payload)
     address = validated["address"]
-    if address != account_id:
+    if address != wallet_address:
         raise GatewayApiError(
             "FAUCET_ADDRESS_MISMATCH",
-            "address must match authenticated account_id",
+            "address must match authenticated wallet_address",
             http_status=403,
         )
 
@@ -459,6 +509,15 @@ def execute_wallet_faucet_v1(
     max_amount = get_faucet_max_amount_per_24h()
     max_claims = get_faucet_max_claims_per_24h()
     ip_max_claims = get_faucet_ip_max_claims_per_24h()
+
+    compliance.require_clearance(
+        account_id=account_id,
+        wallet_address=wallet_address,
+        module="wallet",
+        action="faucet",
+        run_id=run_id,
+        metadata={"asset_id": validated.get("asset_id", "NYXT"), "amount": validated.get("amount")},
+    )
 
     conn = create_connection(db_path or _db_path())
     try:
@@ -590,6 +649,7 @@ def execute_web2_guard_request(
     run_id: str,
     payload: dict[str, Any],
     account_id: str,
+    wallet_address: str,
     db_path: Path | None = None,
     run_root: Path | None = None,
 ) -> dict[str, object]:
@@ -598,6 +658,7 @@ def execute_web2_guard_request(
         run_id=run_id,
         payload=payload,
         account_id=account_id,
+        wallet_address=wallet_address,
         db_path=db_path or _db_path(),
         run_root=run_root or _run_root(),
     )

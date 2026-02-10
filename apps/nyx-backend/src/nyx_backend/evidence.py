@@ -11,6 +11,8 @@ import subprocess
 import sys
 import zipfile
 
+from nyx_backend import metrics
+
 
 class EvidenceError(ValueError):
     pass
@@ -360,6 +362,7 @@ def run_evidence(
     payload: object | None = None,
     base_dir: Path | None = None,
 ) -> EvidencePayload:
+    start = metrics.monotonic_seconds()
     if not isinstance(seed, int) or isinstance(seed, bool):
         raise EvidenceError("seed must be int")
     if not isinstance(run_id, str) or isinstance(run_id, bool):
@@ -447,7 +450,7 @@ def run_evidence(
     }
     (run_dir / "evidence.json").write_text(_json_dumps(evidence_payload), encoding="utf-8")
 
-    return EvidencePayload(
+    result = EvidencePayload(
         protocol_anchor=protocol_anchor,
         inputs=inputs,
         outputs=outputs,
@@ -456,6 +459,8 @@ def run_evidence(
         replay_ok=replay_ok,
         stdout=stdout_text,
     )
+    metrics.record_evidence_duration(mod, act, metrics.monotonic_seconds() - start)
+    return result
 
 
 def replay_compute_outputs(

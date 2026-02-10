@@ -54,6 +54,10 @@ def get_portal_challenge_ttl_seconds() -> int:
     return _settings().portal_challenge_ttl
 
 
+def get_portal_session_ttl_seconds() -> int:
+    return _settings().portal_session_ttl
+
+
 def get_faucet_cooldown_seconds() -> int:
     return _settings().faucet_cooldown_seconds
 
@@ -84,3 +88,19 @@ def get_magic_eden_api_key() -> str:
 
 def get_payevm_api_key() -> str:
     return _settings().api_payevm_key
+
+
+def get_compliance_enabled() -> bool:
+    return _settings().compliance_enabled
+
+
+def get_compliance_url() -> str:
+    return _settings().compliance_url
+
+
+def get_compliance_timeout_seconds() -> int:
+    return _settings().compliance_timeout_seconds
+
+
+def get_compliance_fail_closed() -> bool:
+    return _settings().compliance_fail_closed

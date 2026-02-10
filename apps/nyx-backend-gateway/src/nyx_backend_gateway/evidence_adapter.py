@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from nyx_backend_gateway.errors import GatewayError
+from nyx_backend_gateway import metrics, tracing
 from nyx_backend_gateway.identifiers import receipt_id
 from nyx_backend_gateway.paths import backend_src, run_root
 from nyx_backend_gateway.storage import EvidenceRun, Receipt, insert_evidence_run, insert_receipt
@@ -38,14 +39,24 @@ def run_and_record(
 
     base_dir = base_dir or run_root()
     try:
-        evidence = run_evidence(
-            seed=seed,
-            run_id=run_id,
-            module=module,
-            action=action,
-            payload=payload,
-            base_dir=base_dir,
-        )
+        start = metrics.monotonic_seconds()
+        with tracing.start_span(
+            "gateway.evidence.run",
+            {
+                "nyx.module": module,
+                "nyx.action": action,
+                "nyx.run_id": run_id,
+            },
+        ):
+            evidence = run_evidence(
+                seed=seed,
+                run_id=run_id,
+                module=module,
+                action=action,
+                payload=payload,
+                base_dir=base_dir,
+            )
+        metrics.record_evidence_duration(module, action, metrics.monotonic_seconds() - start)
     except EvidenceError as exc:
         raise GatewayError(str(exc)) from exc
 
