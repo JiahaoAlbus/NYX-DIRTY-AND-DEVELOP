@@ -85,7 +85,9 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE portal_accounts ADD COLUMN bio TEXT")
     if "wallet_address" not in columns:
         cursor.execute("ALTER TABLE portal_accounts ADD COLUMN wallet_address TEXT")
-    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_accounts_wallet_address ON portal_accounts(wallet_address)")
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_accounts_wallet_address ON portal_accounts(wallet_address)"
+    )
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS portal_challenges (
             account_id TEXT NOT NULL,

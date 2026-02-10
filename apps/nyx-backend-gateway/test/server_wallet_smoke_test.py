@@ -89,7 +89,9 @@ class ServerWalletSmokeTests(unittest.TestCase):
         self.assertIn("fee_total", parsed)
 
         conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
-        conn.request("GET", f"/wallet/v1/balances?address={wallet_address}", headers={"Authorization": f"Bearer {token}"})
+        conn.request(
+            "GET", f"/wallet/v1/balances?address={wallet_address}", headers={"Authorization": f"Bearer {token}"}
+        )
         response = conn.getresponse()
         data = response.read()
         self.assertEqual(response.status, 200)

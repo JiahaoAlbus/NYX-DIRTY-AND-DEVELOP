@@ -1290,7 +1290,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     tasks = gateway.list_airdrop_tasks_v1(conn, session.account_id, account.wallet_address)
                 finally:
                     conn.close()
-                self._send_json({"account_id": session.account_id, "wallet_address": account.wallet_address, "tasks": tasks})
+                self._send_json(
+                    {"account_id": session.account_id, "wallet_address": account.wallet_address, "tasks": tasks}
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
