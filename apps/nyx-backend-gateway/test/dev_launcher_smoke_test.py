@@ -2,12 +2,12 @@ import base64
 import hmac
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
 import time
 import unittest
-import signal
 from http.client import HTTPConnection
 from pathlib import Path
 

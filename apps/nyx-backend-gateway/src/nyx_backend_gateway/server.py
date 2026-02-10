@@ -162,7 +162,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
     server_version = "NYXGateway/2.0"
     _response_status: int | None = None
 
-    def send_response(self, code: int, message: str | None = None) -> None:  # type: ignore[override]
+    def send_response(self, code: int, message: str | None = None) -> None:
         self._response_status = code
         super().send_response(code, message)
 
@@ -174,7 +174,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         status = self._response_status or HTTPStatus.INTERNAL_SERVER_ERROR
         metrics.record_request(method, path, int(status), metrics.monotonic_seconds() - start_time)
 
-    def handle_one_request(self) -> None:  # type: ignore[override]
+    def handle_one_request(self) -> None:
         start = metrics.monotonic_seconds()
         self._response_status = None
         try:
@@ -434,12 +434,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 conn = create_connection(_db_path())
                 try:
                     session = portal.verify_challenge(conn, account_id, nonce, signature)
-                    account = portal.load_account(conn, account_id)
+                    account_record = portal.load_account(conn, account_id)
                 finally:
                     conn.close()
                 response = {"access_token": session.token, "expires_at": session.expires_at}
-                if account is not None:
-                    response["wallet_address"] = account.wallet_address
+                if account_record is not None:
+                    response["wallet_address"] = account_record.wallet_address
                 self._send_json(response)
                 return
             if self.path == "/portal/v1/auth/logout":

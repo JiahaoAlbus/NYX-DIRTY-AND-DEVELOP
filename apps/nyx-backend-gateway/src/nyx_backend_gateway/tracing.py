@@ -21,8 +21,7 @@ def init_tracing(service_name: str) -> bool:
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-        from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+        from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
     except Exception:
         return False
 

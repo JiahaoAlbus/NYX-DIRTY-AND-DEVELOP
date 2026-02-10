@@ -7,8 +7,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from nyx_backend_gateway.identifiers import wallet_address as derive_wallet_address
 from nyx_backend_gateway import metrics
+from nyx_backend_gateway.identifiers import wallet_address as derive_wallet_address
 from nyx_backend_gateway.migrations import apply_migrations
 
 
@@ -17,21 +17,21 @@ class StorageError(ValueError):
 
 
 class InstrumentedConnection(sqlite3.Connection):
-    def execute(self, sql, parameters=()):  # type: ignore[override]
+    def execute(self, sql, parameters=()):
         start = time.perf_counter()
         try:
             return super().execute(sql, parameters)
         finally:
             metrics.record_db_query(str(sql), time.perf_counter() - start)
 
-    def executemany(self, sql, seq_of_parameters):  # type: ignore[override]
+    def executemany(self, sql, seq_of_parameters):
         start = time.perf_counter()
         try:
             return super().executemany(sql, seq_of_parameters)
         finally:
             metrics.record_db_query(str(sql), time.perf_counter() - start)
 
-    def executescript(self, sql_script):  # type: ignore[override]
+    def executescript(self, sql_script):
         start = time.perf_counter()
         try:
             return super().executescript(sql_script)

@@ -4,8 +4,8 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from nyx_backend_gateway.errors import GatewayError
 from nyx_backend_gateway import metrics, tracing
+from nyx_backend_gateway.errors import GatewayError
 from nyx_backend_gateway.identifiers import receipt_id
 from nyx_backend_gateway.paths import backend_src, run_root
 from nyx_backend_gateway.storage import EvidenceRun, Receipt, insert_evidence_run, insert_receipt
