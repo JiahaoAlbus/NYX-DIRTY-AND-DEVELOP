@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { fetchEvidence, listEvidenceRuns, EvidenceBundle } from "../api";
+import { useI18n } from "../i18n";
 
 export const Evidence: React.FC = () => {
+  const { t } = useI18n();
   const [runs, setRuns] = useState<{ run_id: string; status: string }[]>([]);
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
   const [bundle, setBundle] = useState<EvidenceBundle | null>(null);
@@ -27,7 +29,7 @@ export const Evidence: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold">Evidence Center</h2>
+      <h2 className="text-xl font-bold">{t("evidence.title")}</h2>
       <div className="flex flex-col gap-2">
         {runs.map((run) => (
           <button
@@ -42,16 +44,17 @@ export const Evidence: React.FC = () => {
       </div>
       {bundle && (
         <div className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm overflow-hidden">
-          <h3 className="font-bold mb-2">Run Details</h3>
+          <h3 className="font-bold mb-2">{t("evidence.runDetails")}</h3>
           <div className="text-xs space-y-2">
             <div>
-              <span className="font-bold">Protocol Anchor:</span> {bundle.protocol_anchor}
+              <span className="font-bold">{t("evidence.protocolAnchor")}:</span> {bundle.protocol_anchor}
             </div>
             <div>
-              <span className="font-bold">Replay OK:</span> {bundle.replay_ok ? "✅" : "❌"}
+              <span className="font-bold">{t("evidence.replayOk")}:</span>{" "}
+              {bundle.replay_ok ? t("common.yes") : t("common.no")}
             </div>
             <div className="mt-2">
-              <div className="font-bold">Receipt Hashes:</div>
+              <div className="font-bold">{t("evidence.receiptHashes")}:</div>
               <ul className="list-disc list-inside">
                 {bundle.receipt_hashes.map((h, i) => (
                   <li key={i} className="truncate">

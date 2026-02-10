@@ -8,6 +8,7 @@ import {
   transferWallet,
 } from "../api";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
 
 type WalletAsset = { asset_id: string; name?: string };
 type WalletBalanceRow = { asset_id: string; balance: number };
@@ -21,7 +22,8 @@ interface WalletProps {
 }
 
 export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
-  const address = session?.account_id ?? "";
+  const { t } = useI18n();
+  const address = session?.wallet_address ?? "";
   const token = session?.access_token ?? "";
 
   const [activeTab, setActiveTab] = useState<"assets" | "activity">("assets");
@@ -58,7 +60,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
         setTransferAssetId((payload.assets?.[0]?.asset_id as string) || "NYXT");
       }
     } catch (err) {
-      setBalancesError((err as Error).message);
+      setBalancesError(t("wallet.balancesFailed", { message: (err as Error).message }));
     } finally {
       setBalancesLoading(false);
     }
@@ -80,7 +82,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       setTxHasMore(list.length === txLimit);
       setTxOffset(nextOffset + list.length);
     } catch (err) {
-      setTxError((err as Error).message);
+      setTxError(t("wallet.transfersFailed", { message: (err as Error).message }));
     } finally {
       setTxLoading(false);
     }
@@ -90,7 +92,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
     loadBalances();
     loadTransfers({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendOnline, session?.access_token, session?.account_id]);
+  }, [backendOnline, session?.access_token, session?.wallet_address]);
 
   const copyAddress = async () => {
     if (!address) return;
@@ -109,17 +111,17 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
 
     const to = transferTo.trim();
     if (!validateAddress(to)) {
-      setTransferError("Recipient address invalid.");
+      setTransferError(t("wallet.recipientInvalid"));
       return;
     }
     if (to === address) {
-      setTransferError("Recipient must differ from sender.");
+      setTransferError(t("wallet.recipientSame"));
       return;
     }
 
     const amt = Number(transferAmount);
     if (!Number.isInteger(amt) || amt <= 0) {
-      setTransferError("Amount must be a positive integer.");
+      setTransferError(t("wallet.amountPositive"));
       return;
     }
 
@@ -127,7 +129,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
     try {
       seedInt = parseSeed(seed);
     } catch (err) {
-      setTransferError((err as Error).message);
+      setTransferError(t("wallet.seedInvalid"));
       return;
     }
 
@@ -141,7 +143,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       await loadBalances();
       await loadTransfers({ reset: true });
     } catch (err) {
-      setTransferError((err as Error).message);
+      setTransferError(t("wallet.transferFailed", { message: (err as Error).message }));
     } finally {
       setTransferLoading(false);
     }
@@ -152,14 +154,14 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       {/* Account Header */}
       <div className="flex flex-col items-center py-8 bg-gradient-to-b from-primary/10 to-transparent rounded-b-3xl">
         <div className="size-16 rounded-full bg-gradient-to-tr from-primary to-primary-dark shadow-lg mb-4 flex items-center justify-center text-background-dark font-bold text-xl">
-          {session?.handle?.[0]?.toUpperCase() ?? "N"}
+          {session?.handle?.[0]?.toUpperCase() ?? t("common.initialPlaceholder")}
         </div>
-        <div className="text-lg font-bold mb-1">@{session?.handle ?? "user"}</div>
+        <div className="text-lg font-bold mb-1">@{session?.handle ?? t("common.unknownUser")}</div>
         <button
           onClick={copyAddress}
           className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-light dark:bg-surface-dark text-xs text-text-subtle hover:bg-opacity-80 transition-all"
         >
-          {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "—"}
+          {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : t("common.emptyDash")}
           <span className="material-symbols-outlined text-sm">content_copy</span>
         </button>
       </div>
@@ -167,28 +169,28 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       {/* Balance */}
       <div className="flex flex-col items-center py-6">
         <div className="text-4xl font-extrabold tracking-tight mb-2">
-          {balancesLoading ? "…" : nyxtBalance.toLocaleString()}{" "}
+          {balancesLoading ? t("common.ellipsis") : nyxtBalance.toLocaleString()}{" "}
           <span className="text-xl font-normal text-text-subtle">NYXT</span>
         </div>
 
         <div className="flex gap-4 mt-6">
           <ActionButton
             icon="add"
-            label="Buy"
+            label={t("wallet.buy")}
             disabled
-            disabledReason="Fiat on-ramp is disabled in Testnet."
+            disabledReason={t("wallet.fiatDisabled")}
             onClick={() => {}}
           />
-          <ActionButton icon="send" label="Send" onClick={() => setShowSend(true)} />
-          <ActionButton icon="swap_horiz" label="Swap" onClick={() => onNavigate(Screen.EXCHANGE)} />
-          <ActionButton icon="water_drop" label="Faucet" onClick={() => onNavigate(Screen.FAUCET as any)} />
+          <ActionButton icon="send" label={t("wallet.send")} onClick={() => setShowSend(true)} />
+          <ActionButton icon="swap_horiz" label={t("wallet.swap")} onClick={() => onNavigate(Screen.EXCHANGE)} />
+          <ActionButton icon="water_drop" label={t("wallet.faucet")} onClick={() => onNavigate(Screen.FAUCET as any)} />
         </div>
 
         {balancesError && (
           <div className="mt-4 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
             {balancesError}{" "}
             <button onClick={loadBalances} className="underline font-bold">
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
@@ -197,8 +199,12 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       {/* Tabs */}
       <div className="flex-1 flex flex-col mt-4">
         <div className="flex border-b border-primary/10">
-          <TabButton active={activeTab === "assets"} onClick={() => setActiveTab("assets")} label="Assets" />
-          <TabButton active={activeTab === "activity"} onClick={() => setActiveTab("activity")} label="Activity" />
+          <TabButton active={activeTab === "assets"} onClick={() => setActiveTab("assets")} label={t("wallet.assets")} />
+          <TabButton
+            active={activeTab === "activity"}
+            onClick={() => setActiveTab("activity")}
+            label={t("wallet.activity")}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
@@ -206,11 +212,11 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
             <div className="flex flex-col gap-4">
               {balancesLoading ? (
                 <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/5 text-sm text-text-subtle">
-                  Loading balances…
+                  {t("common.loading")}
                 </div>
               ) : balances.length === 0 ? (
                 <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/5 text-sm text-text-subtle">
-                  No assets found.
+                  {t("wallet.noAssets")}
                 </div>
               ) : (
                 balances.map((b) => (
@@ -226,12 +232,12 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
           ) : (
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between px-1">
-                <div className="text-xs font-bold text-text-subtle uppercase">Recent Transfers</div>
+                <div className="text-xs font-bold text-text-subtle uppercase">{t("wallet.recentTransfers")}</div>
                 <button
                   onClick={() => loadTransfers({ reset: true })}
                   className="text-[10px] font-bold text-primary uppercase tracking-widest"
                 >
-                  Refresh
+                  {t("common.refresh")}
                 </button>
               </div>
 
@@ -239,7 +245,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                 <div className="p-4 rounded-2xl bg-binance-red/10 border border-binance-red/20 text-xs text-binance-red">
                   {txError}{" "}
                   <button onClick={() => loadTransfers({ reset: true })} className="underline font-bold">
-                    Retry
+                    {t("common.retry")}
                   </button>
                 </div>
               )}
@@ -247,40 +253,42 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
               {!txError && transfers.length === 0 && !txLoading && (
                 <div className="flex flex-col items-center justify-center py-12 text-text-subtle">
                   <span className="material-symbols-outlined text-4xl mb-2 opacity-20">history</span>
-                  <div className="text-sm">No transfers yet</div>
+                  <div className="text-sm">{t("wallet.noTransfers")}</div>
                   <button onClick={() => onNavigate(Screen.ACTIVITY)} className="mt-2 text-xs text-primary underline">
-                    View Evidence Center
+                    {t("wallet.viewEvidence")}
                   </button>
                 </div>
               )}
 
-              {transfers.map((t) => {
-                const isIncoming = t.to_address === address;
+              {transfers.map((tx) => {
+                const isIncoming = tx.to_address === address;
                 return (
                   <div
-                    key={t.transfer_id}
+                    key={tx.transfer_id}
                     className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/5"
                   >
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold">
-                        {isIncoming ? "Receive" : "Send"} {t.amount} {t.asset_id}
+                        {isIncoming ? t("wallet.receive") : t("wallet.send")} {tx.amount} {tx.asset_id}
                       </div>
                       <div
-                        className={`text-[10px] font-bold ${t.replay_ok ? "text-binance-green" : "text-binance-red"}`}
+                        className={`text-[10px] font-bold ${tx.replay_ok ? "text-binance-green" : "text-binance-red"}`}
                       >
-                        {t.replay_ok ? "Verified" : "Unverified"}
+                        {tx.replay_ok ? t("wallet.verified") : t("wallet.unverified")}
                       </div>
                     </div>
-                    <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run_id: {t.run_id}</div>
+                    <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">
+                      {t("common.runId")}: {tx.run_id}
+                    </div>
                     <div className="mt-2 flex gap-3 text-[10px] text-text-subtle">
-                      <div>fee: {t.fee_total} NYXT</div>
-                      <div>treasury: {t.treasury_address}</div>
+                      <div>{t("wallet.fee", { fee: `${tx.fee_total} NYXT` })}</div>
+                      <div>{t("wallet.treasury", { address: tx.treasury_address })}</div>
                     </div>
                     <button
                       onClick={() => onNavigate(Screen.ACTIVITY)}
                       className="mt-2 text-[10px] font-bold text-primary underline"
                     >
-                      Open Evidence
+                      {t("wallet.openEvidence")}
                     </button>
                   </div>
                 );
@@ -288,7 +296,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
 
               {txLoading && (
                 <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/5 text-xs text-text-subtle">
-                  Loading…
+                  {t("common.loading")}
                 </div>
               )}
 
@@ -297,7 +305,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                   onClick={() => loadTransfers()}
                   className="w-full py-3 rounded-2xl bg-primary/10 text-primary text-xs font-bold border border-primary/20"
                 >
-                  Load more
+                  {t("wallet.loadMore")}
                 </button>
               )}
             </div>
@@ -310,7 +318,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60">
           <div className="w-full max-w-md rounded-t-3xl bg-background-light dark:bg-background-dark p-6 border-t border-primary/20">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-bold">Send</div>
+              <div className="text-sm font-bold">{t("wallet.send")}</div>
               <button onClick={() => setShowSend(false)} className="text-text-subtle hover:text-primary">
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -318,18 +326,18 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
 
             <div className="mt-4 flex flex-col gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-text-subtle uppercase">To</span>
+                <span className="text-[10px] font-bold text-text-subtle uppercase">{t("wallet.toAddress")}</span>
                 <input
                   className="h-11 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/10 px-4 text-sm font-mono outline-none"
                   value={transferTo}
                   onChange={(e) => setTransferTo(e.target.value)}
-                  placeholder="acct-…"
+                  placeholder={t("wallet.addressPlaceholder")}
                 />
               </label>
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-text-subtle uppercase">Amount</span>
+                  <span className="text-[10px] font-bold text-text-subtle uppercase">{t("wallet.amount")}</span>
                   <input
                     className="h-11 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/10 px-4 text-sm outline-none"
                     value={transferAmount}
@@ -338,7 +346,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-text-subtle uppercase">Asset</span>
+                  <span className="text-[10px] font-bold text-text-subtle uppercase">{t("wallet.asset")}</span>
                   <select
                     className="h-11 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-primary/10 px-4 text-sm outline-none"
                     value={transferAssetId}
@@ -366,12 +374,11 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                   transferLoading ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black"
                 }`}
               >
-                {transferLoading ? "Sending…" : "Send"}
+                {transferLoading ? t("wallet.sending") : t("wallet.send")}
               </button>
 
               <div className="text-[10px] text-text-subtle leading-relaxed">
-                Every transfer produces an evidence bundle (receipt_hashes + state_hash) and routes fees to the testnet
-                treasury.
+                {t("wallet.transferEvidenceNote")}
               </div>
             </div>
           </div>
@@ -418,20 +425,23 @@ const TabButton: React.FC<{ active: boolean; onClick: () => void; label: string 
   </button>
 );
 
-const AssetRow: React.FC<{ symbol: string; name?: string; balance: number }> = ({ symbol, name, balance }) => (
-  <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 hover:bg-opacity-80 transition-all border border-primary/5">
-    <div className="flex items-center gap-3">
-      <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-        {symbol[0]}
+const AssetRow: React.FC<{ symbol: string; name?: string; balance: number }> = ({ symbol, name, balance }) => {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 hover:bg-opacity-80 transition-all border border-primary/5">
+      <div className="flex items-center gap-3">
+        <div className="size-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+          {symbol[0]}
+        </div>
+        <div>
+          <div className="font-bold text-sm">{symbol}</div>
+          <div className="text-[10px] text-text-subtle uppercase">{name ?? t("wallet.asset")}</div>
+        </div>
       </div>
-      <div>
-        <div className="font-bold text-sm">{symbol}</div>
-        <div className="text-[10px] text-text-subtle uppercase">{name ?? "Asset"}</div>
+      <div className="text-right">
+        <div className="font-bold text-sm">{balance.toLocaleString()}</div>
+        <div className="text-[10px] text-text-subtle">{t("wallet.testnetLabel")}</div>
       </div>
     </div>
-    <div className="text-right">
-      <div className="font-bold text-sm">{balance.toLocaleString()}</div>
-      <div className="text-[10px] text-text-subtle">testnet</div>
-    </div>
-  </div>
-);
+  );
+};

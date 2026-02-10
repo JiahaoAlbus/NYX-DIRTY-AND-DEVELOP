@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { formatJson } from "../utils";
 import { History, FileJson, Download, ShieldCheck, ArrowRight } from "lucide-react";
+import { useI18n } from "../i18n";
 
 interface ActivityProps {
   runId: string;
@@ -18,6 +19,7 @@ interface ActivityProps {
 }
 
 export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) => {
+  const { t } = useI18n();
   const [receipts, setReceipts] = useState<any[]>([]);
   const [selected, setSelected] = useState(runId);
   const [evidence, setEvidence] = useState<EvidenceBundle | null>(null);
@@ -36,7 +38,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       setReplayResult(Boolean(result.ok));
       setReplayDetails(result as any);
     } catch (err) {
-      setStatus(`Verification failed: ${(err as Error).message}`);
+      setStatus(t("activity.verifyFailed", { message: (err as Error).message }));
     } finally {
       setReplaying(false);
     }
@@ -51,7 +53,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       const payload = await fetchActivity(session.access_token);
       setReceipts(payload.receipts || []);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setStatus(t("common.errorWithMessage", { message: (err as Error).message }));
     } finally {
       setLoading(false);
     }
@@ -63,20 +65,20 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
 
   const loadEvidence = async () => {
     if (!selected.trim()) {
-      setStatus("Run ID required");
+      setStatus(t("common.runIdRequired"));
       return;
     }
     try {
       const payload = await fetchEvidence(selected.trim());
       setEvidence(payload);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setStatus(t("common.errorWithMessage", { message: (err as Error).message }));
     }
   };
 
   const downloadZip = async () => {
     if (!selected.trim()) {
-      setStatus("Run ID required");
+      setStatus(t("common.runIdRequired"));
       return;
     }
     try {
@@ -94,12 +96,12 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
 
   const downloadProof = async () => {
     if (!session) {
-      setStatus("Sign in required");
+      setStatus(t("common.signInRequired"));
       return;
     }
     const prefix = (runId || "").trim();
     if (!prefix) {
-      setStatus("Run ID prefix required");
+      setStatus(t("activity.runIdPrefixRequired"));
       return;
     }
     try {
@@ -111,7 +113,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setStatus(t("common.errorWithMessage", { message: (err as Error).message }));
     }
   };
 
@@ -120,14 +122,14 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center gap-2">
           <History className="text-primary" size={20} />
-          <h2 className="text-xl font-black tracking-tight">Recent Activity</h2>
+          <h2 className="text-xl font-black tracking-tight">{t("activity.title")}</h2>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={downloadProof} className="text-[10px] font-bold text-primary uppercase tracking-widest">
-            Export Proof
+            {t("activity.exportProof")}
           </button>
           <button onClick={loadActivity} className="text-[10px] font-bold text-primary uppercase tracking-widest">
-            Refresh
+            {t("common.refresh")}
           </button>
         </div>
       </div>
@@ -135,7 +137,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       <div className="flex flex-col gap-3">
         {receipts.length === 0 ? (
           <div className="p-12 text-center text-text-subtle text-xs bg-surface-light dark:bg-surface-dark/40 rounded-3xl border border-black/5 dark:border-white/5">
-            No activity found for this account.
+            {t("activity.empty")}
           </div>
         ) : (
           receipts.map((r, i) => (
@@ -151,9 +153,11 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
                 <span className="text-[10px] font-mono text-text-subtle">{r.run_id}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium">Deterministic Receipt</span>
+                <span className="text-xs font-medium">{t("activity.deterministicReceipt")}</span>
                 {r.fee_total !== null && r.fee_total !== undefined && (
-                  <span className="text-[10px] font-bold text-primary">fee {String(r.fee_total)}</span>
+                  <span className="text-[10px] font-bold text-primary">
+                    {t("common.feeWithAmount", { fee: String(r.fee_total) })}
+                  </span>
                 )}
                 <ArrowRight size={12} className="text-text-subtle" />
               </div>
@@ -165,7 +169,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
       {selected && (
         <div className="flex flex-col gap-4 p-6 rounded-3xl bg-background-light dark:bg-background-dark border border-primary/20 shadow-2xl animate-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold">Evidence Inspector</h3>
+            <h3 className="text-sm font-bold">{t("activity.evidenceInspector")}</h3>
             <div className="flex gap-2">
               <button
                 onClick={loadEvidence}
@@ -194,22 +198,23 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
                 className={`text-[10px] font-bold px-2 py-1 rounded-md transition-all ${replayResult === true ? "bg-binance-green text-black" : replayResult === false ? "bg-binance-red text-white" : "bg-primary text-black"}`}
               >
                 {replaying
-                  ? "Verifying..."
+                  ? t("activity.verifying")
                   : replayResult === true
-                    ? "Verified OK"
+                    ? t("activity.verifiedOk")
                     : replayResult === false
-                      ? "Verification Failed"
-                      : "Verify Replay"}
+                      ? t("activity.verifyFailedShort")
+                      : t("activity.verifyReplay")}
               </button>
             </div>
             {replayResult === true && (
               <div className="text-[10px] text-binance-green font-bold animate-pulse">
-                Deterministic replay successful. State hash matches.
+                {t("activity.replaySuccess")}
               </div>
             )}
             {selectedReceipt?.fee_total !== null && selectedReceipt?.fee_total !== undefined && (
               <div className="text-[10px] text-text-subtle">
-                fee_total: <span className="font-mono">{String(selectedReceipt.fee_total)}</span> treasury:{" "}
+                {t("activity.feeTotal")} <span className="font-mono">{String(selectedReceipt.fee_total)}</span>{" "}
+                {t("activity.treasury")}{" "}
                 <span className="font-mono">{String(selectedReceipt.treasury_address || "")}</span>
               </div>
             )}
@@ -221,7 +226,7 @@ export const Activity: React.FC<ActivityProps> = ({ runId, onBack, session }) =>
                 {formatJson(evidence)}
               </pre>
               <div className="absolute top-2 right-2 px-2 py-1 rounded bg-white/10 backdrop-blur-md text-[8px] font-bold text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                Verified Deterministic
+                {t("activity.verifiedDeterministic")}
               </div>
             </div>
           )}

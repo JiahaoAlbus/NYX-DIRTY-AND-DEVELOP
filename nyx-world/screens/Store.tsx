@@ -12,6 +12,8 @@ import {
   searchMarketplaceListings,
 } from "../api";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
+import { getStoredLocale, translate } from "../i18nCore";
 
 type ListingRow = {
   listing_id: string;
@@ -59,16 +61,17 @@ interface StoreProps {
 const PAGE_LIMIT = 20;
 
 function renderApiError(err: unknown): string {
-  if (err instanceof ApiError) {
-    const bits = [err.message];
-    if (err.code && !err.message.includes(err.code)) bits.push(`(${err.code})`);
-    const retryAfter = err.details?.retry_after_seconds;
-    if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
-      bits.push(`retry after ${retryAfter}s`);
+  const locale = getStoredLocale();
+    if (err instanceof ApiError) {
+      const bits = [err.message];
+      if (err.code && !err.message.includes(err.code)) bits.push(`(${err.code})`);
+      const retryAfter = err.details?.retry_after_seconds;
+      if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
+      bits.push(translate("common.retryAfter", { seconds: retryAfter }, locale));
+      }
+      return bits.join(" ");
     }
-    return bits.join(" ");
-  }
-  return (err as Error)?.message ?? "Unknown error";
+  return (err as Error)?.message ?? translate("common.unknownError", undefined, locale);
 }
 
 function formatCompactId(value: string): string {
@@ -78,8 +81,9 @@ function formatCompactId(value: string): string {
 }
 
 export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const { t } = useI18n();
   const token = session?.access_token ?? "";
-  const accountId = session?.account_id ?? "";
+  const walletAddress = session?.wallet_address ?? "";
 
   const [tab, setTab] = useState<"shop" | "orders">("shop");
 
@@ -119,7 +123,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     if (!backendOnline || !session) return;
     setBalanceError("");
     try {
-      const payload = await fetchWalletBalancesV1(token, accountId);
+      const payload = await fetchWalletBalancesV1(token, walletAddress);
       const nyxt = payload.balances?.find((b: any) => b.asset_id === "NYXT")?.balance ?? 0;
       setNyxtBalance(Number(nyxt));
     } catch (err) {
@@ -177,7 +181,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
   useEffect(() => {
     refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendOnline, session?.access_token, session?.account_id]);
+  }, [backendOnline, session?.access_token, session?.wallet_address]);
 
   useEffect(() => {
     loadListings({ reset: true });
@@ -193,16 +197,16 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     const sku = publishSku.trim();
     const title = publishTitle.trim();
     if (!sku) {
-      setPublishError("SKU required.");
+      setPublishError(t("store.skuRequired"));
       return;
     }
     if (!title) {
-      setPublishError("Title required.");
+      setPublishError(t("store.titleRequired"));
       return;
     }
     const px = Number(publishPrice);
     if (!Number.isInteger(px) || px <= 0) {
-      setPublishError("Price must be a positive integer (NYXT).");
+      setPublishError(t("store.pricePositive"));
       return;
     }
 
@@ -217,9 +221,9 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     const deterministicRunId = allocateRunId(runId, "marketplace-listing-publish");
     setMutating(true);
     try {
-      const result = (await publishListing(token, seedInt, deterministicRunId, accountId, sku, title, px)) as RunResult;
+      const result = (await publishListing(token, seedInt, deterministicRunId, walletAddress, sku, title, px)) as RunResult;
       setLastAction(result);
-      setToast(`Listing published (run: ${deterministicRunId})`);
+      setToast(t("store.listingPublished", { runId: deterministicRunId }));
       setShowPublish(false);
       setPublishSku("");
       setPublishTitle("");
@@ -240,7 +244,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
 
     const qty = Number(buyQty);
     if (!Number.isInteger(qty) || qty <= 0) {
-      setBuyError("Quantity must be a positive integer.");
+      setBuyError(t("store.quantityPositive"));
       return;
     }
 
@@ -259,12 +263,12 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
         token,
         seedInt,
         deterministicRunId,
-        accountId,
+        walletAddress,
         buyListing.listing_id,
         qty,
       )) as RunResult;
       setLastAction(result);
-      setToast(`Purchased (run: ${deterministicRunId})`);
+      setToast(t("store.purchased", { runId: deterministicRunId }));
       setBuyListing(null);
       setBuyQty("1");
       await refreshAll();
@@ -280,16 +284,16 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-white">
       <div className="flex items-center justify-between px-2">
         <div>
-          <div className="text-xl font-black tracking-tight">Store</div>
-          <div className="text-[10px] text-text-subtle uppercase tracking-widest">Real listings • Testnet NYXT</div>
+          <div className="text-xl font-black tracking-tight">{t("store.title")}</div>
+          <div className="text-[10px] text-text-subtle uppercase tracking-widest">{t("store.subtitle")}</div>
         </div>
         <button
           onClick={() => setShowPublish(true)}
           className="text-[10px] font-bold text-primary uppercase tracking-widest"
           disabled={!session}
-          title={!session ? "Sign in required" : "Publish a listing"}
+          title={!session ? t("store.signInRequired") : t("store.publishHint")}
         >
-          Publish
+          {t("store.publish")}
         </button>
       </div>
 
@@ -300,7 +304,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
             className="flex-1 bg-transparent outline-none text-sm"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search listings by sku/title"
+            placeholder={t("store.searchPlaceholder")}
           />
         </div>
         <button
@@ -308,13 +312,13 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
           className="px-3 py-2 rounded-2xl bg-primary text-black text-[10px] font-bold uppercase tracking-widest"
           disabled={!backendOnline}
         >
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
 
       <div className="flex items-center justify-between px-1">
         <div className="text-[10px] font-bold text-text-subtle uppercase tracking-widest">
-          NYXT balance:{" "}
+          {t("store.balanceLabel")}{" "}
           {nyxtBalance === null ? (
             <span className="text-text-subtle">—</span>
           ) : (
@@ -323,14 +327,14 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
         </div>
         {balanceError && (
           <button onClick={loadBalance} className="text-[10px] font-bold text-binance-red uppercase tracking-widest">
-            Balance error • Retry
+            {t("store.balanceErrorRetry")}
           </button>
         )}
       </div>
 
       <div className="flex border-b border-primary/10">
-        <TabButton active={tab === "shop"} onClick={() => setTab("shop")} label="Shop" />
-        <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label="My Orders" />
+        <TabButton active={tab === "shop"} onClick={() => setTab("shop")} label={t("store.tabShop")} />
+        <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={t("store.tabOrders")} />
       </div>
 
       {tab === "shop" ? (
@@ -339,14 +343,14 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
             <div className="text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
               {listingsError}{" "}
               <button onClick={() => loadListings({ reset: true })} className="underline font-bold">
-                Retry
+                {t("common.retry")}
               </button>
             </div>
           )}
 
           {!listingsError && listings.length === 0 && !listingsLoading && (
             <div className="p-6 rounded-3xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-sm text-text-subtle">
-              {searchActive ? "No results." : "No listings yet. Publish one to get started."}
+              {searchActive ? t("store.noResults") : t("store.noListings")}
             </div>
           )}
 
@@ -364,7 +368,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
                   <div className="font-bold text-sm line-clamp-2 min-h-[40px]">{item.title}</div>
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-text-subtle">Price</span>
+                      <span className="text-[10px] text-text-subtle">{t("store.price")}</span>
                       <span className="text-primary font-extrabold text-lg">
                         {item.price} <span className="text-xs">NYXT</span>
                       </span>
@@ -373,7 +377,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
                       onClick={() => setBuyListing(item)}
                       className="size-10 rounded-xl bg-primary text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
                       disabled={!session}
-                      title={!session ? "Sign in required" : "Buy"}
+                      title={!session ? t("store.signInRequired") : t("store.buy")}
                     >
                       <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
                     </button>
@@ -383,13 +387,13 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
             ))}
           </div>
 
-          {listingsLoading && <div className="text-[10px] text-text-subtle">Loading…</div>}
+          {listingsLoading && <div className="text-[10px] text-text-subtle">{t("common.loading")}</div>}
           {!listingsLoading && listingsHasMore && (
             <button
               onClick={() => loadListings()}
               className="w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
             >
-              Load more
+              {t("common.loadMore")}
             </button>
           )}
         </div>
@@ -399,14 +403,14 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
             <div className="text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
               {purchasesError}{" "}
               <button onClick={() => loadPurchases({ reset: true })} className="underline font-bold">
-                Retry
+                {t("common.retry")}
               </button>
             </div>
           )}
 
           {!purchasesError && purchases.length === 0 && !purchasesLoading && (
             <div className="p-6 rounded-3xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-sm text-text-subtle">
-              No purchases yet.
+              {t("store.noPurchases")}
             </div>
           )}
 
@@ -415,75 +419,77 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
               <div
                 key={p.purchase_id}
                 className="p-4 rounded-3xl bg-surface-light dark:bg-surface-dark/20 border border-primary/5"
-              >
+                >
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-bold truncate">{p.title ?? p.sku ?? "Purchase"}</div>
-                  <div className="text-[10px] text-text-subtle">qty {p.qty}</div>
+                  <div className="text-sm font-bold truncate">{p.title ?? p.sku ?? t("store.purchase")}</div>
+                  <div className="text-[10px] text-text-subtle">{t("store.qtyLabel", { qty: p.qty })}</div>
                 </div>
                 <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">
-                  purchase: {formatCompactId(p.purchase_id)}
+                  {t("store.purchaseLabel", { id: formatCompactId(p.purchase_id) })}
                 </div>
-                <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run: {p.run_id}</div>
+                <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">
+                  {t("store.runLabel", { id: p.run_id })}
+                </div>
                 <div className="mt-2 flex items-center justify-between">
                   <button
                     onClick={() => {
                       try {
                         navigator.clipboard.writeText(p.run_id);
-                        setToast("Run ID copied.");
+                        setToast(t("store.runIdCopied"));
                       } catch {
                         // ignore
                       }
                     }}
                     className="text-[10px] font-bold text-primary uppercase tracking-widest"
                   >
-                    Copy run_id
+                    {t("store.copyRunId")}
                   </button>
                   <button
                     onClick={() => onNavigate(Screen.ACTIVITY)}
                     className="text-[10px] font-bold text-primary uppercase tracking-widest"
                   >
-                    Evidence Center
+                    {t("store.evidenceCenter")}
                   </button>
                 </div>
               </div>
             ))}
           </div>
 
-          {purchasesLoading && <div className="text-[10px] text-text-subtle">Loading…</div>}
+          {purchasesLoading && <div className="text-[10px] text-text-subtle">{t("common.loading")}</div>}
           {!purchasesLoading && purchasesHasMore && (
             <button
               onClick={() => loadPurchases()}
               className="w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
             >
-              Load more
+              {t("common.loadMore")}
             </button>
           )}
         </div>
       )}
 
       {showPublish && (
-        <Modal title="Publish Listing" onClose={() => setShowPublish(false)}>
+        <Modal title={t("store.publishListingTitle")} onClose={() => setShowPublish(false)}>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-text-subtle uppercase">SKU</span>
+              <span className="text-[10px] font-bold text-text-subtle uppercase">{t("store.sku")}</span>
               <input
                 className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                 value={publishSku}
                 onChange={(e) => setPublishSku(e.target.value)}
-                placeholder="sku-1"
+                placeholder={t("store.skuPlaceholder")}
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-text-subtle uppercase">Title</span>
+              <span className="text-[10px] font-bold text-text-subtle uppercase">{t("store.titleLabel")}</span>
               <input
                 className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                 value={publishTitle}
                 onChange={(e) => setPublishTitle(e.target.value)}
-                placeholder="Item name"
+                placeholder={t("store.titlePlaceholder")}
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-text-subtle uppercase">Price (NYXT)</span>
+              <span className="text-[10px] font-bold text-text-subtle uppercase">{t("store.priceNyxt")}</span>
               <input
                 className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                 value={publishPrice}
@@ -505,21 +511,22 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
                 mutating ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black"
               }`}
             >
-              {mutating ? "Publishing…" : "Publish"}
+              {mutating ? t("store.publishing") : t("store.publishButton")}
             </button>
           </div>
         </Modal>
       )}
 
       {buyListing && (
-        <Modal title="Confirm Purchase" onClose={() => setBuyListing(null)}>
+        <Modal title={t("store.confirmPurchase")} onClose={() => setBuyListing(null)}>
           <div className="flex flex-col gap-3">
             <div className="text-sm font-bold">{buyListing.title}</div>
             <div className="text-xs text-text-subtle">
-              {buyListing.price} NYXT each • seller {formatCompactId(buyListing.publisher_id)}
+              {t("store.priceEach", { price: buyListing.price })} • {t("store.sellerLabel")}{" "}
+              {formatCompactId(buyListing.publisher_id)}
             </div>
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-text-subtle uppercase">Quantity</span>
+              <span className="text-[10px] font-bold text-text-subtle uppercase">{t("store.quantity")}</span>
               <input
                 className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                 value={buyQty}
@@ -541,7 +548,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
                 mutating ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black"
               }`}
             >
-              {mutating ? "Purchasing…" : "Buy now"}
+              {mutating ? t("store.purchasing") : t("store.buyNow")}
             </button>
           </div>
         </Modal>
@@ -549,15 +556,16 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
 
       {lastAction && (
         <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
-          <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
+          <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">{t("common.lastAction")}</div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
-            run_id: {String(lastAction.run_id ?? "")}
+            {t("common.runId")}: {String(lastAction.run_id ?? "")}
           </div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
-            state_hash: {String(lastAction.state_hash ?? "")}
+            {t("common.stateHash")}: {String(lastAction.state_hash ?? "")}
           </div>
           <div className="text-[10px] text-text-subtle">
-            fee_total: {String(lastAction.fee_total ?? "—")} • treasury: {String(lastAction.treasury_address ?? "—")}
+            {t("activity.feeTotal")} {String(lastAction.fee_total ?? "—")} • {t("activity.treasury")}{" "}
+            {String(lastAction.treasury_address ?? "—")}
           </div>
         </div>
       )}

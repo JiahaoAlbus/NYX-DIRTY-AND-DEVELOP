@@ -3,6 +3,7 @@ import { Screen } from "../types";
 import { fetchDiscoveryFeed } from "../api";
 import type { Capabilities } from "../capabilities";
 import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from "../capabilities";
+import { useI18n } from "../i18n";
 import {
   Zap,
   Droplets,
@@ -25,6 +26,7 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate, capabilities }) => {
+  const { t } = useI18n();
   const [feed, setFeed] = useState<any[]>([]);
   const [feedError, setFeedError] = useState<string | null>(null);
 
@@ -56,9 +58,9 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
     <div className="flex flex-col gap-6 pb-24">
       {!capabilities && (
         <div className="rounded-3xl border border-primary/20 bg-surface-light dark:bg-surface-dark/40 p-5 text-xs text-text-subtle">
-          Capabilities not loaded. Modules are gated by backend <code>/capabilities</code>.{" "}
+          {t("home.capabilitiesMissing")} <code>/capabilities</code>.{" "}
           <button onClick={onRefresh} className="ml-2 font-bold text-primary underline">
-            Refresh
+            {t("common.refresh")}
           </button>
         </div>
       )}
@@ -66,19 +68,19 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
       {/* Wallet Glance */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary-dark p-6 shadow-2xl glass">
         <div className="relative z-10 flex flex-col gap-2">
-          <h2 className="text-2xl font-black text-black leading-tight">Secure Your Future with NYX</h2>
-          <p className="text-xs font-bold text-black/60 uppercase tracking-widest">Deterministic Web3 Ecosystem</p>
+          <h2 className="text-2xl font-black text-black leading-tight">{t("home.heroTitle2")}</h2>
+          <p className="text-xs font-bold text-black/60 uppercase tracking-widest">{t("home.heroSubtitle2")}</p>
           <button
             onClick={() => canAirdrop && onNavigate(Screen.AIRDROP)}
             disabled={!canAirdrop}
             title={canAirdrop ? undefined : featureReasonText(featureStatus(capabilities, "wallet", "airdrop"))}
             className={`mt-4 w-fit rounded-xl bg-black px-6 py-2.5 text-xs font-bold shadow-xl transition-all ${canAirdrop ? "text-primary hover:scale-105 active:scale-95" : "text-white/60 opacity-70 cursor-not-allowed"}`}
           >
-            Claim Airdrop
+            {t("home.claimAirdrop")}
           </button>
           {!canAirdrop && (
             <div className="text-[10px] font-bold text-black/50">
-              Airdrop disabled: {featureReasonText(featureStatus(capabilities, "wallet", "airdrop"))}
+              {t("home.airdropDisabled", { reason: featureReasonText(featureStatus(capabilities, "wallet", "airdrop")) })}
             </div>
           )}
         </div>
@@ -92,28 +94,28 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
       <div className="grid grid-cols-4 gap-4">
         <Shortcut
           icon={<Droplets size={20} />}
-          label="Faucet"
+          label={t("wallet.faucet")}
           disabled={!canFaucet}
           disabledReason={featureReasonText(featureStatus(capabilities, "wallet", "faucet"))}
           onClick={() => onNavigate(Screen.FAUCET)}
         />
         <Shortcut
           icon={<WalletIcon size={20} />}
-          label="Wallet"
+          label={t("nav.wallet")}
           disabled={!canWallet}
-          disabledReason="Wallet disabled by backend capabilities."
+          disabledReason={t("app.walletDisabled")}
           onClick={() => onNavigate(Screen.WALLET)}
         />
         <Shortcut
           icon={<ArrowLeftRight size={20} />}
-          label="Trade"
+          label={t("nav.trade")}
           disabled={!canExchange}
           disabledReason={featureReasonText(featureStatus(capabilities, "exchange", "trading"))}
           onClick={() => onNavigate(Screen.EXCHANGE)}
         />
         <Shortcut
           icon={<ShoppingBag size={20} />}
-          label="Store"
+          label={t("nav.store")}
           disabled={!canStore}
           disabledReason={featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))}
           onClick={() => onNavigate(Screen.STORE)}
@@ -123,57 +125,57 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
       {/* Ecosystem Modules */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between px-2">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">Core Modules</h3>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-text-subtle">{t("home.coreModules")}</h3>
           <button onClick={onRefresh} className="text-[10px] text-primary font-bold">
-            Refresh Status
+            {t("home.refreshStatus")}
           </button>
         </div>
 
         <div className="grid grid-cols-1 gap-3">
           <ModuleCard
             icon={<WalletIcon className="text-primary" />}
-            title="Web3 Wallet"
-            desc="Secure MetaMask-style asset management"
+            title={t("home.walletTitle")}
+            desc={t("home.walletDesc")}
             disabled={!canWallet}
-            disabledReason="Disabled by backend capabilities."
+            disabledReason={t("app.walletDisabled")}
             onClick={() => onNavigate(Screen.WALLET)}
           />
           <ModuleCard
             icon={<ArrowLeftRight className="text-binance-green" />}
-            title="Exchange"
-            desc="Pro-grade trading with deep liquidity"
+            title={t("home.exchangeTitle")}
+            desc={t("home.exchangeDesc")}
             disabled={!canExchange}
             disabledReason={featureReasonText(featureStatus(capabilities, "exchange", "trading"))}
             onClick={() => onNavigate(Screen.EXCHANGE)}
           />
           <ModuleCard
             icon={<MessageCircle className="text-blue-400" />}
-            title="Chat"
-            desc="Instagram-style P2P encrypted social"
+            title={t("home.chatTitle")}
+            desc={t("home.chatDesc")}
             disabled={!canChat}
             disabledReason={featureReasonText(featureStatus(capabilities, "chat", "dm"))}
             onClick={() => onNavigate(Screen.CHAT)}
           />
           <ModuleCard
             icon={<ShoppingBag className="text-orange-400" />}
-            title="Store"
-            desc="Deterministic marketplace for dApps"
+            title={t("home.storeTitle")}
+            desc={t("home.storeDesc")}
             disabled={!canStore}
             disabledReason={featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))}
             onClick={() => onNavigate(Screen.STORE)}
           />
           <ModuleCard
             icon={<Globe className="text-primary" />}
-            title="dApp Browser"
-            desc="Open dApps with your NYX wallet"
+            title={t("home.dappTitle")}
+            desc={t("home.dappDesc")}
             disabled={!canDappBrowser}
             disabledReason={featureReasonText(featureStatus(capabilities, "dapp", "browser"))}
             onClick={() => onNavigate(Screen.DAPP_BROWSER)}
           />
           <ModuleCard
             icon={<ShieldCheck className="text-purple-400" />}
-            title="Web2 Guard"
-            desc="Encrypted access to external APIs"
+            title={t("home.web2Title")}
+            desc={t("home.web2Desc")}
             disabled={!canWeb2Guard}
             disabledReason={featureReasonText(featureStatus(capabilities, "web2", "guard"))}
             onClick={() => onNavigate(Screen.WEB2_ACCESS)}
@@ -184,9 +186,9 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
       {/* Discovery Feed: IG Style */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between px-2">
-          <h3 className="font-black text-lg tracking-tight">Explore NYX</h3>
+          <h3 className="font-black text-lg tracking-tight">{t("home.exploreTitle")}</h3>
           <button onClick={onRefresh} className="text-xs font-bold text-primary">
-            Refresh
+            {t("common.refresh")}
           </button>
         </div>
 
@@ -194,10 +196,10 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
           {feed.length === 0 ? (
             <div className="col-span-2 rounded-3xl border border-black/5 dark:border-white/5 bg-surface-light dark:bg-surface-dark/40 p-6 text-xs text-text-subtle">
               {feedError ? (
-                <>Discovery feed unavailable: {feedError}</>
+                <>{t("home.feedUnavailable", { error: feedError })}</>
               ) : (
                 <>
-                  No live listings yet. Publish a listing in Store to populate the discovery feed.
+                  {t("home.feedEmpty")}
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => onNavigate(Screen.STORE)}
@@ -207,7 +209,7 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
                         canStore ? undefined : featureReasonText(featureStatus(capabilities, "marketplace", "purchase"))
                       }
                     >
-                      Open Store
+                      {t("home.openStore")}
                     </button>
                     <button
                       onClick={() => onNavigate(Screen.CHAT)}
@@ -215,7 +217,7 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
                       disabled={!canChat}
                       title={canChat ? undefined : featureReasonText(featureStatus(capabilities, "chat", "dm"))}
                     >
-                      Open Chat
+                      {t("home.openChat")}
                     </button>
                   </div>
                 </>
@@ -233,7 +235,7 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
                 <img
                   src={`https://api.dicebear.com/7.x/initials/svg?seed=${item.data.name || item.data.title}`}
                   className="size-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  alt="feed-item"
+                  alt={t("home.feedItemAlt")}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-3">
                   <span className="text-[10px] font-bold text-primary">{item.type.toUpperCase()}</span>

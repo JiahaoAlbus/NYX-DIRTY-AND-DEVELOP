@@ -14,6 +14,8 @@ import {
   sendChatMessage,
 } from "../api";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
+import { getStoredLocale, translate } from "../i18nCore";
 
 type ConversationRow = {
   channel: string;
@@ -55,6 +57,7 @@ interface ChatProps {
 
 const PAGE_LIMIT = 50;
 const PEER_STORAGE_PREFIX = "nyx_e2ee_peer_v1_";
+const tCore = (key: string, vars?: Record<string, string | number>) => translate(key, vars, getStoredLocale());
 
 function renderApiError(err: unknown): string {
   if (err instanceof ApiError) {
@@ -62,11 +65,11 @@ function renderApiError(err: unknown): string {
     if (err.code && !err.message.includes(err.code)) bits.push(`(${err.code})`);
     const retryAfter = err.details?.retry_after_seconds;
     if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
-      bits.push(`retry after ${retryAfter}s`);
+      bits.push(tCore("common.retryAfter", { seconds: retryAfter }));
     }
     return bits.join(" ");
   }
-  return (err as Error)?.message ?? "Unknown error";
+  return (err as Error)?.message ?? tCore("common.unknownError");
 }
 
 function formatCompactId(value: string): string {
@@ -111,6 +114,7 @@ function savePeerToStorage(peer: PeerRecord) {
 }
 
 export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const { t } = useI18n();
   const token = session?.access_token ?? "";
   const me = session?.account_id ?? "";
 
@@ -296,7 +300,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
     const plain = text.trim();
     if (!plain) return;
     if (!activePeer) {
-      setSendError("Peer E2EE key not available. Ask them to open Chat once to register.");
+      setSendError(t("chat.peerKeyMissing"));
       return;
     }
 
@@ -316,7 +320,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
       setLastAction(result);
       setText("");
       await loadMessages({ reset: true });
-      setToast(`Sent (run: ${run_id})`);
+      setToast(t("chat.sentToast", { runId: run_id }));
     } catch (err) {
       setSendError(renderApiError(err));
     } finally {
@@ -328,41 +332,41 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
     <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-white">
       <div className="flex items-center justify-between px-2">
         <div>
-          <div className="text-xl font-black tracking-tight">Chat</div>
-          <div className="text-[10px] text-text-subtle uppercase tracking-widest">E2EE only • ciphertext storage</div>
+          <div className="text-xl font-black tracking-tight">{t("chat.title")}</div>
+          <div className="text-[10px] text-text-subtle uppercase tracking-widest">{t("chat.subtitle")}</div>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowNewDm(true)}
             className="text-[10px] font-bold text-primary uppercase tracking-widest"
             disabled={!session}
-            title={!session ? "Sign in required" : "Start a DM"}
+            title={!session ? t("common.signInRequired") : t("chat.startDm")}
           >
-            New DM
+            {t("chat.newDm")}
           </button>
           <button
             onClick={() => onNavigate(Screen.ACTIVITY)}
             className="text-[10px] font-bold text-primary uppercase tracking-widest"
           >
-            Evidence
+            {t("chat.evidence")}
           </button>
         </div>
       </div>
 
       {identityError && (
         <div className="text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
-          E2EE identity publish failed: {identityError}{" "}
+          {t("chat.identityFailed", { message: identityError })}{" "}
           <button onClick={ensureIdentity} className="underline font-bold">
-            Retry
+            {t("common.retry")}
           </button>
         </div>
       )}
 
       <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-bold text-text-subtle uppercase">Conversations</div>
+          <div className="text-xs font-bold text-text-subtle uppercase">{t("chat.conversations")}</div>
           <button onClick={loadConversations} className="text-[10px] font-bold text-primary uppercase tracking-widest">
-            Refresh
+            {t("common.refresh")}
           </button>
         </div>
         {convError && (
@@ -371,13 +375,13 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
           </div>
         )}
         {!convError && conversations.length === 0 && !convLoading && (
-          <div className="text-sm text-text-subtle">No conversations yet. Start a DM.</div>
+          <div className="text-sm text-text-subtle">{t("chat.noConversations")}</div>
         )}
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {conversations.map((c) => {
             const channel = String(c.channel || "");
             const peerId = parseDmPeer(channel, me);
-            const label = peerId ? `DM ${formatCompactId(peerId)}` : channel;
+            const label = peerId ? t("chat.dmLabel", { id: formatCompactId(peerId) }) : channel;
             const active = channel === activeChannel;
             return (
               <button
@@ -400,7 +404,8 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between px-1">
           <div className="text-xs font-bold text-text-subtle uppercase">
-            Channel: <span className="font-mono text-text-subtle">{activeChannel || "—"}</span>
+            {t("chat.channelLabel")}:{" "}
+            <span className="font-mono text-text-subtle">{activeChannel || t("common.emptyDash")}</span>
           </div>
           {activeChannel && msgHasMore && (
             <button
@@ -408,7 +413,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
               className="text-[10px] font-bold text-primary uppercase tracking-widest"
               disabled={msgLoading}
             >
-              Load older
+              {t("chat.loadOlder")}
             </button>
           )}
         </div>
@@ -417,14 +422,14 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
           <div className="text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
             {msgError}{" "}
             <button onClick={() => loadMessages({ reset: true })} className="underline font-bold">
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         )}
 
         <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 min-h-[260px] max-h-[420px] overflow-y-auto no-scrollbar flex flex-col gap-3">
           {activeChannel && messages.length === 0 && !msgLoading && !msgError && (
-            <div className="text-sm text-text-subtle">No messages yet.</div>
+            <div className="text-sm text-text-subtle">{t("chat.noMessages")}</div>
           )}
           {messages.map((m) => {
             const isMe = m.sender_account_id === me;
@@ -435,8 +440,14 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
                     isMe ? "bg-primary text-black rounded-br-none" : "bg-black/5 dark:bg-white/5 rounded-bl-none"
                   }`}
                 >
-                  <div>{activePeer ? decrypted[m.message_id] || "Decrypting…" : "E2EE key missing"}</div>
-                  <div className="mt-1 text-[9px] opacity-60 font-mono break-all">run: {formatCompactId(m.run_id)}</div>
+                  <div>
+                    {activePeer
+                      ? decrypted[m.message_id] || t("chat.decrypting")
+                      : t("chat.e2eeKeyMissing")}
+                  </div>
+                  <div className="mt-1 text-[9px] opacity-60 font-mono break-all">
+                    {t("common.runShort")}: {formatCompactId(m.run_id)}
+                  </div>
                 </div>
               </div>
             );
@@ -450,7 +461,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
               className="flex-1 h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/10 px-3 text-sm outline-none"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={activeChannel ? "Message (encrypted)" : "Select or start a DM"}
+              placeholder={activeChannel ? t("chat.messageEncrypted") : t("chat.selectOrStart")}
               disabled={!activeChannel || sending}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSend();
@@ -462,9 +473,9 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
               className={`px-4 h-10 rounded-xl font-bold text-sm transition-all active:scale-95 ${
                 sending ? "bg-surface-light dark:bg-surface-dark text-text-subtle" : "bg-primary text-black"
               }`}
-              title={!activeChannel ? "Select a conversation first" : ""}
+              title={!activeChannel ? t("chat.selectConversationFirst") : ""}
             >
-              {sending ? "…" : "Send"}
+              {sending ? t("common.ellipsis") : t("chat.send")}
             </button>
           </div>
           {sendError && <div className="mt-2 text-xs text-binance-red">{sendError}</div>}
@@ -473,42 +484,43 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
 
       {lastAction && (
         <div className="p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
-          <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
+          <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">{t("common.lastAction")}</div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
-            run_id: {String(lastAction.run_id ?? "")}
+            {t("common.runId")}: {String(lastAction.run_id ?? "")}
           </div>
           <div className="text-[10px] font-mono text-text-subtle break-all">
-            state_hash: {String(lastAction.state_hash ?? "")}
+            {t("common.stateHash")}: {String(lastAction.state_hash ?? "")}
           </div>
           {lastAction.fee_total !== undefined && (
             <div className="text-[10px] font-mono text-text-subtle break-all">
-              fee_total: {String(lastAction.fee_total)} treasury: {String(lastAction.treasury_address ?? "")}
+              {t("activity.feeTotal")} {String(lastAction.fee_total)} {t("activity.treasury")}{" "}
+              {String(lastAction.treasury_address ?? "")}
             </div>
           )}
         </div>
       )}
 
       {showNewDm && (
-        <Modal title="Start a DM" onClose={() => setShowNewDm(false)}>
+        <Modal title={t("chat.startDm")} onClose={() => setShowNewDm(false)}>
           <div className="flex flex-col gap-3">
             <div className="flex gap-2">
               <input
                 className="flex-1 h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/10 px-3 text-sm outline-none"
                 value={searchQ}
                 onChange={(e) => setSearchQ(e.target.value)}
-                placeholder="Search handle prefix (e.g. ali)"
+                placeholder={t("chat.searchPlaceholder")}
               />
               <button
                 onClick={handleSearch}
                 className="px-4 h-10 rounded-xl font-bold text-sm bg-primary text-black"
                 disabled={searchLoading}
               >
-                {searchLoading ? "…" : "Search"}
+                {searchLoading ? t("common.ellipsis") : t("common.search")}
               </button>
             </div>
             {searchError && <div className="text-xs text-binance-red">{searchError}</div>}
             {searchResults.length === 0 && !searchLoading && (
-              <div className="text-sm text-text-subtle">No results.</div>
+              <div className="text-sm text-text-subtle">{t("common.noResults")}</div>
             )}
             <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto no-scrollbar">
               {searchResults.map((acc) => {
@@ -529,7 +541,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
                       <div className="text-[10px] text-text-subtle">{formatCompactId(acc.account_id)}</div>
                     </div>
                     <div className="text-[10px] text-text-subtle mt-1">
-                      {acc.public_jwk ? "E2EE ready" : "Missing E2EE key (ask them to open Chat once)"}
+                      {acc.public_jwk ? t("chat.e2eeReady") : t("chat.e2eeMissingHint")}
                     </div>
                   </button>
                 );

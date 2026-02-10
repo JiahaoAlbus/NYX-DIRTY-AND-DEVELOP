@@ -1,20 +1,22 @@
 import React, { useState } from "react";
 import { ArrowUpDown, Landmark, CreditCard, ShieldCheck, ChevronRight } from "lucide-react";
+import { useI18n } from "../i18n";
 
 export const Fiat: React.FC = () => {
+  const { t } = useI18n();
   const [fiatAmount, setFiatAmount] = useState("100");
   const [cryptoAmount, setCryptoAmount] = useState("100");
 
   return (
     <div className="flex flex-col gap-6 text-text-main dark:text-white pb-24">
       <div className="flex flex-col gap-2 px-2">
-        <h2 className="text-2xl font-bold">Fiat Exchange</h2>
-        <p className="text-xs text-text-subtle">Securely swap between Fiat and NYX Testnet assets</p>
+        <h2 className="text-2xl font-bold">{t("fiat.title")}</h2>
+        <p className="text-xs text-text-subtle">{t("fiat.subtitle")}</p>
       </div>
 
       <div className="p-6 rounded-3xl glass-dark border border-white/10 flex flex-col gap-4 relative">
         <div className="flex flex-col gap-2 p-4 bg-background-light dark:bg-background-dark/60 rounded-2xl border border-black/5 dark:border-white/5">
-          <label className="text-[10px] text-text-subtle uppercase">Pay</label>
+          <label className="text-[10px] text-text-subtle uppercase">{t("fiat.payLabel")}</label>
           <div className="flex items-center justify-between">
             <input
               className="bg-transparent text-2xl font-bold outline-none flex-1"
@@ -32,7 +34,7 @@ export const Fiat: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-2 p-4 bg-background-light dark:bg-background-dark/60 rounded-2xl border border-black/5 dark:border-white/5">
-          <label className="text-[10px] text-text-subtle uppercase">Receive</label>
+          <label className="text-[10px] text-text-subtle uppercase">{t("fiat.receiveLabel")}</label>
           <div className="flex items-center justify-between">
             <input className="bg-transparent text-2xl font-bold outline-none flex-1" value={cryptoAmount} readOnly />
             <div className="flex items-center gap-2 bg-surface-light dark:bg-surface-dark px-3 py-1.5 rounded-xl border border-black/5 dark:border-white/5">
@@ -42,12 +44,12 @@ export const Fiat: React.FC = () => {
         </div>
 
         <button className="w-full py-4 rounded-2xl bg-primary text-black font-bold text-lg mt-4 hover:scale-[1.02] active:scale-95 transition-all shadow-xl">
-          Buy NYXT
+          {t("fiat.buyNyxt")}
         </button>
       </div>
 
       <div className="flex flex-col gap-4">
-        <h3 className="font-bold px-2 text-sm uppercase text-text-subtle">Payment Methods</h3>
+        <h3 className="font-bold px-2 text-sm uppercase text-text-subtle">{t("fiat.paymentMethods")}</h3>
         <div className="flex flex-col gap-3">
           <div className="p-4 rounded-2xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex items-center justify-between group cursor-pointer hover:bg-surface-light dark:bg-surface-dark/60 transition-all">
             <div className="flex items-center gap-4">
@@ -55,8 +57,8 @@ export const Fiat: React.FC = () => {
                 <Landmark size={20} />
               </div>
               <div>
-                <div className="font-bold text-sm">Bank Transfer</div>
-                <div className="text-[10px] text-text-subtle">0% Fee ● 1-3 Business Days</div>
+                <div className="font-bold text-sm">{t("fiat.bankTransfer")}</div>
+                <div className="text-[10px] text-text-subtle">{t("fiat.bankTransferNote")}</div>
               </div>
             </div>
             <ChevronRight size={18} className="text-text-subtle group-hover:text-text-main dark:text-white" />
@@ -68,8 +70,8 @@ export const Fiat: React.FC = () => {
                 <CreditCard size={20} />
               </div>
               <div>
-                <div className="font-bold text-sm">Credit/Debit Card</div>
-                <div className="text-[10px] text-text-subtle">3.5% Fee ● Instant</div>
+                <div className="font-bold text-sm">{t("fiat.card")}</div>
+                <div className="text-[10px] text-text-subtle">{t("fiat.cardNote")}</div>
               </div>
             </div>
             <ChevronRight size={18} className="text-text-subtle group-hover:text-text-main dark:text-white" />
@@ -79,7 +81,7 @@ export const Fiat: React.FC = () => {
 
       <div className="mt-auto flex items-center justify-center gap-2 text-[10px] text-text-subtle p-4 bg-primary/5 rounded-2xl border border-primary/10">
         <ShieldCheck size={14} className="text-primary" />
-        Security by NYX Deterministic Verification
+        {t("fiat.securityNote")}
       </div>
     </div>
   );

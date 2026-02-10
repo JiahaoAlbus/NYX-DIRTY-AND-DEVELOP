@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Droplets, Send, Info, ShieldCheck } from "lucide-react";
 import { allocateRunId, faucetWallet, parseSeed, PortalSession } from "../api";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
 
 type FaucetProps = {
   seed: string;
@@ -12,7 +13,8 @@ type FaucetProps = {
 };
 
 export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
-  const [address, setAddress] = useState(session?.account_id ?? "");
+  const { t } = useI18n();
+  const [address, setAddress] = useState(session?.wallet_address ?? "");
   const [assetId, setAssetId] = useState("NYXT");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,11 +26,17 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
     [backendOnline, session, address, loading],
   );
 
+  useEffect(() => {
+    if (session?.wallet_address) {
+      setAddress(session.wallet_address);
+    }
+  }, [session?.wallet_address]);
+
   const handleRequest = async () => {
     if (!canSubmit || !session) return;
     setLoading(true);
     setRetryAfter(null);
-    setStatus("Requesting tokens…");
+    setStatus(t("faucet.requesting"));
 
     let seedInt = 0;
     try {
@@ -47,14 +55,20 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
       const treasury = (res as any).treasury_address;
       const newBalance = (res as any).balance;
       setStatus(
-        `Faucet success. +1000 ${assetId}. New balance: ${newBalance}. Fee: ${feeTotal ?? "?"} NYXT → ${treasury ?? "treasury"}.`,
+        t("faucet.success", {
+          amount: 1000,
+          asset: assetId,
+          balance: newBalance ?? "?",
+          fee: feeTotal ?? "?",
+          treasury: treasury ?? t("common.treasury"),
+        }),
       );
     } catch (err) {
       const message = (err as Error).message;
       const details = (err as any)?.details;
       const ra = details?.retry_after_seconds;
       if (typeof ra === "number") setRetryAfter(ra);
-      setStatus(`Error: ${message}`);
+      setStatus(t("faucet.error", { message }));
     } finally {
       setLoading(false);
     }
@@ -66,13 +80,13 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
         <div className="size-16 rounded-2xl bg-primary/20 flex items-center justify-center text-primary mb-4 shadow-inner">
           <Droplets size={32} />
         </div>
-        <h2 className="text-xl font-bold">Testnet Faucet</h2>
-        <p className="text-xs text-text-subtle mt-2">Deterministic mint with receipts + replayable evidence</p>
+        <h2 className="text-xl font-bold">{t("faucet.title")}</h2>
+        <p className="text-xs text-text-subtle mt-2">{t("faucet.subtitle")}</p>
       </div>
 
       <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] text-text-subtle uppercase px-1">Wallet Address</label>
+          <label className="text-[10px] text-text-subtle uppercase px-1">{t("faucet.walletAddress")}</label>
           <div className="flex items-center gap-2 px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5">
             <input
               className="bg-transparent flex-1 outline-none text-sm font-mono"
@@ -83,7 +97,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] text-text-subtle uppercase px-1">Asset</label>
+          <label className="text-[10px] text-text-subtle uppercase px-1">{t("faucet.assetLabel")}</label>
           <select
             className="h-11 rounded-2xl bg-background-light dark:bg-background-dark border border-black/5 dark:border-white/5 px-4 text-sm outline-none"
             value={assetId}
@@ -99,8 +113,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3 items-start">
             <Info size={16} className="text-primary shrink-0 mt-0.5" />
             <div className="text-[10px] text-text-subtle leading-relaxed">
-              Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns
-              a deterministic receipt and fee routing.
+              {t("faucet.limitsNote")}
             </div>
           </div>
 
@@ -118,21 +131,21 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
             ) : (
               <Send size={18} />
             )}
-            Request 1000 {assetId}
+            {t("faucet.requestAmount", { amount: 1000, asset: assetId })}
           </button>
 
           {retryAfter !== null && (
             <div className="text-[10px] text-text-subtle">
-              Retry after: <span className="font-mono">{retryAfter}s</span>
+              {t("faucet.retryAfter", { seconds: retryAfter })}
             </div>
           )}
 
           {lastRunId && (
             <div className="text-[10px] text-text-subtle">
-              run_id: <span className="font-mono break-all">{lastRunId}</span>{" "}
+              {t("common.runId")}: <span className="font-mono break-all">{lastRunId}</span>{" "}
               {onNavigate && (
                 <button onClick={() => onNavigate(Screen.ACTIVITY)} className="underline text-primary font-bold ml-2">
-                  Open Evidence
+                  {t("activity.openEvidence")}
                 </button>
               )}
             </div>
@@ -141,7 +154,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
       </div>
 
       <div className="flex items-center justify-center gap-2 text-[10px] text-text-subtle">
-        <ShieldCheck size={12} /> Deterministic execution + replayable proof
+        <ShieldCheck size={12} /> {t("faucet.deterministicNote")}
       </div>
 
       {status && (

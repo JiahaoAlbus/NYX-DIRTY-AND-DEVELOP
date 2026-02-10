@@ -12,6 +12,7 @@ import {
 import { bytesToBase64 } from "../utils";
 import type { Web2AllowlistEntry, Web2GuardRequestRow, Web2GuardResponse } from "../types";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
 
 interface Web2AccessProps {
   seed: string;
@@ -25,7 +26,7 @@ const DEFAULT_URL = "https://api.coingecko.com/api/v3/ping";
 
 const sealSecret = async (secret: string, seed: string): Promise<string> => {
   if (!window.crypto?.subtle) {
-    throw new Error("Web Crypto unavailable.");
+    throw new Error("WEB_CRYPTO_UNAVAILABLE");
   }
   const enc = new TextEncoder();
   const seedBytes = enc.encode(seed);
@@ -40,6 +41,7 @@ const sealSecret = async (secret: string, seed: string): Promise<string> => {
 };
 
 export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const { t } = useI18n();
   const [allowlist, setAllowlist] = useState<Web2AllowlistEntry[]>([]);
   const [allowlistLoading, setAllowlistLoading] = useState(false);
   const [allowlistError, setAllowlistError] = useState<string>("");
@@ -65,7 +67,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
 
   const loadAllowlist = async () => {
     if (!backendOnline) {
-      setAllowlistError("Backend unavailable.");
+      setAllowlistError(t("common.backendUnavailable"));
       return;
     }
     setAllowlistLoading(true);
@@ -75,7 +77,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
       setAllowlist(payload.allowlist || []);
     } catch (err) {
       const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setAllowlistError(`Failed to load allowlist: ${message}`);
+      setAllowlistError(t("web2.allowlistFailed", { message }));
     } finally {
       setAllowlistLoading(false);
     }
@@ -98,7 +100,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
       setHistoryOffset(nextOffset + rows.length);
     } catch (err) {
       const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setHistoryError(`Failed to load history: ${message}`);
+      setHistoryError(t("web2.historyFailed", { message }));
     } finally {
       setHistoryLoading(false);
     }
@@ -112,16 +114,16 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
 
   const handleSend = async () => {
     if (!backendOnline) {
-      setStatus("Backend unavailable.");
+      setStatus(t("common.backendUnavailable"));
       return;
     }
     if (!session?.access_token) {
-      setStatus("Sign in required.");
+      setStatus(t("common.signInRequired"));
       return;
     }
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
-      setStatus("URL required.");
+      setStatus(t("common.urlRequired"));
       return;
     }
 
@@ -138,14 +140,15 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
       try {
         sealed = await sealSecret(secret.trim(), seed);
       } catch (err) {
-        setStatus((err as Error).message);
+        const msg = (err as Error).message;
+        setStatus(msg === "WEB_CRYPTO_UNAVAILABLE" ? t("web2.cryptoUnavailable") : msg);
         return;
       }
     }
 
     const bodyText = body.trim();
     if (method === "GET" && bodyText) {
-      setStatus("Body not allowed for GET.");
+      setStatus(t("web2.bodyNotAllowed"));
       return;
     }
 
@@ -164,7 +167,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
       await loadHistory(true);
     } catch (err) {
       const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setStatus(`Request failed: ${message}`);
+      setStatus(t("web2.requestFailed", { message }));
     } finally {
       setSending(false);
     }
@@ -175,7 +178,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
       key={entry.id}
       onClick={() => setUrl(entry.base_url)}
       className="px-3 py-2 rounded-xl text-xs font-bold border border-black/5 dark:border-white/10 bg-surface-light dark:bg-surface-dark/50 hover:border-primary/40 transition-all"
-      title={`Allowlisted: ${entry.base_url}`}
+      title={t("web2.allowlistedTitle", { url: entry.base_url })}
     >
       {entry.label}
     </button>
@@ -187,33 +190,35 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
         <div className="size-20 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 mb-4 shadow-2xl border border-blue-500/30">
           <Globe size={40} />
         </div>
-        <h2 className="text-2xl font-bold">Web2 Guard</h2>
-        <p className="text-sm text-text-subtle mt-2">Allowlisted Web2 requests with deterministic evidence + fees</p>
+        <h2 className="text-2xl font-bold">{t("web2.title")}</h2>
+        <p className="text-sm text-text-subtle mt-2">{t("web2.subtitle")}</p>
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col gap-6">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-bold uppercase text-text-subtle">Allowlist</div>
+            <div className="text-xs font-bold uppercase text-text-subtle">{t("web2.allowlist")}</div>
             <button
               onClick={loadAllowlist}
               disabled={allowlistLoading}
               className="flex items-center gap-2 text-xs font-bold text-primary"
             >
               <RefreshCw size={14} className={allowlistLoading ? "animate-spin" : ""} />
-              Refresh
+              {t("common.refresh")}
             </button>
           </div>
           {allowlist.length === 0 ? (
             <div className="text-xs text-text-subtle">
-              {allowlistLoading ? "Loading allowlist…" : allowlistError || "No allowlisted endpoints yet."}
+              {allowlistLoading
+                ? t("web2.loadingAllowlist")
+                : allowlistError || t("web2.noAllowlist")}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">{hintRows}</div>
           )}
 
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] text-text-subtle uppercase px-1">Target URL</label>
+            <label className="text-[10px] text-text-subtle uppercase px-1">{t("web2.targetUrl")}</label>
             <div className="flex items-center gap-3 px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5">
               <Globe size={18} className="text-text-subtle" />
               <input
@@ -226,7 +231,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] text-text-subtle uppercase px-1">Method</label>
+              <label className="text-[10px] text-text-subtle uppercase px-1">{t("web2.method")}</label>
               <select
                 className="h-11 rounded-2xl bg-background-light dark:bg-background-dark border border-black/5 dark:border-white/5 px-4 text-sm outline-none"
                 value={method}
@@ -237,7 +242,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
               </select>
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-[10px] text-text-subtle uppercase px-1">Body</label>
+              <label className="text-[10px] text-text-subtle uppercase px-1">{t("web2.body")}</label>
               <input
                 className="bg-transparent flex-1 outline-none text-sm font-mono px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5"
                 value={body}
@@ -248,7 +253,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] text-text-subtle uppercase px-1">Sealed Key (Optional)</label>
+            <label className="text-[10px] text-text-subtle uppercase px-1">{t("web2.sealedKey")}</label>
             <div className="flex items-center gap-3 px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5">
               <Key size={18} className="text-text-subtle" />
               <input
@@ -269,8 +274,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
           <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex gap-3 items-start">
             <AlertTriangle size={16} className="text-orange-500 shrink-0 mt-0.5" />
             <div className="text-[10px] text-text-subtle leading-relaxed">
-              Secrets are sealed on-device and stored only as ciphertext. Testnet guard forwards only allowlisted public
-              endpoints.
+              {t("web2.sealedNote")}
             </div>
           </div>
 
@@ -284,20 +288,34 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
             ) : (
               <Send size={18} />
             )}
-            Send Request
+            {t("web2.send")}
           </button>
         </div>
 
         {lastResponse && (
           <div className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-white/10 text-xs">
-            <div className="font-bold">Latest Response</div>
+            <div className="font-bold">{t("web2.latestResponse")}</div>
             <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-[10px] text-text-subtle break-all">
-              <div>run_id: {lastResponse.run_id}</div>
-              <div>status: {lastResponse.response_status}</div>
-              <div>request_hash: {lastResponse.request_hash}</div>
-              <div>response_hash: {lastResponse.response_hash}</div>
-              <div>fee_total: {lastResponse.fee_total}</div>
-              {lastResponse.treasury_address && <div>treasury: {lastResponse.treasury_address}</div>}
+              <div>
+                {t("common.runId")}: {lastResponse.run_id}
+              </div>
+              <div>
+                {t("common.status")}: {lastResponse.response_status}
+              </div>
+              <div>
+                {t("web2.requestHash")}: {lastResponse.request_hash}
+              </div>
+              <div>
+                {t("web2.responseHash")}: {lastResponse.response_hash}
+              </div>
+              <div>
+                {t("activity.feeTotal")} {lastResponse.fee_total}
+              </div>
+              {lastResponse.treasury_address && (
+                <div>
+                  {t("activity.treasury")} {lastResponse.treasury_address}
+                </div>
+              )}
             </div>
             {lastResponse.response_preview && (
               <pre className="mt-3 p-3 rounded-2xl bg-black/80 text-green-300 text-[10px] overflow-x-auto max-h-48">
@@ -308,7 +326,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
               onClick={() => onNavigate(Screen.ACTIVITY)}
               className="mt-3 text-xs font-bold text-primary underline"
             >
-              Open Evidence Center
+              {t("activity.openEvidence")}
             </button>
           </div>
         )}
@@ -316,24 +334,24 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col items-center gap-2 text-center">
             <Shield size={24} className="text-blue-500" />
-            <div className="text-[10px] font-bold">Allowlist Gate</div>
+            <div className="text-[10px] font-bold">{t("web2.allowlistGate")}</div>
           </div>
           <div className="p-4 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col items-center gap-2 text-center">
             <Lock size={24} className="text-purple-500" />
-            <div className="text-[10px] font-bold">Ciphertext Only</div>
+            <div className="text-[10px] font-bold">{t("web2.ciphertextOnly")}</div>
           </div>
         </div>
 
         <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-bold uppercase text-text-subtle">Recent Requests</div>
+            <div className="text-xs font-bold uppercase text-text-subtle">{t("web2.recentRequests")}</div>
             <button onClick={() => loadHistory(true)} className="text-xs font-bold text-primary">
-              Refresh
+              {t("common.refresh")}
             </button>
           </div>
           {history.length === 0 ? (
             <div className="text-xs text-text-subtle">
-              {historyLoading ? "Loading history…" : historyError || "No requests yet."}
+              {historyLoading ? t("web2.loadingHistory") : historyError || t("web2.noRequests")}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -344,7 +362,9 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
                     <span>{row.response_status}</span>
                   </div>
                   <div className="text-[10px] text-text-subtle break-all">{row.url}</div>
-                  <div className="text-[10px] text-text-subtle">run_id: {row.run_id}</div>
+                  <div className="text-[10px] text-text-subtle">
+                    {t("common.runId")}: {row.run_id}
+                  </div>
                 </div>
               ))}
               {historyHasMore && (
@@ -353,7 +373,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
                   disabled={historyLoading}
                   className="text-xs font-bold text-primary underline"
                 >
-                  {historyLoading ? "Loading…" : "Load more"}
+                  {historyLoading ? t("common.loading") : t("common.loadMore")}
                 </button>
               )}
             </div>

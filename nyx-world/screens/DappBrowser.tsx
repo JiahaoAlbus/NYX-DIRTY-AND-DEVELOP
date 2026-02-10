@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Globe, RefreshCw } from "lucide-react";
+import { useI18n } from "../i18n";
 
 type NormalizedUrl = { ok: true; url: string } | { ok: false; reason: string };
 
 export const DappBrowser: React.FC = () => {
+  const { t } = useI18n();
   const [url, setUrl] = useState("");
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
   const [mode, setMode] = useState<"tab" | "embed">("tab");
@@ -30,16 +32,16 @@ export const DappBrowser: React.FC = () => {
 
   const normalize = (raw: string): NormalizedUrl => {
     const trimmed = (raw || "").trim();
-    if (!trimmed) return { ok: false, reason: "URL required." };
+    if (!trimmed) return { ok: false, reason: t("dapp.urlRequired") };
     const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
     let parsed: URL;
     try {
       parsed = new URL(withScheme);
     } catch {
-      return { ok: false, reason: "Invalid URL." };
+      return { ok: false, reason: t("dapp.invalidUrl") };
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return { ok: false, reason: "Only http/https URLs are supported." };
+      return { ok: false, reason: t("dapp.protocolOnly") };
     }
     return { ok: true, url: parsed.toString() };
   };
@@ -91,20 +93,18 @@ export const DappBrowser: React.FC = () => {
         <div className="size-20 rounded-full bg-primary/20 flex items-center justify-center text-primary mb-4 shadow-2xl border border-primary/30">
           <Globe size={40} />
         </div>
-        <h2 className="text-2xl font-bold">dApp Browser</h2>
-        <p className="text-sm text-text-subtle mt-2">
-          For best compatibility, open dApps in a new tab (wallet extensions can inject providers there).
-        </p>
+        <h2 className="text-2xl font-bold">{t("dapp.title")}</h2>
+        <p className="text-sm text-text-subtle mt-2">{t("dapp.subtitle")}</p>
       </div>
 
       <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] text-text-subtle uppercase px-1">URL</label>
+          <label className="text-[10px] text-text-subtle uppercase px-1">{t("common.url")}</label>
           <div className="flex items-center gap-3 px-4 py-3 bg-background-light dark:bg-background-dark rounded-2xl border border-black/5 dark:border-white/5">
             <Globe size={18} className="text-text-subtle" />
             <input
               className="bg-transparent flex-1 outline-none text-sm font-mono"
-              placeholder="https://app.example.com"
+              placeholder={t("dapp.placeholder")}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
@@ -120,13 +120,13 @@ export const DappBrowser: React.FC = () => {
             className="flex-1 py-3 rounded-2xl bg-primary text-black font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl"
           >
             <ExternalLink size={16} />
-            Open Tab
+            {t("dapp.openTab")}
           </button>
           <button
             onClick={() => go("embed")}
             className="flex-1 py-3 rounded-2xl border border-primary/20 text-primary font-bold flex items-center justify-center gap-2 hover:bg-primary/10 transition-all"
           >
-            Embed
+            {t("dapp.embed")}
           </button>
         </div>
 
@@ -137,7 +137,7 @@ export const DappBrowser: React.FC = () => {
         )}
 
         <div className="flex flex-col gap-2">
-          <div className="text-[10px] text-text-subtle uppercase px-1">Quick Links</div>
+          <div className="text-[10px] text-text-subtle uppercase px-1">{t("dapp.quickLinks")}</div>
           <div className="grid grid-cols-3 gap-2">
             {quickLinks.map((link) => (
               <button
@@ -161,7 +161,7 @@ export const DappBrowser: React.FC = () => {
 
         {recents.length > 0 && (
           <div className="flex flex-col gap-2">
-            <div className="text-[10px] text-text-subtle uppercase px-1">Recent</div>
+            <div className="text-[10px] text-text-subtle uppercase px-1">{t("dapp.recent")}</div>
             <div className="flex flex-col gap-2">
               {recents.map((r) => (
                 <button
@@ -174,7 +174,7 @@ export const DappBrowser: React.FC = () => {
                     openNewTab(r);
                   }}
                   className="rounded-2xl border border-black/5 dark:border-white/10 bg-background-light dark:bg-background-dark px-4 py-3 text-left text-[10px] font-mono text-text-subtle hover:border-primary/30 transition-colors break-all"
-                  title="Open in new tab"
+                  title={t("dapp.openTab")}
                 >
                   {r}
                 </button>
@@ -187,14 +187,12 @@ export const DappBrowser: React.FC = () => {
       <div className="rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 overflow-hidden min-h-[420px]">
         {!activeUrl ? (
           <div className="flex items-center justify-center h-[420px] text-text-subtle text-sm">
-            Enter a URL to open a dApp.
+            {t("dapp.empty")}
           </div>
         ) : mode === "tab" ? (
           <div className="p-6 flex flex-col gap-4">
-            <div className="text-sm font-bold">Opened in a new tab</div>
-            <div className="text-[11px] text-text-subtle">
-              If your wallet is available as a browser extension, the dApp can request signatures there.
-            </div>
+            <div className="text-sm font-bold">{t("dapp.opened")}</div>
+            <div className="text-[11px] text-text-subtle">{t("dapp.openedHint")}</div>
             <div className="rounded-2xl border border-black/5 dark:border-white/10 bg-background-light dark:bg-background-dark px-4 py-3 text-[10px] font-mono text-text-subtle break-all">
               {activeUrl}
             </div>
@@ -204,7 +202,7 @@ export const DappBrowser: React.FC = () => {
                 className="flex-1 py-3 rounded-2xl bg-primary text-black font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all"
               >
                 <ExternalLink size={16} />
-                Open Again
+                {t("dapp.openAgain")}
               </button>
               <button
                 onClick={() => {
@@ -214,7 +212,7 @@ export const DappBrowser: React.FC = () => {
                 }}
                 className="flex-1 py-3 rounded-2xl border border-primary/20 text-primary font-bold flex items-center justify-center gap-2 hover:bg-primary/10 transition-all"
               >
-                Embed Here
+                {t("dapp.embedHere")}
               </button>
             </div>
           </div>
@@ -222,7 +220,7 @@ export const DappBrowser: React.FC = () => {
           <div className="relative h-[420px]">
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background-light/70 dark:bg-background-dark/70 backdrop-blur-sm z-10">
-                <div className="text-xs font-bold text-text-subtle">Loading…</div>
+                <div className="text-xs font-bold text-text-subtle">{t("dapp.loading")}</div>
               </div>
             )}
             <div className="absolute right-3 top-3 z-20">
@@ -232,7 +230,7 @@ export const DappBrowser: React.FC = () => {
                   setIframeKey((k) => k + 1);
                 }}
                 className="size-9 rounded-2xl bg-background-light dark:bg-background-dark border border-black/5 dark:border-white/10 flex items-center justify-center text-text-subtle hover:text-primary transition-colors"
-                title="Reload embed"
+                title={t("dapp.reloadEmbed")}
               >
                 <RefreshCw size={16} />
               </button>
@@ -241,11 +239,11 @@ export const DappBrowser: React.FC = () => {
               key={iframeKey}
               src={activeUrl}
               className="w-full h-[420px] border-none"
-              title="dApp View"
+              title={t("dapp.viewTitle")}
               onLoad={() => setIsLoading(false)}
             />
             <div className="px-4 py-3 text-[10px] text-text-subtle border-t border-black/5 dark:border-white/10">
-              Some dApps block embedding (X-Frame-Options / CSP). If blank, use “Open Tab”.
+              {t("dapp.embedBlocked")}
             </div>
           </div>
         )}

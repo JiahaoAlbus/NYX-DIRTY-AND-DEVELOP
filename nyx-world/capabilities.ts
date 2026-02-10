@@ -42,11 +42,17 @@ export function isModuleUsable(caps: Capabilities | null, moduleName: string): b
   return typeof caps.module_features?.[moduleName] === "object";
 }
 
+import { getStoredLocale, translate } from "./i18nCore";
+
 export function featureReasonText(status: CapabilityStatus | null): string {
-  if (!status) return "Capabilities not loaded yet.";
-  if (status === "disabled") return "Disabled by backend capabilities.";
-  if (status.startsWith("disabled_")) return `Disabled: ${status.slice("disabled_".length).replaceAll("_", " ")}.`;
-  if (status === "mandatory") return "Mandatory for this environment.";
-  if (status === "verified") return "Verified in this environment.";
-  return `Capability status: ${status}`;
+  const locale = getStoredLocale();
+  if (!status) return translate("capabilities.notLoaded", undefined, locale);
+  if (status === "disabled") return translate("capabilities.disabled", undefined, locale);
+  if (status.startsWith("disabled_")) {
+    const reason = status.slice("disabled_".length).replaceAll("_", " ");
+    return translate("capabilities.disabledReason", { reason }, locale);
+  }
+  if (status === "mandatory") return translate("capabilities.mandatory", undefined, locale);
+  if (status === "verified") return translate("capabilities.verified", undefined, locale);
+  return translate("capabilities.status", { status }, locale);
 }

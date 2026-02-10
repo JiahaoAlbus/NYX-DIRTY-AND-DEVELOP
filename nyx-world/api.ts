@@ -21,6 +21,7 @@ export interface PortalSession {
   handle: string;
   pubkey: string;
   access_token: string;
+  wallet_address?: string;
 }
 
 export type ApiErrorDetails = Record<string, unknown>;
@@ -192,14 +193,18 @@ export function derivePortalKey(seed: string): { pubkey: string; keyBytes: Uint8
 }
 
 export async function createPortalAccount(handle: string, pubkey: string) {
-  return requestJson<{ account_id: string; handle: string; pubkey: string; created_at: number; status: string }>(
-    "/portal/v1/accounts",
-    {
-      method: "POST",
-      body: { handle, pubkey },
-      retry: false,
-    },
-  );
+  return requestJson<{
+    account_id: string;
+    handle: string;
+    pubkey: string;
+    wallet_address: string;
+    created_at: number;
+    status: string;
+  }>("/portal/v1/accounts", {
+    method: "POST",
+    body: { handle, pubkey },
+    retry: false,
+  });
 }
 
 export async function fetchPortalChallenge(accountId: string) {
@@ -212,7 +217,7 @@ export async function fetchPortalChallenge(accountId: string) {
 
 export async function verifyPortalChallenge(accountId: string, nonce: string, keyBytes: Uint8Array) {
   const signature = bytesToBase64(hmac(sha256, keyBytes, encodeUtf8(nonce)));
-  return requestJson<{ access_token: string; expires_at: number }>("/portal/v1/auth/verify", {
+  return requestJson<{ access_token: string; expires_at: number; wallet_address?: string }>("/portal/v1/auth/verify", {
     method: "POST",
     body: { account_id: accountId, nonce, signature },
     retry: false,
@@ -228,17 +233,23 @@ export async function logoutPortal(accessToken: string) {
 }
 
 export async function fetchPortalMe(accessToken: string) {
-  return requestJson<{ account_id: string; handle: string; pubkey: string; created_at: number; status: string }>(
-    "/portal/v1/me",
-    { token: accessToken, retry: false },
-  );
+  return requestJson<{
+    account_id: string;
+    handle: string;
+    pubkey: string;
+    wallet_address: string;
+    created_at: number;
+    status: string;
+  }>("/portal/v1/me", { token: accessToken, retry: false });
 }
 
 export async function fetchPortalAccountById(accessToken: string, accountId: string) {
-  return requestJson<{ account: { account_id: string; handle: string; public_jwk: JsonWebKey | null } }>(
-    `/portal/v1/accounts/by_id?account_id=${encodeURIComponent(accountId)}`,
-    { token: accessToken, retry: false },
-  );
+  return requestJson<{
+    account: { account_id: string; handle: string; wallet_address?: string; public_jwk: JsonWebKey | null };
+  }>(`/portal/v1/accounts/by_id?account_id=${encodeURIComponent(accountId)}`, {
+    token: accessToken,
+    retry: false,
+  });
 }
 
 export async function fetchActivity(accessToken: string, limit: number = 50, offset: number = 0) {
