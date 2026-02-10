@@ -62,15 +62,15 @@ const PAGE_LIMIT = 20;
 
 function renderApiError(err: unknown): string {
   const locale = getStoredLocale();
-    if (err instanceof ApiError) {
-      const bits = [err.message];
-      if (err.code && !err.message.includes(err.code)) bits.push(`(${err.code})`);
-      const retryAfter = err.details?.retry_after_seconds;
-      if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
+  if (err instanceof ApiError) {
+    const bits = [err.message];
+    if (err.code && !err.message.includes(err.code)) bits.push(`(${err.code})`);
+    const retryAfter = err.details?.retry_after_seconds;
+    if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
       bits.push(translate("common.retryAfter", { seconds: retryAfter }, locale));
-      }
-      return bits.join(" ");
     }
+    return bits.join(" ");
+  }
   return (err as Error)?.message ?? translate("common.unknownError", undefined, locale);
 }
 
@@ -221,7 +221,15 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
     const deterministicRunId = allocateRunId(runId, "marketplace-listing-publish");
     setMutating(true);
     try {
-      const result = (await publishListing(token, seedInt, deterministicRunId, walletAddress, sku, title, px)) as RunResult;
+      const result = (await publishListing(
+        token,
+        seedInt,
+        deterministicRunId,
+        walletAddress,
+        sku,
+        title,
+        px,
+      )) as RunResult;
       setLastAction(result);
       setToast(t("store.listingPublished", { runId: deterministicRunId }));
       setShowPublish(false);
@@ -419,7 +427,7 @@ export const Store: React.FC<StoreProps> = ({ seed, runId, backendOnline, sessio
               <div
                 key={p.purchase_id}
                 className="p-4 rounded-3xl bg-surface-light dark:bg-surface-dark/20 border border-primary/5"
-                >
+              >
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-bold truncate">{p.title ?? p.sku ?? t("store.purchase")}</div>
                   <div className="text-[10px] text-text-subtle">{t("store.qtyLabel", { qty: p.qty })}</div>

@@ -149,9 +149,7 @@ const App: React.FC = () => {
     }
 
     if (screen === Screen.WALLET) {
-      return isModuleUsable(capabilities, "wallet")
-        ? { ok: true }
-        : { ok: false, reason: t("app.walletDisabled") };
+      return isModuleUsable(capabilities, "wallet") ? { ok: true } : { ok: false, reason: t("app.walletDisabled") };
     }
     if (screen === Screen.FAUCET) {
       const status = isFeatureEnabled(capabilities, "wallet", "faucet") ? null : "disabled";

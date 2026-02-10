@@ -186,9 +186,7 @@ export const DappBrowser: React.FC = () => {
 
       <div className="rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 overflow-hidden min-h-[420px]">
         {!activeUrl ? (
-          <div className="flex items-center justify-center h-[420px] text-text-subtle text-sm">
-            {t("dapp.empty")}
-          </div>
+          <div className="flex items-center justify-center h-[420px] text-text-subtle text-sm">{t("dapp.empty")}</div>
         ) : mode === "tab" ? (
           <div className="p-6 flex flex-col gap-4">
             <div className="text-sm font-bold">{t("dapp.opened")}</div>

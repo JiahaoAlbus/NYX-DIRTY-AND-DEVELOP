@@ -22,11 +22,7 @@ export function storeLocale(locale: Locale) {
   window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
 }
 
-export function translate(
-  key: string,
-  vars: Record<string, string | number> | undefined,
-  locale: Locale,
-): string {
+export function translate(key: string, vars: Record<string, string | number> | undefined, locale: Locale): string {
   const dict = dictionaries[locale] ?? dictionaries.en;
   const template = dict[key] ?? dictionaries.en[key] ?? key;
   if (!vars) return template;

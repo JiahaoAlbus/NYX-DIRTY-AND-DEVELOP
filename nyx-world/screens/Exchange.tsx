@@ -348,9 +348,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               </div>
             </div>
 
-            <div className="mt-3 text-[10px] text-text-subtle">
-              {t("exchange.bookNote")}
-            </div>
+            <div className="mt-3 text-[10px] text-text-subtle">{t("exchange.bookNote")}</div>
           </div>
 
           {/* Place order */}
@@ -421,7 +419,9 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               }`}
               title={!backendOnline ? t("app.backendUnavailable") : ""}
             >
-              {mutating ? t("exchange.submitting") : `${t(side === "BUY" ? "exchange.buy" : "exchange.sell")} ${assetOut}`}
+              {mutating
+                ? t("exchange.submitting")
+                : `${t(side === "BUY" ? "exchange.buy" : "exchange.sell")} ${assetOut}`}
             </button>
 
             {actionError && (

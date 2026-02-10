@@ -78,16 +78,12 @@ export const Settings: React.FC<SettingsProps> = ({ session, seed, runId, onSeed
 
         <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm glass">
           <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">{t("settings.treasuryFees")}</h3>
-          <div className="text-xs text-text-subtle leading-relaxed">
-            {t("settings.treasuryFeesNote")}
-          </div>
+          <div className="text-xs text-text-subtle leading-relaxed">{t("settings.treasuryFeesNote")}</div>
         </section>
 
         <section className="p-4 rounded-xl bg-white border border-primary/20 shadow-sm">
           <h3 className="text-sm font-bold uppercase text-text-subtle mb-3">{t("settings.about")}</h3>
-          <div className="text-xs text-text-subtle leading-relaxed">
-            {t("settings.aboutNote")}
-          </div>
+          <div className="text-xs text-text-subtle leading-relaxed">{t("settings.aboutNote")}</div>
         </section>
       </div>
     </div>

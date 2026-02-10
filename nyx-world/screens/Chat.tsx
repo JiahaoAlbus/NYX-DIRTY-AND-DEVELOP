@@ -440,11 +440,7 @@ export const Chat: React.FC<ChatProps> = ({ seed, runId, backendOnline, session,
                     isMe ? "bg-primary text-black rounded-br-none" : "bg-black/5 dark:bg-white/5 rounded-bl-none"
                   }`}
                 >
-                  <div>
-                    {activePeer
-                      ? decrypted[m.message_id] || t("chat.decrypting")
-                      : t("chat.e2eeKeyMissing")}
-                  </div>
+                  <div>{activePeer ? decrypted[m.message_id] || t("chat.decrypting") : t("chat.e2eeKeyMissing")}</div>
                   <div className="mt-1 text-[9px] opacity-60 font-mono break-all">
                     {t("common.runShort")}: {formatCompactId(m.run_id)}
                   </div>

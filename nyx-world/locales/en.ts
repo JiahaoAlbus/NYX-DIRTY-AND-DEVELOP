@@ -268,11 +268,13 @@ export const en: Record<string, string> = {
   "faucet.subtitle": "Deterministic mint with receipts + replayable evidence",
   "faucet.walletAddress": "Wallet Address",
   "faucet.assetLabel": "Asset",
-  "faucet.limitsNote": "Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns a deterministic receipt and fee routing.",
+  "faucet.limitsNote":
+    "Limits are enforced server-side (cooldown, per-account and per-IP quotas). On success the backend returns a deterministic receipt and fee routing.",
   "faucet.requestAmount": "Request {{amount}} {{asset}}",
   "faucet.retryAfter": "Retry after: {{seconds}}s",
   "faucet.requesting": "Requesting tokens…",
-  "faucet.success": "Faucet success. +{{amount}} {{asset}}. New balance: {{balance}}. Fee: {{fee}} NYXT → {{treasury}}.",
+  "faucet.success":
+    "Faucet success. +{{amount}} {{asset}}. New balance: {{balance}}. Fee: {{fee}} NYXT → {{treasury}}.",
   "faucet.deterministicNote": "Deterministic execution + replayable proof",
   "airdrop.subtitle": "Tasks are verified from real receipts (no Web2 tasks).",
   "airdrop.availableTasks": "Available Tasks",
@@ -335,7 +337,8 @@ export const en: Record<string, string> = {
   "web2.noAllowlist": "No allowlisted endpoints yet.",
   "web2.targetUrl": "Target URL",
   "web2.sealedKey": "Sealed Key (Optional)",
-  "web2.sealedNote": "Secrets are sealed on-device and stored only as ciphertext. Testnet guard forwards only allowlisted public endpoints.",
+  "web2.sealedNote":
+    "Secrets are sealed on-device and stored only as ciphertext. Testnet guard forwards only allowlisted public endpoints.",
   "web2.latestResponse": "Latest Response",
   "web2.requestHash": "request_hash",
   "web2.responseHash": "response_hash",
@@ -356,9 +359,11 @@ export const en: Record<string, string> = {
   "settings.runId": "Run ID",
   "settings.runNote": "Changing these values will reset the deterministic evidence chain for your next session.",
   "settings.treasuryFees": "Treasury + Fees",
-  "settings.treasuryFeesNote": "Treasury routing is configured server-side (testnet). Each state mutation response includes fee_total and treasury_address. Use Activity → Evidence Inspector to audit the full fee + receipt chain.",
+  "settings.treasuryFeesNote":
+    "Treasury routing is configured server-side (testnet). Each state mutation response includes fee_total and treasury_address. Use Activity → Evidence Inspector to audit the full fee + receipt chain.",
   "settings.about": "About NYX",
-  "settings.aboutNote": "NYX is a deterministic, verifiable portal infrastructure. This is a Testnet Portal v1 preview. All state transitions generate evidence that can be replayed for correctness.",
+  "settings.aboutNote":
+    "NYX is a deterministic, verifiable portal infrastructure. This is a Testnet Portal v1 preview. All state transitions generate evidence that can be replayed for correctness.",
   "store.listingPublished": "Listing published (run: {{runId}})",
   "store.publishListingTitle": "Publish Listing",
   "store.sku": "SKU",

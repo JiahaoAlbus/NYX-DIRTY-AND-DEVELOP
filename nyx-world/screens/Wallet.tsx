@@ -199,7 +199,11 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
       {/* Tabs */}
       <div className="flex-1 flex flex-col mt-4">
         <div className="flex border-b border-primary/10">
-          <TabButton active={activeTab === "assets"} onClick={() => setActiveTab("assets")} label={t("wallet.assets")} />
+          <TabButton
+            active={activeTab === "assets"}
+            onClick={() => setActiveTab("assets")}
+            label={t("wallet.assets")}
+          />
           <TabButton
             active={activeTab === "activity"}
             onClick={() => setActiveTab("activity")}
@@ -377,9 +381,7 @@ export const Wallet: React.FC<WalletProps> = ({ seed, runId, backendOnline, sess
                 {transferLoading ? t("wallet.sending") : t("wallet.send")}
               </button>
 
-              <div className="text-[10px] text-text-subtle leading-relaxed">
-                {t("wallet.transferEvidenceNote")}
-              </div>
+              <div className="text-[10px] text-text-subtle leading-relaxed">{t("wallet.transferEvidenceNote")}</div>
             </div>
           </div>
         </div>

@@ -80,7 +80,9 @@ export const Home: React.FC<HomeProps> = ({ backendOnline, onRefresh, onNavigate
           </button>
           {!canAirdrop && (
             <div className="text-[10px] font-bold text-black/50">
-              {t("home.airdropDisabled", { reason: featureReasonText(featureStatus(capabilities, "wallet", "airdrop")) })}
+              {t("home.airdropDisabled", {
+                reason: featureReasonText(featureStatus(capabilities, "wallet", "airdrop")),
+              })}
             </div>
           )}
         </div>

@@ -209,9 +209,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
           </div>
           {allowlist.length === 0 ? (
             <div className="text-xs text-text-subtle">
-              {allowlistLoading
-                ? t("web2.loadingAllowlist")
-                : allowlistError || t("web2.noAllowlist")}
+              {allowlistLoading ? t("web2.loadingAllowlist") : allowlistError || t("web2.noAllowlist")}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">{hintRows}</div>
@@ -273,9 +271,7 @@ export const Web2Access: React.FC<Web2AccessProps> = ({ seed, runId, backendOnli
 
           <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex gap-3 items-start">
             <AlertTriangle size={16} className="text-orange-500 shrink-0 mt-0.5" />
-            <div className="text-[10px] text-text-subtle leading-relaxed">
-              {t("web2.sealedNote")}
-            </div>
+            <div className="text-[10px] text-text-subtle leading-relaxed">{t("web2.sealedNote")}</div>
           </div>
 
           <button

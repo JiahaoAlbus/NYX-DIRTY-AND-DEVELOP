@@ -112,9 +112,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
         <div className="flex flex-col gap-4">
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 flex gap-3 items-start">
             <Info size={16} className="text-primary shrink-0 mt-0.5" />
-            <div className="text-[10px] text-text-subtle leading-relaxed">
-              {t("faucet.limitsNote")}
-            </div>
+            <div className="text-[10px] text-text-subtle leading-relaxed">{t("faucet.limitsNote")}</div>
           </div>
 
           <button
@@ -135,9 +133,7 @@ export const Faucet: React.FC<FaucetProps> = ({ seed, runId, backendOnline, sess
           </button>
 
           {retryAfter !== null && (
-            <div className="text-[10px] text-text-subtle">
-              {t("faucet.retryAfter", { seconds: retryAfter })}
-            </div>
+            <div className="text-[10px] text-text-subtle">{t("faucet.retryAfter", { seconds: retryAfter })}</div>
           )}
 
           {lastRunId && (

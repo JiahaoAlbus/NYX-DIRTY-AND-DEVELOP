@@ -356,7 +356,8 @@ export const zh: Record<string, string> = {
   "settings.runId": "Run ID",
   "settings.runNote": "修改后将重置下一次会话的确定性证据链。",
   "settings.treasuryFees": "金库与费用",
-  "settings.treasuryFeesNote": "金库路由由服务端配置（测试网）。每次状态变更都会返回 fee_total 与 treasury_address，可在活动 → 证据检查器审计费用链路。",
+  "settings.treasuryFeesNote":
+    "金库路由由服务端配置（测试网）。每次状态变更都会返回 fee_total 与 treasury_address，可在活动 → 证据检查器审计费用链路。",
   "settings.about": "关于 NYX",
   "settings.aboutNote": "NYX 是确定性、可验证的门户基础设施。这是 Testnet Portal v1 预览，所有状态变更都可回放验证。",
   "store.listingPublished": "已发布商品（run: {{runId}}）",
