@@ -18,6 +18,7 @@ class IdentityWalletInvariantTests(unittest.TestCase):
                 pubkey = base64.b64encode(key).decode("utf-8")
                 account = portal.create_account(conn, handle="user_1", pubkey=pubkey)
                 self.assertNotEqual(account.account_id, account.handle)
+                self.assertNotEqual(account.account_id, account.wallet_address)
             finally:
                 conn.close()
 

@@ -23,9 +23,14 @@ The system is designed to support lawful operation and auditability.
 ## 4) KYC/AML Integration Path (Future)
 
 The architecture supports integrating KYC/AML without redesign:
-- Add a **compliance service** that issues capability flags.
-- Block account actions until compliance is satisfied.
-- Record compliance decisions as evidence (without exposing PII).
+- Add a **compliance service** that issues allow/deny decisions.
+- Gate shared-state mutations via `NYX_COMPLIANCE_ENABLED=true`.
+- Decisions are evaluated **before** deterministic execution (no PII in evidence).
+
+### Compliance Hook (Current Integration Point)
+- `NYX_COMPLIANCE_URL` is called with `{account_id, wallet_address, module, action, run_id, metadata}`.
+- `NYX_COMPLIANCE_FAIL_CLOSED=true` blocks actions if the service is unavailable.
+- The compliance service is **external** and should implement its own audit log and retention policy.
 
 ## 5) Testnet vs Mainnet
 

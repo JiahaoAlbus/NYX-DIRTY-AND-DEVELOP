@@ -9,6 +9,7 @@ import {
   parseSeed,
   PortalSession,
 } from "../api";
+import { useI18n } from "../i18n";
 
 interface AirdropProps {
   seed: string;
@@ -18,6 +19,7 @@ interface AirdropProps {
 }
 
 export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, session }) => {
+  const { t } = useI18n();
   const [tasks, setTasks] = useState<AirdropTaskV1[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -27,11 +29,11 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
 
   const loadTasks = async () => {
     if (!backendOnline) {
-      setStatus("Backend unavailable.");
+      setStatus(t("common.backendUnavailable"));
       return;
     }
     if (!session?.access_token) {
-      setStatus("Sign in required.");
+      setStatus(t("common.signInRequired"));
       return;
     }
     setLoading(true);
@@ -41,7 +43,7 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
       setTasks(payload.tasks || []);
     } catch (err) {
       const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setStatus(`Failed to load tasks: ${message}`);
+      setStatus(t("airdrop.loadFailed", { message }));
     } finally {
       setLoading(false);
     }
@@ -65,7 +67,7 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
       await loadTasks();
     } catch (err) {
       const message = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setStatus(`Claim failed: ${message}`);
+      setStatus(t("airdrop.claimFailed", { message }));
     } finally {
       setLoading(false);
     }
@@ -77,17 +79,21 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
         <div className="size-20 rounded-full bg-primary flex items-center justify-center text-black mb-4 shadow-2xl">
           <Trophy size={40} />
         </div>
-        <h2 className="text-2xl font-bold">NYX Ecosystem Airdrop</h2>
-        <p className="text-sm text-text-subtle mt-2">Tasks are verified from real receipts (no Web2 tasks).</p>
+        <h2 className="text-2xl font-bold">{t("airdrop.title")}</h2>
+        <p className="text-sm text-text-subtle mt-2">{t("airdrop.subtitle")}</p>
       </div>
 
       <div className="flex flex-col gap-4">
         <h3 className="font-bold px-2 flex items-center gap-2">
-          <Gift size={18} className="text-primary" /> Available Tasks
+          <Gift size={18} className="text-primary" /> {t("airdrop.availableTasks")}
         </h3>
         {tasks.length === 0 ? (
           <div className="p-6 rounded-3xl glass bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-xs text-text-subtle">
-            {loading ? "Loading tasks…" : backendOnline ? "No tasks available." : "Backend unavailable."}
+            {loading
+              ? t("airdrop.loadingTasks")
+              : backendOnline
+                ? t("airdrop.noTasks")
+                : t("common.backendUnavailable")}
           </div>
         ) : (
           tasks.map((task) => (
@@ -114,7 +120,7 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
                   {task.completion_run_id && (
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-mono text-text-subtle">
                       <ShieldCheck size={12} className="text-binance-green" />
-                      completion_run_id: {task.completion_run_id}
+                      {t("common.completionRunId")}: {task.completion_run_id}
                     </div>
                   )}
                 </div>
@@ -124,10 +130,10 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
                 disabled={!task.claimable || loading}
                 title={
                   task.claimed
-                    ? `Already claimed: ${task.claim_run_id ?? ""}`
+                    ? t("airdrop.claimedTitle", { runId: task.claim_run_id ?? "" })
                     : task.completed
                       ? undefined
-                      : "Complete the task via real receipts first."
+                      : t("airdrop.completeTaskFirst")
                 }
                 className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
                   task.claimable
@@ -135,7 +141,13 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
                     : "bg-surface-light dark:bg-surface-dark text-text-subtle opacity-70 cursor-not-allowed"
                 }`}
               >
-                {task.claimed ? "Claimed" : task.claimable ? "Claim" : task.completed ? "Ready" : "Incomplete"}
+                {task.claimed
+                  ? t("airdrop.claimed")
+                  : task.claimable
+                    ? t("airdrop.claim")
+                    : task.completed
+                      ? t("airdrop.ready")
+                      : t("airdrop.incomplete")}
               </button>
             </div>
           ))
@@ -144,18 +156,38 @@ export const Airdrop: React.FC<AirdropProps> = ({ seed, runId, backendOnline, se
 
       {lastClaim && (
         <div className="p-5 rounded-3xl bg-black/5 dark:bg-white/5 border border-white/10 text-xs">
-          <div className="font-bold">Last Claim Receipt</div>
+          <div className="font-bold">{t("airdrop.lastClaimReceipt")}</div>
           <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-[10px] text-text-subtle break-all">
-            {"run_id" in lastClaim && <div>run_id: {String((lastClaim as any).run_id)}</div>}
-            {"state_hash" in lastClaim && <div>state_hash: {String((lastClaim as any).state_hash)}</div>}
+            {"run_id" in lastClaim && (
+              <div>
+                {t("common.runId")}: {String((lastClaim as any).run_id)}
+              </div>
+            )}
+            {"state_hash" in lastClaim && (
+              <div>
+                {t("common.stateHash")}: {String((lastClaim as any).state_hash)}
+              </div>
+            )}
             {"receipt_hashes" in lastClaim && (
-              <div>receipt_hashes: {JSON.stringify((lastClaim as any).receipt_hashes)}</div>
+              <div>
+                {t("common.receiptHashes")}: {JSON.stringify((lastClaim as any).receipt_hashes)}
+              </div>
             )}
-            {"fee_total" in lastClaim && <div>fee_total: {String((lastClaim as any).fee_total)}</div>}
+            {"fee_total" in lastClaim && (
+              <div>
+                {t("activity.feeTotal")} {String((lastClaim as any).fee_total)}
+              </div>
+            )}
             {"treasury_address" in lastClaim && (
-              <div>treasury_address: {String((lastClaim as any).treasury_address)}</div>
+              <div>
+                {t("activity.treasury")} {String((lastClaim as any).treasury_address)}
+              </div>
             )}
-            {"balance" in lastClaim && <div>balance(NYXT): {String((lastClaim as any).balance)}</div>}
+            {"balance" in lastClaim && (
+              <div>
+                {t("airdrop.balanceLabel", { asset: "NYXT" })}: {String((lastClaim as any).balance)}
+              </div>
+            )}
           </div>
         </div>
       )}

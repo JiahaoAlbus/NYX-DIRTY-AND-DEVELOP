@@ -38,10 +38,16 @@ struct NYXHomeView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("@\(session.handle)")
                                     .font(.headline)
-                                Text(session.account_id)
+                                Text("Account: \(session.account_id)")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                     .textSelection(.enabled)
+                                if let wallet = session.wallet_address, !wallet.isEmpty {
+                                    Text("Wallet: \(wallet)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .textSelection(.enabled)
+                                }
                             }
                         }
                     }
@@ -125,13 +131,14 @@ struct NYXWalletView: View {
     private let client = GatewayClient()
 
     private var accountId: String { settings.session?.account_id ?? "" }
+    private var walletAddress: String { settings.session?.wallet_address ?? "" }
     private var token: String { settings.session?.access_token ?? "" }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 14) {
-                if accountId.isEmpty || token.isEmpty {
-                    Text("Sign in required.")
+                if accountId.isEmpty || token.isEmpty || walletAddress.isEmpty {
+                    Text("Sign in required (wallet address missing).")
                         .foregroundColor(.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
@@ -140,11 +147,15 @@ struct NYXWalletView: View {
                                 .font(.headline)
                             Spacer()
                             Button("Copy") {
-                                UIPasteboard.general.string = accountId
+                                UIPasteboard.general.string = walletAddress
                             }
                             .buttonStyle(.bordered)
                         }
-                        Text(accountId)
+                        Text(walletAddress)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
+                        Text("Account: \(accountId)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .textSelection(.enabled)
@@ -297,12 +308,12 @@ struct NYXWalletView: View {
 
     @MainActor
     private func refreshAll(resetTransfers: Bool) async {
-        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let url = settings.resolvedURL(), !walletAddress.isEmpty, !token.isEmpty else { return }
         loading = true
         status = ""
         client.setBaseURL(url)
         do {
-            async let balancesResp = client.fetchWalletBalancesV1(token: token, address: accountId)
+            async let balancesResp = client.fetchWalletBalancesV1(token: token, address: walletAddress)
             let b = try await balancesResp
             assets = b.assets
             balances = b.balances
@@ -319,7 +330,7 @@ struct NYXWalletView: View {
 
     @MainActor
     private func loadTransfers(nextPage: Bool) async {
-        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let url = settings.resolvedURL(), !walletAddress.isEmpty, !token.isEmpty else { return }
         client.setBaseURL(url)
         if nextPage {
             transfersOffset += transfersPageSize
@@ -327,7 +338,7 @@ struct NYXWalletView: View {
         do {
             let resp = try await client.fetchWalletTransfersV1(
                 token: token,
-                address: accountId,
+                address: walletAddress,
                 limit: transfersPageSize,
                 offset: transfersOffset
             )
@@ -360,7 +371,7 @@ struct NYXWalletView: View {
 
     @MainActor
     private func claimFaucet() async {
-        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let url = settings.resolvedURL(), !walletAddress.isEmpty, !token.isEmpty else { return }
         guard let seedValue = parseSeedValue() else {
             status = "Seed must be a non-negative integer"
             return
@@ -374,7 +385,14 @@ struct NYXWalletView: View {
         client.setBaseURL(url)
         do {
             let runId = allocateRunId(action: "faucet")
-            let result = try await client.faucetV1(token: token, seed: seedValue, runId: runId, address: accountId, amount: amount, assetId: faucetAsset)
+            let result = try await client.faucetV1(
+                token: token,
+                seed: seedValue,
+                runId: runId,
+                address: walletAddress,
+                amount: amount,
+                assetId: faucetAsset
+            )
             lastReceipt = "run_id=\(result.runId) state_hash=\(result.stateHash) fee_total=\(result.feeTotal) treasury=\(result.treasuryAddress)"
             showFaucet = false
             await refreshAll(resetTransfers: true)
@@ -386,7 +404,7 @@ struct NYXWalletView: View {
 
     @MainActor
     private func sendTransfer() async {
-        guard let url = settings.resolvedURL(), !accountId.isEmpty, !token.isEmpty else { return }
+        guard let url = settings.resolvedURL(), !walletAddress.isEmpty, !token.isEmpty else { return }
         guard let seedValue = parseSeedValue() else {
             status = "Seed must be a non-negative integer"
             return
@@ -405,7 +423,15 @@ struct NYXWalletView: View {
         client.setBaseURL(url)
         do {
             let runId = allocateRunId(action: "transfer")
-            let result = try await client.transferV1(token: token, seed: seedValue, runId: runId, from: accountId, to: to, amount: amount, assetId: sendAsset)
+            let result = try await client.transferV1(
+                token: token,
+                seed: seedValue,
+                runId: runId,
+                from: walletAddress,
+                to: to,
+                amount: amount,
+                assetId: sendAsset
+            )
             lastReceipt = "run_id=\(result.runId) state_hash=\(result.stateHash) fee_total=\(result.feeTotal) treasury=\(result.treasuryAddress)"
             showSend = false
             sendTo = ""

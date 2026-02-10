@@ -20,8 +20,8 @@ MUST and MUST NOT
 - The client MUST NOT generate or store secrets, witness data, or root material.
 
 Evidence / Verification
-- `apps/nyx-reference-client/test/client_smoke_test.py`
-- `apps/nyx-reference-client/test/determinism_guard_test.py`
+- `attic/apps/nyx-reference-client/test/client_smoke_test.py`
+- `attic/apps/nyx-reference-client/test/determinism_guard_test.py`
 
 Freeze / Change Control
 - Client output format is frozen after Week07 (F1).

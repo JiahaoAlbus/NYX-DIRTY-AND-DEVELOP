@@ -17,6 +17,7 @@ import { Screen } from "./types";
 import { checkHealth, fetchCapabilities, fetchPortalMe, PortalSession } from "./api";
 import type { Capabilities } from "./capabilities";
 import { featureReasonText, isFeatureEnabled, isModuleUsable } from "./capabilities";
+import { useI18n } from "./i18n";
 
 const SESSION_KEY = "nyx_portal_session";
 
@@ -29,6 +30,7 @@ const loadSession = (): PortalSession | null => {
       account_id: "",
       handle: "",
       pubkey: "",
+      wallet_address: "",
     };
   }
 
@@ -64,9 +66,10 @@ const getInitialTab = (): Screen => {
 };
 
 const App: React.FC = () => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<Screen>(() => getInitialTab());
   const [backendOnline, setBackendOnline] = useState(false);
-  const [backendStatus, setBackendStatus] = useState("Backend: unknown");
+  const [backendStatusKey, setBackendStatusKey] = useState<"unknown" | "available" | "unavailable">("unknown");
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [session, setSession] = useState<PortalSession | null>(() => loadSession());
   const [seed, setSeed] = useState("123");
@@ -76,6 +79,12 @@ const App: React.FC = () => {
     const saved = localStorage.getItem("nyx_theme");
     return saved ? saved === "dark" : true; // Default to dark
   });
+
+  const backendStatus = useMemo(() => {
+    if (backendStatusKey === "available") return t("app.backendAvailable");
+    if (backendStatusKey === "unavailable") return t("app.backendUnavailable");
+    return t("app.backendUnknown");
+  }, [backendStatusKey, t]);
 
   useEffect(() => {
     localStorage.setItem("nyx_theme", isDark ? "dark" : "light");
@@ -93,7 +102,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const hydrateInjectedSession = async () => {
       if (!session?.access_token) return;
-      if (session.account_id) return;
+      if (session.account_id && session.wallet_address) return;
       try {
         const me = await fetchPortalMe(session.access_token);
         setSession({
@@ -101,6 +110,7 @@ const App: React.FC = () => {
           account_id: me.account_id,
           handle: me.handle,
           pubkey: me.pubkey,
+          wallet_address: me.wallet_address,
         });
       } catch {
         setSession(null);
@@ -108,12 +118,12 @@ const App: React.FC = () => {
     };
     hydrateInjectedSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.access_token, session?.account_id]);
+  }, [session?.access_token, session?.account_id, session?.wallet_address]);
 
   const refreshHealth = async () => {
     const ok = await checkHealth();
     setBackendOnline(ok);
-    setBackendStatus(ok ? "Backend: available" : "Backend: unavailable");
+    setBackendStatusKey(ok ? "available" : "unavailable");
     if (ok) {
       try {
         const caps = await fetchCapabilities();
@@ -135,48 +145,46 @@ const App: React.FC = () => {
     if (screen === Screen.EVIDENCE) return { ok: true };
 
     if (!capabilities) {
-      return { ok: false, reason: "Capabilities are required to render this module. Refresh backend status." };
+      return { ok: false, reason: t("app.capabilitiesRequired") };
     }
 
     if (screen === Screen.WALLET) {
-      return isModuleUsable(capabilities, "wallet")
-        ? { ok: true }
-        : { ok: false, reason: "Wallet module disabled by backend capabilities." };
+      return isModuleUsable(capabilities, "wallet") ? { ok: true } : { ok: false, reason: t("app.walletDisabled") };
     }
     if (screen === Screen.FAUCET) {
       const status = isFeatureEnabled(capabilities, "wallet", "faucet") ? null : "disabled";
       return isFeatureEnabled(capabilities, "wallet", "faucet")
         ? { ok: true }
-        : { ok: false, reason: `Faucet unavailable. ${featureReasonText(status)}` };
+        : { ok: false, reason: t("app.faucetUnavailable", { reason: featureReasonText(status) }) };
     }
     if (screen === Screen.AIRDROP) {
       const ok = isFeatureEnabled(capabilities, "wallet", "airdrop");
-      return ok ? { ok: true } : { ok: false, reason: "Airdrop unavailable by backend capabilities." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.airdropUnavailable") };
     }
     if (screen === Screen.EXCHANGE) {
       const ok = isFeatureEnabled(capabilities, "exchange", "trading");
-      return ok ? { ok: true } : { ok: false, reason: "Exchange unavailable by backend capabilities." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.exchangeUnavailable") };
     }
     if (screen === Screen.STORE) {
       const ok = isFeatureEnabled(capabilities, "marketplace", "purchase");
-      return ok ? { ok: true } : { ok: false, reason: "Store unavailable by backend capabilities." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.storeUnavailable") };
     }
     if (screen === Screen.CHAT) {
       const ok = isFeatureEnabled(capabilities, "chat", "dm");
-      return ok ? { ok: true } : { ok: false, reason: "Chat unavailable by backend capabilities." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.chatUnavailable") };
     }
     if (screen === Screen.DAPP_BROWSER) {
       const ok = isFeatureEnabled(capabilities, "dapp", "browser");
-      return ok ? { ok: true } : { ok: false, reason: "Dapp browser is disabled in this environment." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.dappDisabled") };
     }
     if (screen === Screen.WEB2_ACCESS) {
       const ok = isFeatureEnabled(capabilities, "web2", "guard");
-      return ok ? { ok: true } : { ok: false, reason: "Web2 Guard is disabled in this environment." };
+      return ok ? { ok: true } : { ok: false, reason: t("app.web2Disabled") };
     }
     if (screen === Screen.FIAT) {
-      return { ok: false, reason: "Fiat onramp is out of scope for testnet release." };
+      return { ok: false, reason: t("fiat.disabled") };
     }
-    return { ok: false, reason: "Screen disabled by policy." };
+    return { ok: false, reason: t("app.screenDisabled") };
   };
 
   const navigate = (screen: Screen) => {
@@ -186,27 +194,27 @@ const App: React.FC = () => {
       setActiveTab(screen);
       return;
     }
-    setUiNotice(guard.reason ?? "Feature unavailable.");
+    setUiNotice(guard.reason ?? t("app.featureUnavailable"));
     setActiveTab(Screen.HOME);
   };
 
   useEffect(() => {
     const guard = guardScreen(activeTab);
     if (guard.ok) return;
-    setUiNotice(guard.reason ?? "Feature unavailable.");
+    setUiNotice(guard.reason ?? t("app.featureUnavailable"));
     setActiveTab(Screen.HOME);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capabilities]);
 
   const renderDisabled = (reason: string) => (
     <div className="flex flex-col gap-3 rounded-3xl border border-primary/20 bg-surface-light dark:bg-surface-dark/40 p-6 text-sm">
-      <div className="text-lg font-black">Feature unavailable</div>
+      <div className="text-lg font-black">{t("app.featureUnavailable")}</div>
       <div className="text-text-subtle">{reason}</div>
       <button
         onClick={() => navigate(Screen.HOME)}
         className="mt-2 w-fit rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black"
       >
-        Back to Home
+        {t("app.backToHome")}
       </button>
     </div>
   );
@@ -214,7 +222,7 @@ const App: React.FC = () => {
   const renderScreen = () => {
     const guard = guardScreen(activeTab);
     if (!guard.ok) {
-      return renderDisabled(guard.reason ?? "Feature unavailable.");
+      return renderDisabled(guard.reason ?? t("app.featureUnavailable"));
     }
     switch (activeTab) {
       case Screen.HOME:
@@ -311,7 +319,7 @@ const App: React.FC = () => {
   if (!session.account_id) {
     return (
       <div className="flex h-screen w-full max-w-md mx-auto shadow-2xl overflow-hidden bg-background-light dark:bg-background-dark items-center justify-center">
-        <div className="text-sm text-text-subtle">Signing in…</div>
+        <div className="text-sm text-text-subtle">{t("app.signingIn")}</div>
       </div>
     );
   }
@@ -325,8 +333,12 @@ const App: React.FC = () => {
               <span className="material-symbols-outlined text-[20px] font-bold">diamond</span>
             </div>
             <div>
-              <div className="text-lg font-bold tracking-tight text-text-main dark:text-primary leading-none">NYX</div>
-              <div className="text-[10px] font-extrabold uppercase tracking-widest text-text-subtle">Ecosystem</div>
+              <div className="text-lg font-bold tracking-tight text-text-main dark:text-primary leading-none">
+                {t("app.name")}
+              </div>
+              <div className="text-[10px] font-extrabold uppercase tracking-widest text-text-subtle">
+                {t("app.ecosystem")}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -339,7 +351,7 @@ const App: React.FC = () => {
             <div
               className={`text-[10px] font-bold px-3 py-1 rounded-full border ${backendOnline ? "border-binance-green/30 bg-binance-green/10 text-binance-green" : "border-binance-red/30 bg-binance-red/10 text-binance-red"}`}
             >
-              {backendOnline ? "ONLINE" : "OFFLINE"}
+              {backendOnline ? t("app.statusOnline") : t("app.statusOffline")}
             </div>
           </div>
         </div>

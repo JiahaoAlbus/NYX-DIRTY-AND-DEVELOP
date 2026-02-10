@@ -13,7 +13,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import nyx_backend_gateway.gateway as gateway
+import nyx_backend_gateway.metrics as metrics
 import nyx_backend_gateway.portal as portal
+import nyx_backend_gateway.tracing as tracing
 from nyx_backend_gateway.env import load_env_file
 from nyx_backend_gateway.gateway import (
     GatewayApiError,
@@ -158,6 +160,28 @@ class RequestLimiter:
 
 class GatewayHandler(BaseHTTPRequestHandler):
     server_version = "NYXGateway/2.0"
+    _response_status: int | None = None
+
+    def send_response(self, code: int, message: str | None = None) -> None:
+        self._response_status = code
+        super().send_response(code, message)
+
+    def _record_metrics(self, method: str, start_time: float) -> None:
+        try:
+            path = urlparse(self.path).path
+        except Exception:
+            path = self.path
+        status = self._response_status or HTTPStatus.INTERNAL_SERVER_ERROR
+        metrics.record_request(method, path, int(status), metrics.monotonic_seconds() - start_time)
+
+    def handle_one_request(self) -> None:
+        start = metrics.monotonic_seconds()
+        self._response_status = None
+        try:
+            super().handle_one_request()
+        finally:
+            if self.command:
+                self._record_metrics(self.command, start)
 
     def _send_security_headers(self) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -219,6 +243,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self._send_security_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_metrics(self) -> None:
+        payload = metrics.render_metrics().encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self._send_security_headers()
+        self.end_headers()
+        self.wfile.write(payload)
 
     def _send_bytes(self, data: bytes, content_type: str) -> None:
         self.send_response(HTTPStatus.OK)
@@ -292,13 +325,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
             raise GatewayApiError("ACCOUNT_RATE_LIMIT", "rate limit exceeded", http_status=HTTPStatus.TOO_MANY_REQUESTS)
         return session
 
+    def _require_wallet_account(self) -> tuple[portal.PortalSession, portal.PortalAccount]:
+        session = self._require_auth()
+        conn = create_connection(_db_path())
+        try:
+            account = portal.load_account(conn, session.account_id)
+        finally:
+            conn.close()
+        if account is None:
+            raise GatewayApiError("ACCOUNT_NOT_FOUND", "account not found", http_status=HTTPStatus.BAD_REQUEST)
+        return session, account
+
     def do_POST(self) -> None:  # noqa: N802
         if not self._rate_limit_ok():
             self._send_text("rate limit exceeded", HTTPStatus.TOO_MANY_REQUESTS)
             return
         try:
             if self.path == "/run":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -319,6 +363,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     module=module,
                     action=action,
                     payload=extra,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -357,6 +402,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "account_id": account.account_id,
                         "handle": account.handle,
                         "pubkey": account.public_key,
+                        "wallet_address": account.wallet_address,
                         "created_at": account.created_at,
                         "status": account.status,
                     }
@@ -388,9 +434,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 conn = create_connection(_db_path())
                 try:
                     session = portal.verify_challenge(conn, account_id, nonce, signature)
+                    account_record = portal.load_account(conn, account_id)
                 finally:
                     conn.close()
-                self._send_json({"access_token": session.token, "expires_at": session.expires_at})
+                response = {"access_token": session.token, "expires_at": session.expires_at}
+                if account_record is not None:
+                    response["wallet_address"] = account_record.wallet_address
+                self._send_json(response)
                 return
             if self.path == "/portal/v1/auth/logout":
                 session = self._require_auth()
@@ -488,7 +538,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json({"message": message_fields, "receipt": receipt})
                 return
             if self.path == "/wallet/v1/faucet":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -501,6 +551,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     run_id=run_id,
                     payload=faucet_payload,
                     account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                     client_ip=client_ip,
                 )
                 self._send_json(
@@ -510,20 +561,20 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "state_hash": result.state_hash,
                         "receipt_hashes": result.receipt_hashes,
                         "replay_ok": result.replay_ok,
-                        "address": faucet_payload.get("address"),
+                        "address": account.wallet_address,
                         "balance": balance,
                         "fee_total": fee_record.total_paid,
                         "fee_breakdown": {
                             "protocol_fee_total": fee_record.protocol_fee_total,
                             "platform_fee_amount": fee_record.platform_fee_amount,
                         },
-                        "payer": session.account_id,
+                        "payer": account.wallet_address,
                         "treasury_address": fee_record.fee_address,
                     }
                 )
                 return
             if self.path == "/wallet/v1/airdrop/claim":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -537,6 +588,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     run_id=run_id,
                     payload=claim_payload,
                     account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(
                     {
@@ -555,13 +607,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
                             "protocol_fee_total": fee_record.protocol_fee_total,
                             "platform_fee_amount": fee_record.platform_fee_amount,
                         },
-                        "payer": session.account_id,
+                        "payer": account.wallet_address,
                         "treasury_address": fee_record.fee_address,
                     }
                 )
                 return
             if self.path == "/wallet/v1/transfer":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -570,16 +622,18 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     transfer_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if not isinstance(transfer_payload, dict):
                     raise GatewayError("payload must be object")
-                if transfer_payload.get("from_address") != session.account_id:
+                if transfer_payload.get("from_address") != account.wallet_address:
                     raise GatewayApiError(
                         "FROM_ADDRESS_MISMATCH",
-                        "from_address must match authenticated account_id",
+                        "from_address must match authenticated wallet_address",
                         http_status=403,
                     )
                 result, balances, fee_record = execute_wallet_transfer(
                     seed=seed,
                     run_id=run_id,
                     payload=transfer_payload,
+                    account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(
                     {
@@ -597,7 +651,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                             "protocol_fee_total": fee_record.protocol_fee_total,
                             "platform_fee_amount": fee_record.platform_fee_amount,
                         },
-                        "payer": session.account_id,
+                        "payer": account.wallet_address,
                         "treasury_address": fee_record.fee_address,
                         "from_balance": balances["from_balance"],
                         "to_balance": balances["to_balance"],
@@ -606,7 +660,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 )
                 return
             if self.path == "/exchange/place_order":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -619,6 +673,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     module="exchange",
                     action="place_order",
                     payload=order_payload,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -633,7 +688,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json(response)
                 return
             if self.path == "/exchange/cancel_order":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -646,6 +701,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     module="exchange",
                     action="cancel_order",
                     payload=cancel_payload,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -660,7 +716,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json(response)
                 return
             if self.path == "/chat/send":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -673,6 +729,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     module="chat",
                     action="message_event",
                     payload=message_payload,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -686,7 +743,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     response.update(_fee_summary("chat", "message_event", message_payload, result.run_id))
                 self._send_json(response)
                 return
-            if self.path in {"/wallet/faucet", "/wallet/v1/faucet"}:
+            if self.path == "/wallet/faucet":
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -697,6 +755,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     seed=seed,
                     run_id=run_id,
                     payload=faucet_payload,
+                    account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(
                     {
@@ -705,13 +765,16 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "state_hash": result.state_hash,
                         "receipt_hashes": result.receipt_hashes,
                         "replay_ok": result.replay_ok,
-                        "address": faucet_payload.get("address"),
+                        "address": account.wallet_address,
                         "balance": balances["balance"],
+                        "fee_total": fee_record.total_paid,
+                        "payer": account.wallet_address,
+                        "treasury_address": fee_record.fee_address,
                     }
                 )
                 return
             if self.path == "/wallet/airdrop/claim":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -725,6 +788,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     run_id=run_id,
                     payload=claim_payload,
                     account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(
                     {
@@ -739,22 +803,33 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "completion_run_id": claim.get("completion_run_id"),
                         "balance": balance,
                         "fee_total": fee_record.total_paid,
-                        "payer": session.account_id,
+                        "payer": account.wallet_address,
                         "treasury_address": fee_record.fee_address,
                     }
                 )
                 return
             if self.path in {"/wallet/transfer", "/wallet/v1/transfer"}:
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
                 transfer_payload = payload.get("payload")
                 if transfer_payload is None:
                     transfer_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
+                if not isinstance(transfer_payload, dict):
+                    raise GatewayError("payload must be object")
+                if transfer_payload.get("from_address") != account.wallet_address:
+                    raise GatewayApiError(
+                        "FROM_ADDRESS_MISMATCH",
+                        "from_address must match authenticated wallet_address",
+                        http_status=403,
+                    )
                 result, balances, fee_record = execute_wallet_transfer(
                     seed=seed,
                     run_id=run_id,
                     payload=transfer_payload,
+                    account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(
                     {
@@ -771,7 +846,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                             "protocol_fee_total": fee_record.protocol_fee_total,
                             "platform_fee_amount": fee_record.platform_fee_amount,
                         },
-                        "payer": transfer_payload.get("from_address"),
+                        "payer": account.wallet_address,
                         "treasury_address": fee_record.fee_address,
                         "from_balance": balances["from_balance"],
                         "to_balance": balances["to_balance"],
@@ -780,7 +855,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 )
                 return
             if self.path == "/marketplace/listing":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -788,13 +863,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 if listing_payload is None:
                     listing_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if isinstance(listing_payload, dict) and "publisher_id" not in listing_payload:
-                    listing_payload["publisher_id"] = session.account_id
+                    listing_payload["publisher_id"] = account.wallet_address
                 result = execute_run(
                     seed=seed,
                     run_id=run_id,
                     module="marketplace",
                     action="listing_publish",
                     payload=listing_payload,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -809,7 +885,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json(response)
                 return
             if self.path == "/marketplace/purchase":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -817,13 +893,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 if purchase_payload is None:
                     purchase_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if isinstance(purchase_payload, dict) and "buyer_id" not in purchase_payload:
-                    purchase_payload["buyer_id"] = session.account_id
+                    purchase_payload["buyer_id"] = account.wallet_address
                 result = execute_run(
                     seed=seed,
                     run_id=run_id,
                     module="marketplace",
                     action="purchase_listing",
                     payload=purchase_payload,
+                    caller_wallet_address=account.wallet_address,
                     caller_account_id=session.account_id,
                 )
                 response = {
@@ -838,7 +915,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json(response)
                 return
             if self.path == "/web2/v1/request":
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 payload = self._parse_body()
                 seed = self._require_seed(payload)
                 run_id = self._require_run_id(payload)
@@ -852,6 +929,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     run_id=run_id,
                     payload=web2_payload,
                     account_id=session.account_id,
+                    wallet_address=account.wallet_address,
                 )
                 self._send_json(response)
                 return
@@ -908,6 +986,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+        if path == "/metrics":
+            self._send_metrics()
+            return
         if path == "/discovery/feed":
             try:
                 conn = create_connection(_db_path())
@@ -968,6 +1049,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "account_id": account.account_id,
                         "handle": account.handle,
                         "pubkey": account.public_key,
+                        "wallet_address": account.wallet_address,
                         "created_at": account.created_at,
                         "status": account.status,
                     }
@@ -983,7 +1065,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     raise GatewayError("account_id required")
                 conn = create_connection(_db_path())
                 row = conn.execute(
-                    "SELECT a.account_id, a.handle, i.public_jwk "
+                    "SELECT a.account_id, a.handle, a.wallet_address, i.public_jwk "
                     "FROM portal_accounts a "
                     "LEFT JOIN e2ee_identities i ON i.account_id = a.account_id "
                     "WHERE a.account_id = ?",
@@ -1007,7 +1089,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/portal/v1/activity":
             try:
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 limit_raw = (query.get("limit") or ["50"])[0]
                 offset_raw = (query.get("offset") or ["0"])[0]
                 try:
@@ -1016,10 +1098,22 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     raise GatewayError("limit or offset invalid")
                 conn = create_connection(_db_path())
-                receipts = portal.list_account_activity(conn, session.account_id, limit=limit, offset=offset)
+                receipts = portal.list_account_activity(
+                    conn,
+                    session.account_id,
+                    account.wallet_address,
+                    limit=limit,
+                    offset=offset,
+                )
                 conn.close()
                 self._send_json(
-                    {"account_id": session.account_id, "receipts": receipts, "limit": limit, "offset": offset}
+                    {
+                        "account_id": session.account_id,
+                        "wallet_address": account.wallet_address,
+                        "receipts": receipts,
+                        "limit": limit,
+                        "offset": offset,
+                    }
                 )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1190,24 +1284,26 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/wallet/v1/airdrop/tasks":
             try:
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 conn = create_connection(_db_path())
                 try:
-                    tasks = gateway.list_airdrop_tasks_v1(conn, session.account_id)
+                    tasks = gateway.list_airdrop_tasks_v1(conn, session.account_id, account.wallet_address)
                 finally:
                     conn.close()
-                self._send_json({"account_id": session.account_id, "tasks": tasks})
+                self._send_json(
+                    {"account_id": session.account_id, "wallet_address": account.wallet_address, "tasks": tasks}
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
         if path == "/wallet/v1/balances":
             try:
-                session = self._require_auth()
-                address = (query.get("address") or [session.account_id])[0]
-                if address != session.account_id:
+                session, account = self._require_wallet_account()
+                address = (query.get("address") or [account.wallet_address])[0]
+                if address != account.wallet_address:
                     raise GatewayApiError(
                         "ADDRESS_MISMATCH",
-                        "address must match authenticated account_id",
+                        "address must match authenticated wallet_address",
                         http_status=HTTPStatus.FORBIDDEN,
                     )
                 conn = create_connection(_db_path())
@@ -1223,12 +1319,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/wallet/v1/transfers":
             try:
-                session = self._require_auth()
-                address = (query.get("address") or [session.account_id])[0]
-                if address != session.account_id:
+                session, account = self._require_wallet_account()
+                address = (query.get("address") or [account.wallet_address])[0]
+                if address != account.wallet_address:
                     raise GatewayApiError(
                         "ADDRESS_MISMATCH",
-                        "address must match authenticated account_id",
+                        "address must match authenticated wallet_address",
                         http_status=HTTPStatus.FORBIDDEN,
                     )
                 limit_raw = (query.get("limit") or ["50"])[0]
@@ -1278,7 +1374,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/exchange/v1/my_orders":
             try:
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 side = (query.get("side") or [""])[0] or None
                 asset_in = (query.get("asset_in") or [""])[0] or None
                 asset_out = (query.get("asset_out") or [""])[0] or None
@@ -1291,7 +1387,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
                 conn = create_connection(_db_path())
                 clauses = ["o.owner_address = ?"]
-                params: list[object] = [session.account_id]
+                params: list[object] = [account.wallet_address]
                 if side:
                     clauses.append("o.side = ?")
                     params.append(side)
@@ -1328,6 +1424,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send_json(
                     {
                         "account_id": session.account_id,
+                        "wallet_address": account.wallet_address,
                         "orders": orders,
                         "limit": limit,
                         "offset": offset,
@@ -1339,7 +1436,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/exchange/v1/my_trades":
             try:
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 limit = int((query.get("limit") or ["50"])[0])
                 offset = int((query.get("offset") or ["0"])[0])
                 conn = create_connection(_db_path())
@@ -1352,7 +1449,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     "LEFT JOIN receipts r ON r.run_id = t.run_id "
                     "WHERE o.owner_address = ? "
                     "ORDER BY t.trade_id DESC LIMIT ? OFFSET ?",
-                    (session.account_id, limit, offset),
+                    (account.wallet_address, limit, offset),
                 ).fetchall()
                 trades = []
                 for row in rows:
@@ -1365,7 +1462,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     record["replay_ok"] = bool(record.get("replay_ok"))
                     trades.append(record)
                 conn.close()
-                self._send_json({"account_id": session.account_id, "trades": trades, "limit": limit, "offset": offset})
+                self._send_json(
+                    {
+                        "account_id": session.account_id,
+                        "wallet_address": account.wallet_address,
+                        "trades": trades,
+                        "limit": limit,
+                        "offset": offset,
+                    }
+                )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
             return
@@ -1646,7 +1751,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     raise GatewayError("limit out of bounds")
                 conn = create_connection(_db_path())
                 rows = conn.execute(
-                    "SELECT a.account_id, a.handle, i.public_jwk "
+                    "SELECT a.account_id, a.handle, a.wallet_address, i.public_jwk "
                     "FROM portal_accounts a "
                     "LEFT JOIN e2ee_identities i ON i.account_id = a.account_id "
                     "WHERE a.handle LIKE ? "
@@ -1725,7 +1830,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return
         if path == "/marketplace/v1/my_purchases":
             try:
-                session = self._require_auth()
+                session, account = self._require_wallet_account()
                 limit = int((query.get("limit") or ["50"])[0])
                 offset = int((query.get("offset") or ["0"])[0])
                 if limit < 1 or limit > 200:
@@ -1742,7 +1847,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     "LEFT JOIN receipts r ON r.run_id = p.run_id "
                     "WHERE p.buyer_id = ? "
                     "ORDER BY p.rowid DESC LIMIT ? OFFSET ?",
-                    (session.account_id, limit, offset),
+                    (account.wallet_address, limit, offset),
                 ).fetchall()
                 purchases = []
                 for row in rows:
@@ -1756,7 +1861,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     purchases.append(record)
                 conn.close()
                 self._send_json(
-                    {"account_id": session.account_id, "purchases": purchases, "limit": limit, "offset": offset}
+                    {
+                        "account_id": session.account_id,
+                        "wallet_address": account.wallet_address,
+                        "purchases": purchases,
+                        "limit": limit,
+                        "offset": offset,
+                    }
                 )
             except (GatewayApiError, GatewayError, portal.PortalError, StorageError) as exc:
                 self._send_error(exc, HTTPStatus.BAD_REQUEST)
@@ -1806,6 +1917,7 @@ class GatewayServer(ThreadingHTTPServer):
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8091) -> None:
+    tracing.init_tracing("nyx-backend-gateway")
     server = GatewayServer((host, port), GatewayHandler)
     server.rate_limiter = RequestLimiter(_RATE_LIMIT, _RATE_WINDOW_SECONDS)
     server.account_limiter = RequestLimiter(_ACCOUNT_RATE_LIMIT, _RATE_WINDOW_SECONDS)

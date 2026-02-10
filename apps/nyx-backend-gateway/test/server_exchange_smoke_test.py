@@ -47,12 +47,13 @@ class ServerExchangeSmokeTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> tuple[str, str]:
+    def _auth_token(self) -> tuple[str, str, str]:
         key = b"portal-key-0006-0006-0006-0006"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "trader", "pubkey": pubkey})
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
         nonce = challenge.get("nonce")
@@ -62,13 +63,19 @@ class ServerExchangeSmokeTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return account_id, verified.get("access_token")
+        return account_id, wallet_address, verified.get("access_token")
 
     def test_exchange_place_order_and_orderbook(self) -> None:
-        account_id, token = self._auth_token()
+        _, wallet_address, token = self._auth_token()
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-exchange-faucet", "address": account_id, "amount": 1000, "asset_id": "NYXT"},
+            {
+                "seed": 123,
+                "run_id": "run-exchange-faucet",
+                "address": wallet_address,
+                "amount": 1000,
+                "asset_id": "NYXT",
+            },
             token=token,
         )
         self.assertEqual(status, 200)
@@ -79,7 +86,7 @@ class ServerExchangeSmokeTests(unittest.TestCase):
                 "seed": 123,
                 "run_id": "run-exchange-1",
                 "payload": {
-                    "owner_address": account_id,
+                    "owner_address": wallet_address,
                     "side": "BUY",
                     "asset_in": "NYXT",
                     "asset_out": "ECHO",

@@ -11,6 +11,8 @@ import {
   PortalSession,
 } from "../api";
 import { Screen } from "../types";
+import { useI18n } from "../i18n";
+import { getStoredLocale, translate } from "../i18nCore";
 
 type OrderRow = {
   order_id: string;
@@ -68,21 +70,23 @@ function formatCompactId(value: string): string {
 }
 
 function renderApiError(err: unknown): string {
+  const locale = getStoredLocale();
   if (err instanceof ApiError) {
     const parts = [err.message];
     if (err.code && !err.message.includes(err.code)) parts.push(`(${err.code})`);
     const retryAfter = err.details?.retry_after_seconds;
     if (typeof retryAfter === "number" && Number.isFinite(retryAfter)) {
-      parts.push(`retry after ${retryAfter}s`);
+      parts.push(translate("common.retryAfter", { seconds: retryAfter }, locale));
     }
     return parts.join(" ");
   }
-  return (err as Error)?.message ?? "Unknown error";
+  return (err as Error)?.message ?? translate("common.unknownError", undefined, locale);
 }
 
 export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, session, onNavigate }) => {
+  const { t } = useI18n();
   const token = session?.access_token ?? "";
-  const accountId = session?.account_id ?? "";
+  const walletAddress = session?.wallet_address ?? "";
 
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const assetIn = useMemo(() => (side === "BUY" ? "NYXT" : "ECHO"), [side]);
@@ -177,7 +181,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
   useEffect(() => {
     refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backendOnline, session?.access_token, session?.account_id]);
+  }, [backendOnline, session?.access_token, session?.wallet_address]);
 
   useEffect(() => {
     if (!session) return;
@@ -202,11 +206,11 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
     const amt = Number(amount);
     const px = Number(price);
     if (!Number.isInteger(amt) || amt <= 0) {
-      setActionError("Amount must be a positive integer.");
+      setActionError(t("exchange.amountPositive"));
       return;
     }
     if (!Number.isInteger(px) || px <= 0) {
-      setActionError("Price must be a positive integer.");
+      setActionError(t("exchange.pricePositive"));
       return;
     }
 
@@ -217,7 +221,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
         token,
         seedInt,
         deterministicRunId,
-        accountId,
+        walletAddress,
         side,
         amt,
         px,
@@ -225,7 +229,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
         assetOut,
       )) as RunResult;
       setLastAction(result);
-      setToast(`Order placed (run: ${deterministicRunId})`);
+      setToast(t("exchange.orderPlaced", { runId: deterministicRunId }));
       await refreshAll();
     } catch (err) {
       setActionError(renderApiError(err));
@@ -253,7 +257,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
     try {
       const result = (await cancelOrder(token, seedInt, deterministicRunId, orderId)) as RunResult;
       setLastAction(result);
-      setToast(`Order cancelled (run: ${deterministicRunId})`);
+      setToast(t("exchange.orderCancelled", { runId: deterministicRunId }));
       await refreshAll();
     } catch (err) {
       setActionError(renderApiError(err));
@@ -265,7 +269,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
   const copyText = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      setToast("Copied.");
+      setToast(t("common.copied"));
     } catch {
       // ignore
     }
@@ -275,21 +279,21 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
     <div className="flex flex-col gap-6 pb-24 text-text-main dark:text-white">
       <div className="flex items-center justify-between px-2">
         <div>
-          <div className="text-xl font-black tracking-tight">Exchange</div>
-          <div className="text-[10px] text-text-subtle uppercase tracking-widest">ECHO / NYXT • Limit Orders</div>
+          <div className="text-xl font-black tracking-tight">{t("exchange.title")}</div>
+          <div className="text-[10px] text-text-subtle uppercase tracking-widest">{t("exchange.subtitle")}</div>
         </div>
         <button
           onClick={refreshAll}
           className="text-[10px] font-bold text-primary uppercase tracking-widest"
           disabled={!backendOnline}
         >
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
 
       {!session && (
         <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5 text-sm text-text-subtle">
-          Sign in to trade.
+          {t("exchange.signIn")}
         </div>
       )}
 
@@ -298,26 +302,28 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
           {/* Order book */}
           <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-text-subtle uppercase">Order Book</div>
-              {obLoading && <div className="text-[10px] text-text-subtle">Loading…</div>}
+              <div className="text-xs font-bold text-text-subtle uppercase">{t("exchange.orderbook")}</div>
+              {obLoading && <div className="text-[10px] text-text-subtle">{t("common.loading")}</div>}
             </div>
 
             {obError && (
               <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
                 {obError}{" "}
                 <button onClick={loadOrderbook} className="underline font-bold">
-                  Retry
+                  {t("common.retry")}
                 </button>
               </div>
             )}
 
             {!obError && orderbook.buy.length === 0 && orderbook.sell.length === 0 && !obLoading && (
-              <div className="text-sm text-text-subtle">No orders yet.</div>
+              <div className="text-sm text-text-subtle">{t("exchange.noOrdersYet")}</div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">SELL (ECHO)</div>
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">
+                  {t("exchange.sellBook", { asset: "ECHO" })}
+                </div>
                 <div className="flex flex-col gap-1">
                   {orderbook.sell.slice(0, 10).map((row) => (
                     <div key={row.order_id} className="flex justify-between text-xs font-mono">
@@ -328,7 +334,9 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">BUY (spend NYXT)</div>
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-2">
+                  {t("exchange.buyBook", { asset: "NYXT" })}
+                </div>
                 <div className="flex flex-col gap-1">
                   {orderbook.buy.slice(0, 10).map((row) => (
                     <div key={row.order_id} className="flex justify-between text-xs font-mono">
@@ -340,20 +348,18 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               </div>
             </div>
 
-            <div className="mt-3 text-[10px] text-text-subtle">
-              BUY amount is NYXT spend; SELL amount is ECHO sell. Price is NYXT per ECHO.
-            </div>
+            <div className="mt-3 text-[10px] text-text-subtle">{t("exchange.bookNote")}</div>
           </div>
 
           {/* Place order */}
           <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-text-subtle uppercase">Place Order</div>
+              <div className="text-xs font-bold text-text-subtle uppercase">{t("exchange.placeOrder")}</div>
               <button
                 onClick={() => onNavigate(Screen.WALLET)}
                 className="text-[10px] font-bold text-primary uppercase tracking-widest"
               >
-                Wallet
+                {t("nav.wallet")}
               </button>
             </div>
 
@@ -364,7 +370,7 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                   side === "BUY" ? "bg-binance-green text-black" : "text-text-subtle"
                 }`}
               >
-                Buy
+                {t("exchange.buy")}
               </button>
               <button
                 onClick={() => setSide("SELL")}
@@ -372,13 +378,15 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                   side === "SELL" ? "bg-binance-red text-white" : "text-text-subtle"
                 }`}
               >
-                Sell
+                {t("exchange.sell")}
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-text-subtle uppercase">Price (NYXT/ECHO)</span>
+                <span className="text-[10px] font-bold text-text-subtle uppercase">
+                  {t("exchange.priceLabel", { pair: "NYXT/ECHO" })}
+                </span>
                 <input
                   className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                   value={price}
@@ -387,7 +395,9 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-text-subtle uppercase">Amount ({assetIn})</span>
+                <span className="text-[10px] font-bold text-text-subtle uppercase">
+                  {t("exchange.amountLabel", { asset: assetIn })}
+                </span>
                 <input
                   className="h-10 rounded-xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 px-3 text-sm outline-none"
                   value={amount}
@@ -407,9 +417,11 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                     ? "bg-binance-green text-black"
                     : "bg-binance-red text-white"
               }`}
-              title={!backendOnline ? "Backend offline" : ""}
+              title={!backendOnline ? t("app.backendUnavailable") : ""}
             >
-              {mutating ? "Submitting…" : `${side} ${assetOut}`}
+              {mutating
+                ? t("exchange.submitting")
+                : `${t(side === "BUY" ? "exchange.buy" : "exchange.sell")} ${assetOut}`}
             </button>
 
             {actionError && (
@@ -420,22 +432,24 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
 
             {lastAction && (
               <div className="mt-4 p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10">
-                <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">Last Action</div>
+                <div className="text-[10px] font-bold text-text-subtle uppercase mb-1">{t("exchange.lastAction")}</div>
                 <div className="text-[10px] font-mono text-text-subtle break-all">
-                  run_id: {String(lastAction.run_id ?? "")}
+                  {t("common.runId")}: {String(lastAction.run_id ?? "")}
                 </div>
                 <div className="text-[10px] font-mono text-text-subtle break-all">
-                  state_hash: {String(lastAction.state_hash ?? "")}
+                  {t("common.stateHash")}: {String(lastAction.state_hash ?? "")}
                 </div>
                 <div className="text-[10px] text-text-subtle">
-                  fee_total: {String(lastAction.fee_total ?? "—")} • treasury:{" "}
-                  {String(lastAction.treasury_address ?? "—")}
+                  {t("exchange.feeSummary", {
+                    fee: String(lastAction.fee_total ?? "—"),
+                    treasury: String(lastAction.treasury_address ?? "—"),
+                  })}
                 </div>
                 <button
                   onClick={() => copyText(String(lastAction.run_id ?? ""))}
                   className="mt-2 text-[10px] font-bold text-primary uppercase tracking-widest"
                 >
-                  Copy run_id
+                  {t("exchange.copyRunId")}
                 </button>
               </div>
             )}
@@ -444,16 +458,16 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
           {/* My orders */}
           <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-text-subtle uppercase">My Orders</div>
+              <div className="text-xs font-bold text-text-subtle uppercase">{t("exchange.myOrders")}</div>
               <select
                 className="text-[10px] bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/10 rounded-lg px-2 py-1"
                 value={ordersStatus}
                 onChange={(e) => setOrdersStatus(e.target.value as any)}
               >
-                <option value="open">open</option>
-                <option value="filled">filled</option>
-                <option value="cancelled">cancelled</option>
-                <option value="all">all</option>
+                <option value="open">{t("exchange.statusOpen")}</option>
+                <option value="filled">{t("exchange.statusFilled")}</option>
+                <option value="cancelled">{t("exchange.statusCancelled")}</option>
+                <option value="all">{t("exchange.statusAll")}</option>
               </select>
             </div>
 
@@ -461,13 +475,13 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
                 {ordersError}{" "}
                 <button onClick={() => loadOrders({ reset: true })} className="underline font-bold">
-                  Retry
+                  {t("common.retry")}
                 </button>
               </div>
             )}
 
             {!ordersError && orders.length === 0 && !ordersLoading && (
-              <div className="text-sm text-text-subtle">No orders.</div>
+              <div className="text-sm text-text-subtle">{t("exchange.noOrders")}</div>
             )}
 
             <div className="flex flex-col gap-2">
@@ -484,15 +498,15 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                     <div className="text-[10px] text-text-subtle">{o.status}</div>
                   </div>
                   <div className="flex items-center justify-between mt-1 text-[10px] font-mono text-text-subtle">
-                    <span>order: {formatCompactId(o.order_id)}</span>
-                    <span>run: {formatCompactId(o.run_id)}</span>
+                    <span>{t("exchange.orderLabel", { id: formatCompactId(o.order_id) })}</span>
+                    <span>{t("exchange.runLabel", { id: formatCompactId(o.run_id) })}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-xs">
                     <span>
-                      amt: <span className="font-mono">{o.amount}</span> {o.asset_in}
+                      {t("exchange.amountShort")} <span className="font-mono">{o.amount}</span> {o.asset_in}
                     </span>
                     <span>
-                      px: <span className="font-mono">{o.price}</span>
+                      {t("exchange.priceShort")} <span className="font-mono">{o.price}</span>
                     </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
@@ -500,14 +514,14 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
                       onClick={() => copyText(o.run_id)}
                       className="text-[10px] font-bold text-primary uppercase tracking-widest"
                     >
-                      Copy run_id
+                      {t("exchange.copyRunId")}
                     </button>
                     {o.status === "open" && (
                       <button
                         onClick={() => handleCancelOrder(o.order_id)}
                         className="text-[10px] font-bold text-binance-red uppercase tracking-widest"
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                     )}
                   </div>
@@ -515,13 +529,13 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               ))}
             </div>
 
-            {ordersLoading && <div className="mt-3 text-[10px] text-text-subtle">Loading…</div>}
+            {ordersLoading && <div className="mt-3 text-[10px] text-text-subtle">{t("common.loading")}</div>}
             {!ordersLoading && ordersHasMore && (
               <button
                 onClick={() => loadOrders()}
                 className="mt-3 w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
               >
-                Load more
+                {t("common.loadMore")}
               </button>
             )}
           </div>
@@ -529,12 +543,12 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
           {/* My trades */}
           <div className="p-4 rounded-2xl bg-surface-light dark:bg-surface-dark/40 border border-black/5 dark:border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-bold text-text-subtle uppercase">My Trades</div>
+              <div className="text-xs font-bold text-text-subtle uppercase">{t("exchange.myTrades")}</div>
               <button
                 onClick={() => loadTrades({ reset: true })}
                 className="text-[10px] font-bold text-primary uppercase tracking-widest"
               >
-                Refresh
+                {t("common.refresh")}
               </button>
             </div>
 
@@ -542,43 +556,47 @@ export const Exchange: React.FC<ExchangeProps> = ({ seed, runId, backendOnline, 
               <div className="mb-3 text-xs text-binance-red bg-binance-red/10 border border-binance-red/20 px-3 py-2 rounded-xl">
                 {tradesError}{" "}
                 <button onClick={() => loadTrades({ reset: true })} className="underline font-bold">
-                  Retry
+                  {t("common.retry")}
                 </button>
               </div>
             )}
 
             {!tradesError && trades.length === 0 && !tradesLoading && (
-              <div className="text-sm text-text-subtle">No trades.</div>
+              <div className="text-sm text-text-subtle">{t("exchange.noTrades")}</div>
             )}
 
             <div className="flex flex-col gap-2">
-              {trades.map((t) => (
+              {trades.map((trade) => (
                 <div
-                  key={t.trade_id}
+                  key={trade.trade_id}
                   className="p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className={t.side === "BUY" ? "text-binance-green font-bold" : "text-binance-red font-bold"}>
-                      {t.side}
+                    <span
+                      className={trade.side === "BUY" ? "text-binance-green font-bold" : "text-binance-red font-bold"}
+                    >
+                      {trade.side}
                     </span>
-                    <span className="text-text-subtle font-mono">{formatCompactId(t.trade_id)}</span>
+                    <span className="text-text-subtle font-mono">{formatCompactId(trade.trade_id)}</span>
                   </div>
                   <div className="mt-1 text-xs">
-                    amt: <span className="font-mono">{t.amount}</span> • px:{" "}
-                    <span className="font-mono">{t.price}</span>
+                    {t("exchange.amountShort")} <span className="font-mono">{trade.amount}</span> •{" "}
+                    {t("exchange.priceShort")} <span className="font-mono">{trade.price}</span>
                   </div>
-                  <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">run: {t.run_id}</div>
+                  <div className="mt-1 text-[10px] font-mono text-text-subtle break-all">
+                    {t("common.runShort")}: {trade.run_id}
+                  </div>
                 </div>
               ))}
             </div>
 
-            {tradesLoading && <div className="mt-3 text-[10px] text-text-subtle">Loading…</div>}
+            {tradesLoading && <div className="mt-3 text-[10px] text-text-subtle">{t("common.loading")}</div>}
             {!tradesLoading && tradesHasMore && (
               <button
                 onClick={() => loadTrades()}
                 className="mt-3 w-full py-2 rounded-xl border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
               >
-                Load more
+                {t("common.loadMore")}
               </button>
             )}
           </div>

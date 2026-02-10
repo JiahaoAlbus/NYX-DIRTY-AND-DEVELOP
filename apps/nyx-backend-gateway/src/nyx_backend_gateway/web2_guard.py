@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
+from nyx_backend_gateway import compliance
 from nyx_backend_gateway.errors import GatewayApiError
 from nyx_backend_gateway.evidence_adapter import run_and_record
 from nyx_backend_gateway.fees import route_fee
@@ -329,6 +330,7 @@ def execute_web2_guard_request(
     run_id: str,
     payload: dict[str, Any],
     account_id: str,
+    wallet_address: str,
     db_path=None,
     run_root=None,
 ) -> dict[str, object]:
@@ -350,6 +352,15 @@ def execute_web2_guard_request(
     safe_url = _web2_normalized_url(url, allow_entry)
     request_hash = _web2_request_hash(method, safe_url, body_text, allowlist_id)
 
+    compliance.require_clearance(
+        account_id=account_id,
+        wallet_address=wallet_address,
+        module="web2",
+        action="guard_request",
+        run_id=run_id,
+        metadata={"allowlist_id": allowlist_id, "method": method},
+    )
+
     status, response_bytes, truncated, error_hint = _web2_request(url=safe_url, method=method, body=body_text)
     response_hash = _web2_hash_bytes(response_bytes)
     response_size = len(response_bytes)
@@ -361,7 +372,7 @@ def execute_web2_guard_request(
     fee_record = route_fee("web2", "guard_request", {"amount": 1}, run_id)
     conn = create_connection(db_path or default_db_path())
     try:
-        balance = get_wallet_balance(conn, account_id, "NYXT")
+        balance = get_wallet_balance(conn, wallet_address, "NYXT")
         if balance < fee_record.total_paid:
             raise GatewayApiError(
                 "INSUFFICIENT_BALANCE",
@@ -395,7 +406,7 @@ def execute_web2_guard_request(
         balances = apply_wallet_transfer(
             conn,
             transfer_id=deterministic_id("web2-fee", run_id),
-            from_address=account_id,
+            from_address=wallet_address,
             to_address=fee_record.fee_address,
             asset_id="NYXT",
             amount=0,

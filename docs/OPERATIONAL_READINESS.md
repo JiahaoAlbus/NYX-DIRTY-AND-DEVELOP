@@ -26,7 +26,28 @@ This document defines SLIs/SLOs, monitoring, and incident response.
 
 - Metrics exporter: `scripts/nyx_metrics_exporter.py`
 - Prometheus/Grafana stack: `deploy/free-tier/monitoring`
-- Add tracing (OpenTelemetry) when moving to production
+- Built-in `/metrics` endpoints:
+  - Gateway: `http://<gateway-host>:8091/metrics`
+  - Evidence backend: `http://<backend-host>:8090/metrics`
+
+### Metrics Catalog (Prometheus)
+Gateway (nyx-backend-gateway):
+- `nyx_gateway_http_requests_total{method,path,status}` — counter
+- `nyx_gateway_http_request_latency_seconds{method,path}` — histogram (seconds)
+- `nyx_gateway_http_errors_total{method,path,code}` — counter
+- `nyx_gateway_db_query_total{operation}` — counter
+- `nyx_gateway_db_query_seconds{operation}` — histogram (seconds)
+- `nyx_gateway_evidence_seconds{module,action}` — histogram (seconds)
+
+Evidence backend (nyx-backend):
+- `nyx_backend_http_requests_total{method,path,status}` — counter
+- `nyx_backend_http_request_latency_seconds{method,path}` — histogram (seconds)
+- `nyx_backend_http_errors_total{method,path,code}` — counter
+- `nyx_backend_evidence_seconds{module,action}` — histogram (seconds)
+
+### Tracing (OpenTelemetry)
+- Enable spans with `NYX_OTEL_ENABLED=true`.
+- Current exporter is stdout (dev-safe). In production, route to an OTEL collector.
 
 ## 4) Alerts (Minimum)
 

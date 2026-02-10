@@ -2,6 +2,7 @@ import React from "react";
 import { Screen } from "../types";
 import type { Capabilities } from "../capabilities";
 import { featureReasonText, featureStatus, isFeatureEnabled, isModuleUsable } from "../capabilities";
+import { useI18n } from "../i18n";
 
 interface BottomNavProps {
   activeTab: Screen;
@@ -10,6 +11,7 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, capabilities }) => {
+  const { t } = useI18n();
   const getButtonClass = (isActive: boolean) =>
     `flex flex-1 flex-col items-center gap-1 p-2 group transition-colors duration-300 ${isActive ? "text-text-main dark:text-white" : "text-text-subtle dark:text-gray-400 hover:text-text-main dark:hover:text-primary"}`;
 
@@ -18,11 +20,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
     if (screen === Screen.SETTINGS) return { enabled: true };
     if (screen === Screen.ACTIVITY) return { enabled: true };
     if (screen === Screen.EVIDENCE) return { enabled: true };
-    if (!capabilities) return { enabled: false, reason: "Capabilities not loaded." };
+    if (!capabilities) return { enabled: false, reason: t("capabilities.notLoaded") };
 
     if (screen === Screen.WALLET) {
       const ok = isModuleUsable(capabilities, "wallet");
-      return ok ? { enabled: true } : { enabled: false, reason: "Wallet disabled." };
+      return ok ? { enabled: true } : { enabled: false, reason: t("capabilities.disabled") };
     }
     if (screen === Screen.EXCHANGE) {
       const ok = isFeatureEnabled(capabilities, "exchange", "trading");
@@ -55,7 +57,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           >
             public
           </span>
-          <span className="text-[9px] font-medium">Home</span>
+          <span className="text-[9px] font-medium">{t("nav.home")}</span>
         </button>
 
         {/* Wallet */}
@@ -73,7 +75,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
               >
                 account_balance_wallet
               </span>
-              <span className="text-[9px] font-medium">Wallet</span>
+              <span className="text-[9px] font-medium">{t("nav.wallet")}</span>
             </button>
           );
         })()}
@@ -93,7 +95,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
               >
                 currency_exchange
               </span>
-              <span className="text-[9px] font-medium">Trade</span>
+              <span className="text-[9px] font-medium">{t("nav.trade")}</span>
             </button>
           );
         })()}
@@ -113,7 +115,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
               >
                 chat_bubble
               </span>
-              <span className="text-[9px] font-medium">Chat</span>
+              <span className="text-[9px] font-medium">{t("nav.chat")}</span>
             </button>
           );
         })()}
@@ -133,7 +135,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
               >
                 storefront
               </span>
-              <span className="text-[9px] font-medium">Store</span>
+              <span className="text-[9px] font-medium">{t("nav.store")}</span>
             </button>
           );
         })()}
@@ -145,7 +147,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           >
             history
           </span>
-          <span className="text-[9px] font-medium">Activity</span>
+          <span className="text-[9px] font-medium">{t("nav.activity")}</span>
         </button>
 
         {/* Evidence */}
@@ -155,7 +157,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           >
             verified
           </span>
-          <span className="text-[9px] font-medium">Proof</span>
+          <span className="text-[9px] font-medium">{t("nav.proof")}</span>
         </button>
 
         {/* Settings */}
@@ -165,7 +167,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange, ca
           >
             settings
           </span>
-          <span className="text-[9px] font-medium">Set</span>
+          <span className="text-[9px] font-medium">{t("nav.settings")}</span>
         </button>
       </div>
     </nav>

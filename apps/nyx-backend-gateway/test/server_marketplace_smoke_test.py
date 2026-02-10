@@ -47,12 +47,13 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self, handle: str) -> tuple[str, str]:
+    def _auth_token(self, handle: str) -> tuple[str, str, str]:
         key = f"portal-key-{handle}-0001".encode("utf-8")
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": handle, "pubkey": pubkey})
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
         nonce = challenge.get("nonce")
@@ -62,18 +63,18 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return account_id, verified.get("access_token")
+        return account_id, wallet_address, verified.get("access_token")
 
     def test_listing_and_purchase(self) -> None:
-        seller_id, seller_token = self._auth_token("seller")
-        buyer_id, buyer_token = self._auth_token("buyer")
+        _, seller_wallet, seller_token = self._auth_token("seller")
+        _, buyer_wallet, buyer_token = self._auth_token("buyer")
 
         status, _ = self._post(
             "/wallet/v1/faucet",
             {
                 "seed": 123,
                 "run_id": "run-market-faucet-seller",
-                "address": seller_id,
+                "address": seller_wallet,
                 "amount": 1000,
                 "asset_id": "NYXT",
             },
@@ -82,7 +83,13 @@ class ServerMarketplaceSmokeTests(unittest.TestCase):
         self.assertEqual(status, 200)
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-market-faucet-buyer", "address": buyer_id, "amount": 1000, "asset_id": "NYXT"},
+            {
+                "seed": 123,
+                "run_id": "run-market-faucet-buyer",
+                "address": buyer_wallet,
+                "amount": 1000,
+                "asset_id": "NYXT",
+            },
             token=buyer_token,
         )
         self.assertEqual(status, 200)

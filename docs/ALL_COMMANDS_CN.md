@@ -9,7 +9,7 @@
 
 | 命令 | 作用 |
 |---|---|
-| `gh repo clone JiahaoAlbus/NYX-DIRTY-AND-DEVELOP` | 克隆主仓库。 |
+| `gh repo clone JiahaoAlbus/attic/NYX-DIRTY-AND-DEVELOP` | 克隆主仓库。 |
 | `git status -sb` | 查看当前修改与分支状态。 |
 | `git log --oneline -5` | 查看最近 5 条提交。 |
 

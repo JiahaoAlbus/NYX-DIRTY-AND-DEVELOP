@@ -23,6 +23,7 @@ class Settings:
     env: Literal["dev", "staging", "prod"]
     portal_session_secret: str
     portal_challenge_ttl: int
+    portal_session_ttl: int
     treasury_address: str
     platform_fee_bps: int
     protocol_fee_min: int | None
@@ -34,6 +35,10 @@ class Settings:
     api_jupiter_key: str
     api_magic_eden_key: str
     api_payevm_key: str
+    compliance_enabled: bool
+    compliance_url: str
+    compliance_timeout_seconds: int
+    compliance_fail_closed: bool
 
 
 def _require_env_choice(value: str) -> Literal["dev", "staging", "prod"]:
@@ -56,6 +61,17 @@ def _require_int(name: str, default: int, *, min_value: int, max_value: int) -> 
     if value < min_value or value > max_value:
         raise SettingsError(f"{name} out of bounds")
     return value
+
+
+def _require_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes"}:
+        return True
+    if raw in {"0", "false", "no"}:
+        return False
+    raise SettingsError(f"{name} must be boolean")
 
 
 def _optional_int(name: str, *, min_value: int, max_value: int) -> int | None:
@@ -126,6 +142,12 @@ def get_settings() -> Settings:
         min_value=60,
         max_value=3600,
     )
+    portal_session_ttl = _require_int(
+        "NYX_PORTAL_SESSION_TTL",
+        3600,
+        min_value=300,
+        max_value=24 * 60 * 60,
+    )
     treasury_address = _require_treasury_address(env)
     platform_fee_bps = _require_int(
         "NYX_PLATFORM_FEE_BPS",
@@ -170,10 +192,24 @@ def get_settings() -> Settings:
     )
     api_payevm_key = _validate_generic_key("NYX_PAYEVM_API_KEY", os.environ.get("NYX_PAYEVM_API_KEY", "").strip())
 
+    compliance_enabled = _require_bool("NYX_COMPLIANCE_ENABLED", False)
+    compliance_url = os.environ.get("NYX_COMPLIANCE_URL", "").strip()
+    compliance_timeout_seconds = _require_int(
+        "NYX_COMPLIANCE_TIMEOUT_SECONDS",
+        3,
+        min_value=1,
+        max_value=60,
+    )
+    compliance_fail_closed = _require_bool("NYX_COMPLIANCE_FAIL_CLOSED", True)
+
+    if compliance_enabled and env in {"staging", "prod"} and not compliance_url:
+        raise SettingsError("NYX_COMPLIANCE_URL required when compliance is enabled")
+
     return Settings(
         env=env,
         portal_session_secret=portal_session_secret,
         portal_challenge_ttl=portal_challenge_ttl,
+        portal_session_ttl=portal_session_ttl,
         treasury_address=treasury_address,
         platform_fee_bps=platform_fee_bps,
         protocol_fee_min=protocol_fee_min,
@@ -185,4 +221,8 @@ def get_settings() -> Settings:
         api_jupiter_key=api_jupiter_key,
         api_magic_eden_key=api_magic_eden_key,
         api_payevm_key=api_payevm_key,
+        compliance_enabled=compliance_enabled,
+        compliance_url=compliance_url,
+        compliance_timeout_seconds=compliance_timeout_seconds,
+        compliance_fail_closed=compliance_fail_closed,
     )

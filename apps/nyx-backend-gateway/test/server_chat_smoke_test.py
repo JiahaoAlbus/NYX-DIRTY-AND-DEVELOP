@@ -47,12 +47,13 @@ class ServerChatSmokeTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> tuple[str, str]:
+    def _auth_token(self) -> tuple[str, str, str]:
         key = b"portal-key-chat-0001"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "chatter", "pubkey": pubkey})
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
         nonce = challenge.get("nonce")
@@ -62,13 +63,19 @@ class ServerChatSmokeTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return account_id, verified.get("access_token")
+        return account_id, wallet_address, verified.get("access_token")
 
     def test_chat_send_and_list(self) -> None:
-        account_id, token = self._auth_token()
+        account_id, wallet_address, token = self._auth_token()
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 1, "run_id": "run-chat-faucet-1", "address": account_id, "amount": 1000, "asset_id": "NYXT"},
+            {
+                "seed": 1,
+                "run_id": "run-chat-faucet-1",
+                "address": wallet_address,
+                "amount": 1000,
+                "asset_id": "NYXT",
+            },
             token=token,
         )
         self.assertEqual(status, 200)

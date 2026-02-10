@@ -1,3 +1,5 @@
+import base64
+import hmac
 import json
 import os
 import tempfile
@@ -42,30 +44,64 @@ class ServerWalletHardeningTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
+    def _post_json_auth(self, path: str, payload: dict, token: str) -> tuple[int, dict]:
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=10)
+        body = json.dumps(payload, separators=(",", ":"))
+        conn.request(
+            "POST",
+            path,
+            body=body,
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+        )
+        response = conn.getresponse()
+        data = response.read()
+        conn.close()
+        return response.status, json.loads(data.decode("utf-8"))
+
+    def _auth_token(self) -> tuple[str, str]:
+        key = b"wallet-hardening-0001"
+        pubkey = base64.b64encode(key).decode("utf-8")
+        status, created = self._post_json("/portal/v1/accounts", {"handle": "wallet_guard", "pubkey": pubkey})
+        self.assertEqual(status, 200)
+        account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
+        status, challenge = self._post_json("/portal/v1/auth/challenge", {"account_id": account_id})
+        self.assertEqual(status, 200)
+        nonce = challenge.get("nonce")
+        signature = base64.b64encode(hmac.new(key, nonce.encode("utf-8"), "sha256").digest()).decode("utf-8")
+        status, verified = self._post_json(
+            "/portal/v1/auth/verify",
+            {"account_id": account_id, "nonce": nonce, "signature": signature},
+        )
+        self.assertEqual(status, 200)
+        return wallet_address, verified.get("access_token")
+
     def test_rejects_negative_amount(self) -> None:
+        wallet_address, token = self._auth_token()
         payload = {
             "seed": 1,
             "run_id": "run-wallet-bad-amount",
             "payload": {
-                "from_address": "addr-a",
+                "from_address": wallet_address,
                 "to_address": "addr-b",
                 "amount": -1,
             },
         }
-        status, _ = self._post_json("/wallet/transfer", payload)
+        status, _ = self._post_json_auth("/wallet/transfer", payload, token)
         self.assertEqual(status, 400)
 
     def test_rejects_invalid_address(self) -> None:
+        wallet_address, token = self._auth_token()
         payload = {
             "seed": 1,
             "run_id": "run-wallet-bad-address",
             "payload": {
-                "from_address": "bad addr",
+                "from_address": wallet_address,
                 "to_address": "addr-b",
                 "amount": 1,
             },
         }
-        status, _ = self._post_json("/wallet/transfer", payload)
+        status, _ = self._post_json_auth("/wallet/transfer", payload, token)
         self.assertEqual(status, 400)
 
 

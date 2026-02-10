@@ -4,10 +4,17 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import time
 from typing import Any
 
-from nyx_backend_gateway.env import get_portal_challenge_ttl_seconds, get_portal_session_secret
+from nyx_backend_gateway import auth
+from nyx_backend_gateway.env import (
+    get_portal_challenge_ttl_seconds,
+    get_portal_session_secret,
+    get_portal_session_ttl_seconds,
+)
+from nyx_backend_gateway.identifiers import wallet_address as derive_wallet_address
 from nyx_backend_gateway.storage import (
     ChatMessage,
     ChatRoom,
@@ -76,10 +83,12 @@ def create_account(conn, handle: str, pubkey: str) -> PortalAccount:
         raise PortalError("handle unavailable")
     account_id = _derive_account_id(safe_handle, safe_pubkey)
     created_at = int(time.time())
+    wallet_addr = derive_wallet_address(account_id)
     account = PortalAccount(
         account_id=account_id,
         handle=safe_handle,
         public_key=safe_pubkey,
+        wallet_address=wallet_addr,
         created_at=created_at,
         status="active",
     )
@@ -97,7 +106,8 @@ def issue_challenge(conn, account_id: str) -> PortalChallenge:
         raise PortalError("account not found")
     secret = get_portal_session_secret()
     issued_at = int(time.time())
-    nonce = _sha256_hex(f"nonce:{account_id}:{issued_at}:{secret}".encode("utf-8"))
+    entropy = os.urandom(16).hex()
+    nonce = _sha256_hex(f"nonce:{account_id}:{issued_at}:{secret}:{entropy}".encode("utf-8"))
     ttl = get_portal_challenge_ttl_seconds()
     challenge = PortalChallenge(
         account_id=account.account_id,
@@ -136,17 +146,30 @@ def verify_challenge(conn, account_id: str, nonce: str, signature: str) -> Porta
     if not _verify_signature(account.public_key, nonce, signature):
         raise PortalError("signature invalid")
     secret = get_portal_session_secret()
-    token = _sha256_hex(f"session:{account_id}:{nonce}:{secret}".encode("utf-8"))
-    expires_at = int(time.time()) + 3600
+    expires_at = int(time.time()) + get_portal_session_ttl_seconds()
+    session_id = auth.generate_session_id()
+    token = auth.issue_token(
+        account_id=account_id,
+        session_id=session_id,
+        expires_at=expires_at,
+        secret=secret,
+    )
     session = PortalSession(token=token, account_id=account_id, expires_at=expires_at)
     insert_portal_session(conn, session)
     return session
 
 
 def require_session(conn, token: str) -> PortalSession:
+    secret = get_portal_session_secret()
+    try:
+        payload = auth.verify_token(token, secret)
+    except auth.AuthError as exc:
+        raise PortalError(str(exc)) from exc
     session = load_portal_session(conn, token)
     if session is None:
         raise PortalError("session not found")
+    if session.account_id != payload.account_id:
+        raise PortalError("session account mismatch")
     if int(time.time()) > session.expires_at:
         raise PortalError("session expired")
     return session
@@ -274,7 +297,13 @@ def list_messages(conn, room_id: str, after: int | None, limit: int) -> list[dic
     return list_chat_messages(conn, room_id=room_id, after=after, limit=limit)
 
 
-def list_account_activity(conn, account_id: str, limit: int = 50, offset: int = 0) -> list[dict[str, object]]:
+def list_account_activity(
+    conn,
+    account_id: str,
+    wallet_address: str,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict[str, object]]:
     # Search across receipts linked to this account
     # For now, we'll return receipts that have a run_id matching transactions/orders for this account
     # In a real system, we'd have a join table or account_id on receipts
@@ -308,7 +337,16 @@ def list_account_activity(conn, account_id: str, limit: int = 50, offset: int = 
         ORDER BY r.receipt_id DESC
         LIMIT ? OFFSET ?
         """,
-        (account_id, account_id, account_id, account_id, account_id, account_id, limit, offset),
+        (
+            wallet_address,
+            wallet_address,
+            wallet_address,
+            account_id,
+            wallet_address,
+            wallet_address,
+            limit,
+            offset,
+        ),
     ).fetchall()
 
     results = []

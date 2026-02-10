@@ -2,7 +2,7 @@
 line-length = 120
 target-version = ["py310"]
 include = "\\.py$"
-exclude = "(frozen|release_artifacts|docs/evidence|nyx-world/dist|node_modules)"
+exclude = "(frozen|release_artifacts|docs/evidence|nyx-world/dist|node_modules|attic)"
 
 [tool.ruff]
 line-length = 120
@@ -15,4 +15,5 @@ exclude = [
   "docs/evidence",
   "nyx-world/dist",
   "node_modules",
+  "attic",
 ]

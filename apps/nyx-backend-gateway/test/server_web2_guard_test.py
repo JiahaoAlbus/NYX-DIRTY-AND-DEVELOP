@@ -62,12 +62,13 @@ class ServerWeb2GuardTests(unittest.TestCase):
         conn.close()
         return response.status, json.loads(data.decode("utf-8"))
 
-    def _auth_token(self) -> tuple[str, str]:
+    def _auth_token(self) -> tuple[str, str, str]:
         key = b"portal-key-web2-guard-0001"
         pubkey = base64.b64encode(key).decode("utf-8")
         status, created = self._post("/portal/v1/accounts", {"handle": "web2user", "pubkey": pubkey})
         self.assertEqual(status, 200)
         account_id = created.get("account_id")
+        wallet_address = created.get("wallet_address")
 
         status, challenge = self._post("/portal/v1/auth/challenge", {"account_id": account_id})
         self.assertEqual(status, 200)
@@ -78,14 +79,14 @@ class ServerWeb2GuardTests(unittest.TestCase):
             {"account_id": account_id, "nonce": nonce, "signature": signature},
         )
         self.assertEqual(status, 200)
-        return account_id, verified.get("access_token")
+        return account_id, wallet_address, verified.get("access_token")
 
     def test_web2_guard_request_flow(self) -> None:
-        account_id, token = self._auth_token()
+        _, wallet_address, token = self._auth_token()
 
         status, _ = self._post(
             "/wallet/v1/faucet",
-            {"seed": 123, "run_id": "run-web2-faucet", "payload": {"address": account_id, "amount": 1000}},
+            {"seed": 123, "run_id": "run-web2-faucet", "payload": {"address": wallet_address, "amount": 1000}},
             token=token,
         )
         self.assertEqual(status, 200)

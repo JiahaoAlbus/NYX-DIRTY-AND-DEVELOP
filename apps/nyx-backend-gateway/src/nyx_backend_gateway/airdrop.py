@@ -4,6 +4,7 @@ import re
 import time
 from typing import Any, cast
 
+from nyx_backend_gateway import compliance
 from nyx_backend_gateway.errors import GatewayApiError, GatewayError
 from nyx_backend_gateway.evidence_adapter import run_and_record
 from nyx_backend_gateway.fees import route_fee
@@ -43,8 +44,9 @@ _AIRDROP_TASKS_V1: list[dict[str, object]] = [
 ]
 
 
-def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
+def list_airdrop_tasks_v1(conn, account_id: str, wallet_address: str) -> list[dict[str, object]]:
     acct = validate_address_text(account_id, "account_id")
+    wallet_addr = validate_address_text(wallet_address, "wallet_address")
 
     claimed_rows = conn.execute(
         "SELECT task_id, reward, created_at, run_id FROM airdrop_claims WHERE account_id = ?",
@@ -65,7 +67,7 @@ def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
         "JOIN orders o ON o.order_id = t.order_id "
         "WHERE o.owner_address = ? "
         "ORDER BY t.trade_id ASC LIMIT 1",
-        (acct,),
+        (wallet_addr,),
     ).fetchone()
     trade_run_id = str(trade_row["run_id"]) if trade_row is not None else None
 
@@ -77,7 +79,7 @@ def list_airdrop_tasks_v1(conn, account_id: str) -> list[dict[str, object]]:
 
     store_row = conn.execute(
         "SELECT run_id FROM purchases WHERE buyer_id = ? ORDER BY purchase_id ASC LIMIT 1",
-        (acct,),
+        (wallet_addr,),
     ).fetchone()
     store_run_id = str(store_row["run_id"]) if store_row is not None else None
 
@@ -115,11 +117,13 @@ def execute_airdrop_claim_v1(
     seed: int,
     run_id: str,
     account_id: str,
+    wallet_address: str,
     payload: dict[str, Any],
     db_path=None,
     run_root=None,
 ) -> tuple[GatewayResult, int, FeeLedger, dict[str, object]]:
     acct = validate_address_text(account_id, "account_id")
+    wallet_addr = validate_address_text(wallet_address, "wallet_address")
     if not isinstance(payload, dict):
         raise GatewayApiError("PAYLOAD_INVALID", "payload must be object", http_status=400)
     task_id = payload.get("task_id")
@@ -133,6 +137,15 @@ def execute_airdrop_claim_v1(
     if task is None:
         raise GatewayApiError("TASK_UNKNOWN", "task_id not supported", http_status=404, details={"task_id": task_id})
     reward = int(cast(int, task["reward"]))
+
+    compliance.require_clearance(
+        account_id=acct,
+        wallet_address=wallet_addr,
+        module="wallet",
+        action="airdrop",
+        run_id=run_id,
+        metadata={"task_id": task_id, "reward": reward},
+    )
 
     conn = create_connection(db_path or default_db_path())
     try:
@@ -155,7 +168,7 @@ def execute_airdrop_claim_v1(
                 "JOIN orders o ON o.order_id = t.order_id "
                 "WHERE o.owner_address = ? "
                 "ORDER BY t.trade_id ASC LIMIT 1",
-                (acct,),
+                (wallet_addr,),
             ).fetchone()
             completion_run_id = str(row["run_id"]) if row is not None else None
         if task_id == "chat_1":
@@ -167,7 +180,7 @@ def execute_airdrop_claim_v1(
         if task_id == "store_1":
             row = conn.execute(
                 "SELECT run_id FROM purchases WHERE buyer_id = ? ORDER BY purchase_id ASC LIMIT 1",
-                (acct,),
+                (wallet_addr,),
             ).fetchone()
             completion_run_id = str(row["run_id"]) if row is not None else None
 
@@ -182,14 +195,14 @@ def execute_airdrop_claim_v1(
             run_id=run_id,
             module="wallet",
             action="airdrop",
-            payload={"task_id": task_id, "reward": reward, "account_id": acct},
+            payload={"task_id": task_id, "reward": reward, "account_id": acct, "wallet_address": wallet_addr},
             conn=conn,
             base_dir=run_root or default_run_root(),
         )
 
         faucet_result = apply_wallet_faucet_with_fee(
             conn,
-            address=acct,
+            address=wallet_addr,
             amount=reward,
             fee_total=fee_record.total_paid,
             treasury_address=fee_record.fee_address,

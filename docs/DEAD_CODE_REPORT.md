@@ -28,8 +28,8 @@ This report documents **verified dead code removal** and **candidate cleanups**.
 ## Deferred candidates (needs deeper product verification)
 
 ### Duplicate repository snapshot
-- **Candidate:** `NYX-DIRTY-AND-DEVELOP/` appears to contain a duplicate tree.
-- **Reason to defer:** Could be a vendor snapshot or release mirror; removal requires product owner confirmation.
+- **Candidate:** `attic/NYX-DIRTY-AND-DEVELOP/` appears to contain a duplicate tree.
+- **Action taken:** Moved to `attic/NYX-DIRTY-AND-DEVELOP/` to isolate from CI/release while preserving history.
 
 ### Frontend dependency trimming
 - **Candidate:** Additional `nyx-world/package.json` dependencies.

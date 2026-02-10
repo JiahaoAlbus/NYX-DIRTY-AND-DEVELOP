@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from nyx_backend_gateway import metrics
+from nyx_backend_gateway.identifiers import wallet_address as derive_wallet_address
 from nyx_backend_gateway.migrations import apply_migrations
 
 
@@ -13,10 +16,33 @@ class StorageError(ValueError):
     pass
 
 
+class InstrumentedConnection(sqlite3.Connection):
+    def execute(self, sql, parameters=()):
+        start = time.perf_counter()
+        try:
+            return super().execute(sql, parameters)
+        finally:
+            metrics.record_db_query(str(sql), time.perf_counter() - start)
+
+    def executemany(self, sql, seq_of_parameters):
+        start = time.perf_counter()
+        try:
+            return super().executemany(sql, seq_of_parameters)
+        finally:
+            metrics.record_db_query(str(sql), time.perf_counter() - start)
+
+    def executescript(self, sql_script):
+        start = time.perf_counter()
+        try:
+            return super().executescript(sql_script)
+        finally:
+            metrics.record_db_query("SCRIPT", time.perf_counter() - start)
+
+
 def create_connection(db_path: Path) -> sqlite3.Connection:
     if not isinstance(db_path, Path):
         raise StorageError("db_path must be Path")
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), factory=InstrumentedConnection)
     conn.row_factory = sqlite3.Row
     apply_migrations(conn)
     return conn
@@ -65,6 +91,10 @@ def _validate_hash(value: object, name: str = "hash") -> str:
     if not re.fullmatch(r"[A-Fa-f0-9]{64}", value):
         raise StorageError(f"{name} invalid")
     return value
+
+
+def _validate_portal_token(value: object, name: str = "token") -> str:
+    return _validate_text(value, name, r"[A-Za-z0-9._=-]{24,512}")
 
 
 def _validate_header_names(value: object) -> list[str]:
@@ -126,6 +156,7 @@ class PortalAccount:
     account_id: str
     handle: str
     public_key: str
+    wallet_address: str
     created_at: int
     status: str
     bio: str | None = None
@@ -308,15 +339,16 @@ def insert_portal_account(conn: sqlite3.Connection, account: PortalAccount) -> N
     account_id = _validate_text(account.account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
     handle = _validate_text(account.handle, "handle", r"[a-z0-9_-]{3,24}")
     public_key = _validate_text(account.public_key, "public_key", r"[A-Za-z0-9+/=]{16,256}")
+    wallet_address = _validate_wallet_address(account.wallet_address, "wallet_address")
     created_at = _validate_int(account.created_at, "created_at", 1)
     status = _validate_text(account.status, "status", r"[A-Za-z0-9_-]{3,16}")
     bio = account.bio
     if bio is not None and len(bio) > 256:
         raise StorageError("bio too long")
     conn.execute(
-        "INSERT INTO portal_accounts (account_id, handle, public_key, created_at, status, bio) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (account_id, handle, public_key, created_at, status, bio),
+        "INSERT INTO portal_accounts (account_id, handle, public_key, wallet_address, created_at, status, bio) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (account_id, handle, public_key, wallet_address, created_at, status, bio),
     )
     conn.commit()
 
@@ -324,23 +356,41 @@ def insert_portal_account(conn: sqlite3.Connection, account: PortalAccount) -> N
 def load_portal_account(conn: sqlite3.Connection, account_id: str) -> PortalAccount | None:
     aid = _validate_text(account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
     row = conn.execute(
-        "SELECT account_id, handle, public_key, created_at, status, bio FROM portal_accounts WHERE account_id = ?",
+        "SELECT account_id, handle, public_key, wallet_address, created_at, status, bio "
+        "FROM portal_accounts WHERE account_id = ?",
         (aid,),
     ).fetchone()
     if row is None:
         return None
-    return PortalAccount(**{col: row[col] for col in row.keys()})
+    record = {col: row[col] for col in row.keys()}
+    if not record.get("wallet_address"):
+        record["wallet_address"] = derive_wallet_address(record["account_id"])
+        conn.execute(
+            "UPDATE portal_accounts SET wallet_address = ? WHERE account_id = ?",
+            (record["wallet_address"], record["account_id"]),
+        )
+        conn.commit()
+    return PortalAccount(**record)
 
 
 def load_portal_account_by_handle(conn: sqlite3.Connection, handle: str) -> PortalAccount | None:
     h = _validate_text(handle, "handle", r"[a-z0-9_-]{3,24}")
     row = conn.execute(
-        "SELECT account_id, handle, public_key, created_at, status, bio FROM portal_accounts WHERE handle = ?",
+        "SELECT account_id, handle, public_key, wallet_address, created_at, status, bio "
+        "FROM portal_accounts WHERE handle = ?",
         (h,),
     ).fetchone()
     if row is None:
         return None
-    return PortalAccount(**{col: row[col] for col in row.keys()})
+    record = {col: row[col] for col in row.keys()}
+    if not record.get("wallet_address"):
+        record["wallet_address"] = derive_wallet_address(record["account_id"])
+        conn.execute(
+            "UPDATE portal_accounts SET wallet_address = ? WHERE account_id = ?",
+            (record["wallet_address"], record["account_id"]),
+        )
+        conn.commit()
+    return PortalAccount(**record)
 
 
 def insert_portal_challenge(conn: sqlite3.Connection, challenge: PortalChallenge) -> None:
@@ -376,7 +426,7 @@ def consume_portal_challenge(conn: sqlite3.Connection, account_id: str, nonce: s
 
 
 def insert_portal_session(conn: sqlite3.Connection, session: PortalSession) -> None:
-    token = _validate_text(session.token, "token", r"[A-Fa-f0-9]{32,128}")
+    token = _validate_portal_token(session.token, "token")
     account_id = _validate_text(session.account_id, "account_id", r"[A-Za-z0-9_-]{1,64}")
     expires_at = _validate_int(session.expires_at, "expires_at", 1)
     conn.execute(
@@ -387,7 +437,7 @@ def insert_portal_session(conn: sqlite3.Connection, session: PortalSession) -> N
 
 
 def load_portal_session(conn: sqlite3.Connection, token: str) -> PortalSession | None:
-    tok = _validate_text(token, "token", r"[A-Fa-f0-9]{32,128}")
+    tok = _validate_portal_token(token, "token")
     row = conn.execute(
         "SELECT token, account_id, expires_at FROM portal_sessions WHERE token = ?",
         (tok,),
@@ -398,7 +448,7 @@ def load_portal_session(conn: sqlite3.Connection, token: str) -> PortalSession |
 
 
 def delete_portal_session(conn: sqlite3.Connection, token: str) -> None:
-    tok = _validate_text(token, "token", r"[A-Fa-f0-9]{32,128}")
+    tok = _validate_portal_token(token, "token")
     conn.execute("DELETE FROM portal_sessions WHERE token = ?", (tok,))
     conn.commit()
 

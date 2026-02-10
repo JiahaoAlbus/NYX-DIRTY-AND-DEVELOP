@@ -6,6 +6,7 @@ import {
   verifyPortalChallenge,
   PortalSession,
 } from "../api";
+import { useI18n } from "../i18n";
 
 interface OnboardingProps {
   backendOnline: boolean;
@@ -15,6 +16,7 @@ interface OnboardingProps {
 }
 
 export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendStatus, onRefresh, onComplete }) => {
+  const { t } = useI18n();
   const [handle, setHandle] = useState("");
   const [seed, setSeed] = useState("");
   const [status, setStatus] = useState("");
@@ -22,19 +24,19 @@ export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendSt
 
   const createAccount = async () => {
     if (!backendOnline) {
-      setStatus("Backend unavailable");
+      setStatus(t("onboarding.backendUnavailable"));
       return;
     }
     if (!handle.trim()) {
-      setStatus("Handle required");
+      setStatus(t("onboarding.handleRequired"));
       return;
     }
     if (!seed.trim()) {
-      setStatus("Seed required");
+      setStatus(t("onboarding.seedRequired"));
       return;
     }
     setBusy(true);
-    setStatus("Creating portal account...");
+    setStatus(t("onboarding.createAccount"));
     try {
       const key = derivePortalKey(seed.trim());
       const account = await createPortalAccount(handle.trim(), key.pubkey);
@@ -45,9 +47,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendSt
         handle: account.handle,
         pubkey: account.pubkey,
         access_token: token.access_token,
+        wallet_address: account.wallet_address ?? token.wallet_address ?? "",
       });
     } catch (err) {
-      setStatus(`Error: ${(err as Error).message}`);
+      setStatus(t("onboarding.error", { message: (err as Error).message }));
     } finally {
       setBusy(false);
     }
@@ -55,18 +58,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendSt
 
   return (
     <div className="flex flex-col gap-6 w-full p-6">
-      <div className="text-lg font-semibold text-text-main">NYX Portal Access</div>
-      <div className="text-xs text-text-subtle">Testnet Beta. No mainnet claims. No personal data.</div>
+      <div className="text-lg font-semibold text-text-main">{t("onboarding.title")}</div>
+      <div className="text-xs text-text-subtle">{t("onboarding.subtitle")}</div>
       <div className="rounded-lg border border-primary/20 bg-white/80 p-4">
-        <div className="text-xs font-semibold text-text-subtle">Backend</div>
+        <div className="text-xs font-semibold text-text-subtle">{t("onboarding.backend")}</div>
         <div className="text-sm font-medium">{backendStatus}</div>
         <button onClick={onRefresh} className="mt-2 text-xs font-semibold text-primary underline">
-          Refresh
+          {t("common.refresh")}
         </button>
       </div>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold">Handle</span>
+          <span className="text-xs font-semibold">{t("onboarding.handle")}</span>
           <input
             className="h-10 rounded-lg border border-primary/20 px-3"
             value={handle}
@@ -74,7 +77,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendSt
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold">Seed (deterministic)</span>
+          <span className="text-xs font-semibold">{t("onboarding.seed")}</span>
           <input
             className="h-10 rounded-lg border border-primary/20 px-3"
             value={seed}
@@ -87,7 +90,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ backendOnline, backendSt
         onClick={createAccount}
         className="h-11 rounded-xl bg-primary text-background-dark font-semibold"
       >
-        {busy ? "Working..." : "Create Account + Sign In"}
+        {busy ? t("onboarding.working") : t("onboarding.create")}
       </button>
       {status && <div className="text-xs text-text-subtle">{status}</div>}
     </div>

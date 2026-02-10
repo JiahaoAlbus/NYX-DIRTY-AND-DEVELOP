@@ -6,6 +6,7 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401
 from nyx_backend_gateway.gateway import GatewayError, execute_run
+from nyx_backend_gateway.identifiers import wallet_address
 from nyx_backend_gateway.storage import apply_wallet_faucet, create_connection, load_by_id
 
 
@@ -69,8 +70,9 @@ class GatewayFlowTests(unittest.TestCase):
             db_path = Path(tmp) / "gateway.db"
             run_root = Path(tmp) / "runs"
             account_id = "trader-1"
+            wallet_addr = wallet_address(account_id)
             conn = create_connection(db_path)
-            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, wallet_addr, 1_000, asset_id="NYXT")
             conn.close()
 
             run_id = "run-exchange-place-order"
@@ -80,13 +82,14 @@ class GatewayFlowTests(unittest.TestCase):
                 module="exchange",
                 action="place_order",
                 payload={
-                    "owner_address": account_id,
+                    "owner_address": wallet_addr,
                     "side": "BUY",
                     "asset_in": "NYXT",
                     "asset_out": "ECHO",
                     "amount": 100,
                     "price": 10,
                 },
+                caller_wallet_address=wallet_addr,
                 caller_account_id=account_id,
                 db_path=db_path,
                 run_root=run_root,
@@ -106,8 +109,9 @@ class GatewayFlowTests(unittest.TestCase):
             db_path = Path(tmp) / "gateway.db"
             run_root = Path(tmp) / "runs"
             account_id = "trader-2"
+            wallet_addr = wallet_address(account_id)
             conn = create_connection(db_path)
-            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, wallet_addr, 1_000, asset_id="NYXT")
             conn.close()
 
             run_id_order = "run-exchange-cancel-order-place"
@@ -117,13 +121,14 @@ class GatewayFlowTests(unittest.TestCase):
                 module="exchange",
                 action="place_order",
                 payload={
-                    "owner_address": account_id,
+                    "owner_address": wallet_addr,
                     "side": "BUY",
                     "asset_in": "NYXT",
                     "asset_out": "ECHO",
                     "amount": 50,
                     "price": 10,
                 },
+                caller_wallet_address=wallet_addr,
                 caller_account_id=account_id,
                 db_path=db_path,
                 run_root=run_root,
@@ -137,6 +142,7 @@ class GatewayFlowTests(unittest.TestCase):
                 module="exchange",
                 action="cancel_order",
                 payload={"order_id": order_id},
+                caller_wallet_address=wallet_addr,
                 caller_account_id=account_id,
                 db_path=db_path,
                 run_root=run_root,
@@ -148,7 +154,8 @@ class GatewayFlowTests(unittest.TestCase):
             db_path = Path(tmp) / "gateway.db"
             run_root = Path(tmp) / "runs"
             conn = create_connection(db_path)
-            apply_wallet_faucet(conn, "acct-1", 1_000, asset_id="NYXT")
+            wallet_addr = wallet_address("acct-1")
+            apply_wallet_faucet(conn, wallet_addr, 1_000, asset_id="NYXT")
             conn.close()
             run_id = "run-chat"
             result = execute_run(
@@ -157,6 +164,7 @@ class GatewayFlowTests(unittest.TestCase):
                 module="chat",
                 action="message_event",
                 payload={"channel": "dm/acct-1/acct-2", "message": '{"ciphertext":"AA==","iv":"BB=="}'},
+                caller_wallet_address=wallet_addr,
                 caller_account_id="acct-1",
                 db_path=db_path,
                 run_root=run_root,
@@ -184,8 +192,9 @@ class GatewayFlowTests(unittest.TestCase):
             db_path = Path(tmp) / "gateway.db"
             run_root = Path(tmp) / "runs"
             account_id = "seller-1"
+            wallet_addr = wallet_address(account_id)
             conn = create_connection(db_path)
-            apply_wallet_faucet(conn, account_id, 1_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, wallet_addr, 1_000, asset_id="NYXT")
             conn.close()
 
             run_id = "run-market-listing"
@@ -194,7 +203,8 @@ class GatewayFlowTests(unittest.TestCase):
                 run_id=run_id,
                 module="marketplace",
                 action="listing_publish",
-                payload={"publisher_id": account_id, "sku": "sku-2", "title": "Item Two", "price": 12},
+                payload={"publisher_id": wallet_addr, "sku": "sku-2", "title": "Item Two", "price": 12},
+                caller_wallet_address=wallet_addr,
                 caller_account_id=account_id,
                 db_path=db_path,
                 run_root=run_root,
@@ -207,9 +217,11 @@ class GatewayFlowTests(unittest.TestCase):
             run_root = Path(tmp) / "runs"
             seller_id = "seller-9"
             buyer_id = "buyer-9"
+            seller_wallet = wallet_address(seller_id)
+            buyer_wallet = wallet_address(buyer_id)
             conn = create_connection(db_path)
-            apply_wallet_faucet(conn, seller_id, 1_000, asset_id="NYXT")
-            apply_wallet_faucet(conn, buyer_id, 10_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, seller_wallet, 1_000, asset_id="NYXT")
+            apply_wallet_faucet(conn, buyer_wallet, 10_000, asset_id="NYXT")
             conn.close()
 
             run_id_listing = "run-listing"
@@ -218,7 +230,8 @@ class GatewayFlowTests(unittest.TestCase):
                 run_id=run_id_listing,
                 module="marketplace",
                 action="listing_publish",
-                payload={"publisher_id": seller_id, "sku": "sku-9", "title": "Item Nine", "price": 9},
+                payload={"publisher_id": seller_wallet, "sku": "sku-9", "title": "Item Nine", "price": 9},
+                caller_wallet_address=seller_wallet,
                 caller_account_id=seller_id,
                 db_path=db_path,
                 run_root=run_root,
@@ -229,7 +242,8 @@ class GatewayFlowTests(unittest.TestCase):
                 run_id="run-purchase",
                 module="marketplace",
                 action="purchase_listing",
-                payload={"buyer_id": buyer_id, "listing_id": listing_id, "qty": 1},
+                payload={"buyer_id": buyer_wallet, "listing_id": listing_id, "qty": 1},
+                caller_wallet_address=buyer_wallet,
                 caller_account_id=buyer_id,
                 db_path=db_path,
                 run_root=run_root,

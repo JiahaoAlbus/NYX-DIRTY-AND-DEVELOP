@@ -32,7 +32,7 @@ Evidence / Verification
 - Router invariants map: `docs/INVARIANT_MAP_DEX_V1.md`.
 - Router receipt/replay tests: `packages/l3-router/test`.
 - Conformance drills: `packages/conformance-v1/src/conformance_v1/drills.py`.
-- Reference client tests: `apps/nyx-reference-client/test`.
+- Reference client tests: `attic/apps/nyx-reference-client/test`.
 
 Freeze / Change Control
 - Router v1 meaning is sealed after Week07; see `docs/DEX_V1_ROUTER_BLUEPRINT.md`.

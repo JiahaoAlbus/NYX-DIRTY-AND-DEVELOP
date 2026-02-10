@@ -44,13 +44,13 @@ def search_listings(conn, q: str, limit: int = 100, offset: int = 0) -> list[dic
     return [{col: row[col] for col in row.keys()} for row in rows]
 
 
-def publish_listing(conn, run_id: str, payload: dict[str, object], caller_account_id: str | None) -> None:
+def publish_listing(conn, run_id: str, payload: dict[str, object], caller_wallet_address: str | None) -> None:
     validated = validate_listing_payload(payload)
-    if caller_account_id and validated.get("publisher_id") != caller_account_id:
+    if caller_wallet_address and validated.get("publisher_id") != caller_wallet_address:
         raise GatewayError("publisher_id mismatch")
     fee_record = route_fee("marketplace", "listing_publish", validated, run_id)
-    if caller_account_id:
-        nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+    if caller_wallet_address:
+        nyxt_balance = get_wallet_balance(conn, caller_wallet_address, "NYXT")
         if nyxt_balance < int(fee_record.total_paid):
             raise GatewayError("insufficient NYXT balance for fee")
     insert_listing(
@@ -65,11 +65,11 @@ def publish_listing(conn, run_id: str, payload: dict[str, object], caller_accoun
             run_id=run_id,
         ),
     )
-    if caller_account_id:
+    if caller_wallet_address:
         apply_wallet_transfer(
             conn,
             transfer_id=deterministic_id("fee", run_id),
-            from_address=caller_account_id,
+            from_address=caller_wallet_address,
             to_address=fee_record.fee_address,
             asset_id="NYXT",
             amount=0,
@@ -80,9 +80,9 @@ def publish_listing(conn, run_id: str, payload: dict[str, object], caller_accoun
         insert_fee_ledger(conn, fee_record)
 
 
-def purchase_listing(conn, run_id: str, payload: dict[str, object], caller_account_id: str | None) -> None:
+def purchase_listing(conn, run_id: str, payload: dict[str, object], caller_wallet_address: str | None) -> None:
     validated = validate_purchase_payload(payload)
-    if caller_account_id and validated.get("buyer_id") != caller_account_id:
+    if caller_wallet_address and validated.get("buyer_id") != caller_wallet_address:
         raise GatewayError("buyer_id mismatch")
     listing_record = load_by_id(conn, "listings", "listing_id", validated["listing_id"])
     if listing_record is None:
@@ -92,8 +92,8 @@ def purchase_listing(conn, run_id: str, payload: dict[str, object], caller_accou
 
     total_price = int(cast(int, listing_record["price"])) * int(cast(int, validated["qty"]))
     fee_record = route_fee("marketplace", "purchase_listing", validated, run_id)
-    if caller_account_id:
-        nyxt_balance = get_wallet_balance(conn, caller_account_id, "NYXT")
+    if caller_wallet_address:
+        nyxt_balance = get_wallet_balance(conn, caller_wallet_address, "NYXT")
         required = total_price + int(fee_record.total_paid)
         if nyxt_balance < required:
             raise GatewayError("insufficient NYXT balance for amount + fee")
