@@ -113,7 +113,8 @@ struct PortalAuthView: View {
                     account_id: me.accountId,
                     handle: me.handle,
                     pubkey: me.pubkey,
-                    access_token: token.accessToken
+                    access_token: token.accessToken,
+                    wallet_address: me.walletAddress
                 )
             )
         } catch {
@@ -149,7 +150,8 @@ struct PortalAuthView: View {
                     account_id: me.accountId,
                     handle: me.handle,
                     pubkey: me.pubkey,
-                    access_token: token.accessToken
+                    access_token: token.accessToken,
+                    wallet_address: me.walletAddress
                 )
             )
         } catch {
@@ -158,4 +160,3 @@ struct PortalAuthView: View {
         busy = false
     }
 }
-

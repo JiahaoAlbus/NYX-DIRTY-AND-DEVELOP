@@ -129,11 +129,14 @@ final class GatewayClient {
         return String(data: data, encoding: .utf8) ?? ""
     }
 
-    func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any]) async throws -> RunResponse {
+    func run(seed: Int, runId: String, module: String, action: String, payload: [String: Any], token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("run")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         let body: [String: Any] = [
             "seed": seed,
@@ -148,11 +151,14 @@ final class GatewayClient {
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
-    func placeOrder(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
+    func placeOrder(seed: Int, runId: String, payload: [String: Any], token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("exchange/place_order")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -163,11 +169,14 @@ final class GatewayClient {
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
-    func cancelOrder(seed: Int, runId: String, orderId: String) async throws -> RunResponse {
+    func cancelOrder(seed: Int, runId: String, orderId: String, token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("exchange/cancel_order")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -193,11 +202,14 @@ final class GatewayClient {
         return payload["trades"] ?? []
     }
 
-    func sendMessage(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
+    func sendMessage(seed: Int, runId: String, payload: [String: Any], token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("chat/send")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -388,11 +400,14 @@ final class GatewayClient {
         return try JSONDecoder().decode(WalletTransferV1Response.self, from: data)
     }
 
-    func publishListing(seed: Int, runId: String, payload: [String: Any]) async throws -> RunResponse {
+    func publishListing(seed: Int, runId: String, payload: [String: Any], token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("marketplace/listing")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -403,11 +418,14 @@ final class GatewayClient {
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
-    func purchaseListing(seed: Int, runId: String, listingId: String, qty: Int) async throws -> RunResponse {
+    func purchaseListing(seed: Int, runId: String, listingId: String, qty: Int, token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("marketplace/purchase")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -470,11 +488,14 @@ final class GatewayClient {
         return payload["balance"] ?? 0
     }
 
-    func walletFaucet(seed: Int, runId: String, address: String, amount: Int) async throws -> RunResponse {
+    func walletFaucet(seed: Int, runId: String, address: String, amount: Int, token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("wallet/faucet")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,
@@ -485,11 +506,14 @@ final class GatewayClient {
         return try JSONDecoder().decode(RunResponse.self, from: data)
     }
 
-    func walletTransfer(seed: Int, runId: String, from: String, to: String, amount: Int) async throws -> RunResponse {
+    func walletTransfer(seed: Int, runId: String, from: String, to: String, amount: Int, token: String? = nil) async throws -> RunResponse {
         let url = baseURL.appendingPathComponent("wallet/transfer")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         let body: [String: Any] = [
             "seed": seed,
             "run_id": runId,

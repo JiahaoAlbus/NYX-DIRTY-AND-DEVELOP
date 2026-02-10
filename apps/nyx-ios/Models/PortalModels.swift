@@ -11,12 +11,14 @@ struct PortalSession: Codable {
     let handle: String
     let pubkey: String
     let access_token: String
+    let wallet_address: String?
 }
 
 struct PortalAccount: Codable, Identifiable {
     let accountId: String
     let handle: String
     let pubkey: String
+    let walletAddress: String
     let createdAt: Int
     let status: String
 
@@ -26,6 +28,7 @@ struct PortalAccount: Codable, Identifiable {
         case accountId = "account_id"
         case handle
         case pubkey
+        case walletAddress = "wallet_address"
         case createdAt = "created_at"
         case status
     }
