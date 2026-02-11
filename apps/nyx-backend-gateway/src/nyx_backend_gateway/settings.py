@@ -12,6 +12,7 @@ class SettingsError(ValueError):
 
 
 _ENV_CHOICES = {"dev", "staging", "prod"}
+_RISK_MODE_CHOICES = {"off", "monitor", "enforce"}
 _ADDRESS_MIN_LEN = 8
 _SESSION_SECRET_MIN_LEN = 32
 _KEY_MIN_LEN = 8
@@ -39,6 +40,28 @@ class Settings:
     compliance_url: str
     compliance_timeout_seconds: int
     compliance_fail_closed: bool
+    risk_mode: Literal["off", "monitor", "enforce"]
+    risk_global_mutations_paused: bool
+    risk_global_max_per_min: int
+    risk_global_max_amount_per_min: int
+    risk_account_max_per_min: int
+    risk_account_max_amount_per_min: int
+    risk_ip_max_per_min: int
+    risk_ip_max_amount_per_min: int
+    risk_transfer_max_per_min: int
+    risk_faucet_max_per_min: int
+    risk_airdrop_max_per_min: int
+    risk_exchange_orders_per_min: int
+    risk_exchange_cancels_per_min: int
+    risk_marketplace_orders_per_min: int
+    risk_chat_messages_per_min: int
+    risk_max_transfer_amount: int
+    risk_max_faucet_amount: int
+    risk_max_airdrop_amount: int
+    risk_max_order_notional: int
+    risk_max_store_notional: int
+    risk_breaker_errors_per_min: int
+    risk_breaker_window_seconds: int
 
 
 def _require_env_choice(value: str) -> Literal["dev", "staging", "prod"]:
@@ -48,6 +71,19 @@ def _require_env_choice(value: str) -> Literal["dev", "staging", "prod"]:
     if normalized not in _ENV_CHOICES:
         raise SettingsError("NYX_ENV must be dev, staging, or prod")
     return cast(Literal["dev", "staging", "prod"], normalized)
+
+
+def _require_risk_mode(value: str, env: str) -> Literal["off", "monitor", "enforce"]:
+    normalized = value.strip().lower()
+    if not normalized:
+        if env == "dev":
+            return "off"
+        if env == "staging":
+            return "monitor"
+        return "enforce"
+    if normalized not in _RISK_MODE_CHOICES:
+        raise SettingsError("NYX_RISK_MODE must be off, monitor, or enforce")
+    return cast(Literal["off", "monitor", "enforce"], normalized)
 
 
 def _require_int(name: str, default: int, *, min_value: int, max_value: int) -> int:
@@ -205,6 +241,129 @@ def get_settings() -> Settings:
     if compliance_enabled and env in {"staging", "prod"} and not compliance_url:
         raise SettingsError("NYX_COMPLIANCE_URL required when compliance is enabled")
 
+    risk_mode = _require_risk_mode(os.environ.get("NYX_RISK_MODE", ""), env)
+    risk_global_mutations_paused = _require_bool("NYX_RISK_GLOBAL_MUTATIONS_PAUSED", False)
+    risk_global_max_per_min = _require_int(
+        "NYX_RISK_GLOBAL_MAX_PER_MIN",
+        600,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_global_max_amount_per_min = _require_int(
+        "NYX_RISK_GLOBAL_MAX_AMOUNT_PER_MIN",
+        10_000_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_account_max_per_min = _require_int(
+        "NYX_RISK_ACCOUNT_MAX_PER_MIN",
+        120,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_account_max_amount_per_min = _require_int(
+        "NYX_RISK_ACCOUNT_MAX_AMOUNT_PER_MIN",
+        2_000_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_ip_max_per_min = _require_int(
+        "NYX_RISK_IP_MAX_PER_MIN",
+        240,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_ip_max_amount_per_min = _require_int(
+        "NYX_RISK_IP_MAX_AMOUNT_PER_MIN",
+        3_000_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_transfer_max_per_min = _require_int(
+        "NYX_RISK_TRANSFER_MAX_PER_MIN",
+        30,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_faucet_max_per_min = _require_int(
+        "NYX_RISK_FAUCET_MAX_PER_MIN",
+        30,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_airdrop_max_per_min = _require_int(
+        "NYX_RISK_AIRDROP_MAX_PER_MIN",
+        30,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_exchange_orders_per_min = _require_int(
+        "NYX_RISK_EXCHANGE_ORDERS_PER_MIN",
+        60,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_exchange_cancels_per_min = _require_int(
+        "NYX_RISK_EXCHANGE_CANCELS_PER_MIN",
+        120,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_marketplace_orders_per_min = _require_int(
+        "NYX_RISK_MARKETPLACE_ORDERS_PER_MIN",
+        60,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_chat_messages_per_min = _require_int(
+        "NYX_RISK_CHAT_MESSAGES_PER_MIN",
+        120,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_max_transfer_amount = _require_int(
+        "NYX_RISK_MAX_TRANSFER_AMOUNT",
+        250_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_max_faucet_amount = _require_int(
+        "NYX_RISK_MAX_FAUCET_AMOUNT",
+        10_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_max_airdrop_amount = _require_int(
+        "NYX_RISK_MAX_AIRDROP_AMOUNT",
+        50_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_max_order_notional = _require_int(
+        "NYX_RISK_MAX_ORDER_NOTIONAL",
+        500_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_max_store_notional = _require_int(
+        "NYX_RISK_MAX_STORE_NOTIONAL",
+        250_000,
+        min_value=0,
+        max_value=1_000_000_000_000,
+    )
+    risk_breaker_errors_per_min = _require_int(
+        "NYX_RISK_BREAKER_ERRORS_PER_MIN",
+        40,
+        min_value=0,
+        max_value=100_000,
+    )
+    risk_breaker_window_seconds = _require_int(
+        "NYX_RISK_BREAKER_WINDOW_SECONDS",
+        60,
+        min_value=10,
+        max_value=3600,
+    )
+
     return Settings(
         env=env,
         portal_session_secret=portal_session_secret,
@@ -225,4 +384,26 @@ def get_settings() -> Settings:
         compliance_url=compliance_url,
         compliance_timeout_seconds=compliance_timeout_seconds,
         compliance_fail_closed=compliance_fail_closed,
+        risk_mode=risk_mode,
+        risk_global_mutations_paused=risk_global_mutations_paused,
+        risk_global_max_per_min=risk_global_max_per_min,
+        risk_global_max_amount_per_min=risk_global_max_amount_per_min,
+        risk_account_max_per_min=risk_account_max_per_min,
+        risk_account_max_amount_per_min=risk_account_max_amount_per_min,
+        risk_ip_max_per_min=risk_ip_max_per_min,
+        risk_ip_max_amount_per_min=risk_ip_max_amount_per_min,
+        risk_transfer_max_per_min=risk_transfer_max_per_min,
+        risk_faucet_max_per_min=risk_faucet_max_per_min,
+        risk_airdrop_max_per_min=risk_airdrop_max_per_min,
+        risk_exchange_orders_per_min=risk_exchange_orders_per_min,
+        risk_exchange_cancels_per_min=risk_exchange_cancels_per_min,
+        risk_marketplace_orders_per_min=risk_marketplace_orders_per_min,
+        risk_chat_messages_per_min=risk_chat_messages_per_min,
+        risk_max_transfer_amount=risk_max_transfer_amount,
+        risk_max_faucet_amount=risk_max_faucet_amount,
+        risk_max_airdrop_amount=risk_max_airdrop_amount,
+        risk_max_order_notional=risk_max_order_notional,
+        risk_max_store_notional=risk_max_store_notional,
+        risk_breaker_errors_per_min=risk_breaker_errors_per_min,
+        risk_breaker_window_seconds=risk_breaker_window_seconds,
     )

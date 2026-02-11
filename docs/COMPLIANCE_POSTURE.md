@@ -32,12 +32,18 @@ The architecture supports integrating KYC/AML without redesign:
 - `NYX_COMPLIANCE_FAIL_CLOSED=true` blocks actions if the service is unavailable.
 - The compliance service is **external** and should implement its own audit log and retention policy.
 
-## 5) Testnet vs Mainnet
+## 5) Mainnet Compliance Templates
+
+Templates are provided for mainnet rollout:
+- `docs/MAINNET_COMPLIANCE_TEMPLATE.md`
+- `docs/LEGAL_TEMPLATES_MAINNET.md`
+
+## 6) Testnet vs Mainnet
 
 - Testnet uses valueless assets and testnet infrastructure.
 - Mainnet requires compliance obligations, legal review, and production-grade controls.
 
-## 6) Disclaimer
+## 7) Disclaimer
 
 NYX does not provide legal advice.  
 Operators are responsible for meeting jurisdictional requirements.

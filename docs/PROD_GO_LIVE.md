@@ -14,12 +14,14 @@ This document defines **non‑negotiable** production requirements for a mainnet
 - **MUST** implement review/appeal workflow for flagged accounts.
 - **MUST** define data retention + deletion windows aligned to legal counsel.
 - **MUST** log compliance decisions without storing sensitive PII in plaintext.
+- Templates: `docs/MAINNET_COMPLIANCE_TEMPLATE.md`, `docs/LEGAL_TEMPLATES_MAINNET.md`
 
 ## 3) Privacy Policy + Terms of Service
 - **MUST** publish a Privacy Policy covering data collection, processing, and retention.
 - **MUST** publish Terms of Service covering user obligations, prohibited conduct, and dispute resolution.
 - **MUST** provide a contact channel for privacy/abuse requests.
 - **MUST** include explicit disclosures for on‑chain/public data visibility.
+- Templates: `docs/LEGAL_TEMPLATES_MAINNET.md`
 
 ## 4) Logging + Redaction
 - **MUST** redact secrets (API keys, tokens, signatures, raw ciphertext) from logs.
@@ -60,6 +62,7 @@ This document defines **non‑negotiable** production requirements for a mainnet
 - **MUST** implement risk limits (per‑account, per‑IP, per‑day).
 - **MUST** separate hot/cold wallets with multi‑sig for cold storage.
 - **MUST** provide circuit‑breaker toggles for trading, swap, and purchase flows.
+- Risk config: `docs/MAINNET_RISK_CONTROLS.md`
 
 ## 10) Web2 Guard Production Requirements
 - **MUST** maintain a tight allowlist with explicit host + path_prefix rules.

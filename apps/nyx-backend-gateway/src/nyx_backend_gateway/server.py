@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 import nyx_backend_gateway.gateway as gateway
 import nyx_backend_gateway.metrics as metrics
 import nyx_backend_gateway.portal as portal
+import nyx_backend_gateway.risk as risk
 import nyx_backend_gateway.tracing as tracing
 from nyx_backend_gateway.env import load_env_file
 from nyx_backend_gateway.gateway import (
@@ -193,6 +194,46 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
         self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         self.send_header("Cache-Control", "no-store")
+
+    def _risk_guard(
+        self,
+        action: str,
+        *,
+        account_id: str | None,
+        client_ip: str | None,
+        amount: int | None = None,
+    ) -> None:
+        try:
+            self.server.risk_engine.check(
+                action,
+                account_id=account_id,
+                client_ip=client_ip,
+                amount=amount,
+            )
+        except GatewayApiError:
+            raise
+        except Exception as exc:
+            raise GatewayError(str(exc)) from exc
+
+    def _risk_failure(self, action: str) -> None:
+        try:
+            self.server.risk_engine.record_failure(action)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _parse_int(value: object | None) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str):
+            text = value.strip()
+            if text.isdigit():
+                return int(text)
+        return None
 
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         try:
@@ -528,11 +569,21 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 body = payload.get("body")
                 if not isinstance(body, str) or not body:
                     raise GatewayError("body required")
+                self._risk_guard(
+                    "chat_message",
+                    account_id=session.account_id,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=None,
+                )
                 conn = create_connection(_db_path())
                 try:
-                    message_fields, receipt = portal.post_message(
-                        conn, room_id=room_id, sender_account_id=session.account_id, body=body
-                    )
+                    try:
+                        message_fields, receipt = portal.post_message(
+                            conn, room_id=room_id, sender_account_id=session.account_id, body=body
+                        )
+                    except Exception:
+                        self._risk_failure("chat_message")
+                        raise
                 finally:
                     conn.close()
                 self._send_json({"message": message_fields, "receipt": receipt})
@@ -546,14 +597,27 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 if faucet_payload is None:
                     faucet_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 client_ip = self.client_address[0] if self.client_address else None
-                result, balance, fee_record = gateway.execute_wallet_faucet_v1(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=faucet_payload,
+                faucet_amount = None
+                if isinstance(faucet_payload, dict):
+                    faucet_amount = self._parse_int(faucet_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_faucet",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
                     client_ip=client_ip,
+                    amount=faucet_amount,
                 )
+                try:
+                    result, balance, fee_record = gateway.execute_wallet_faucet_v1(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=faucet_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                        client_ip=client_ip,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_faucet")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -583,13 +647,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     claim_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if not isinstance(claim_payload, dict):
                     raise GatewayError("payload must be object")
-                result, balance, fee_record, claim = gateway.execute_airdrop_claim_v1(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=claim_payload,
+                claim_amount = self._parse_int(claim_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_airdrop",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=claim_amount,
                 )
+                try:
+                    result, balance, fee_record, claim = gateway.execute_airdrop_claim_v1(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=claim_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_airdrop")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -628,13 +703,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "from_address must match authenticated wallet_address",
                         http_status=403,
                     )
-                result, balances, fee_record = execute_wallet_transfer(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=transfer_payload,
+                transfer_amount = self._parse_int(transfer_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_transfer",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=transfer_amount,
                 )
+                try:
+                    result, balances, fee_record = execute_wallet_transfer(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=transfer_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_transfer")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -667,15 +753,33 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 order_payload = payload.get("payload")
                 if order_payload is None:
                     order_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
-                result = execute_run(
-                    seed=seed,
-                    run_id=run_id,
-                    module="exchange",
-                    action="place_order",
-                    payload=order_payload,
-                    caller_wallet_address=account.wallet_address,
-                    caller_account_id=session.account_id,
+                notional = None
+                if isinstance(order_payload, dict):
+                    amount_val = self._parse_int(order_payload.get("amount"))
+                    price_val = self._parse_int(order_payload.get("price"))
+                    if amount_val is not None and price_val is not None:
+                        notional = amount_val * price_val
+                    else:
+                        notional = amount_val
+                self._risk_guard(
+                    "exchange_order",
+                    account_id=session.account_id,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=notional,
                 )
+                try:
+                    result = execute_run(
+                        seed=seed,
+                        run_id=run_id,
+                        module="exchange",
+                        action="place_order",
+                        payload=order_payload,
+                        caller_wallet_address=account.wallet_address,
+                        caller_account_id=session.account_id,
+                    )
+                except Exception:
+                    self._risk_failure("exchange_order")
+                    raise
                 response = {
                     "run_id": result.run_id,
                     "status": "complete",
@@ -695,15 +799,25 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 cancel_payload = payload.get("payload")
                 if cancel_payload is None:
                     cancel_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
-                result = execute_run(
-                    seed=seed,
-                    run_id=run_id,
-                    module="exchange",
-                    action="cancel_order",
-                    payload=cancel_payload,
-                    caller_wallet_address=account.wallet_address,
-                    caller_account_id=session.account_id,
+                self._risk_guard(
+                    "exchange_cancel",
+                    account_id=session.account_id,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=None,
                 )
+                try:
+                    result = execute_run(
+                        seed=seed,
+                        run_id=run_id,
+                        module="exchange",
+                        action="cancel_order",
+                        payload=cancel_payload,
+                        caller_wallet_address=account.wallet_address,
+                        caller_account_id=session.account_id,
+                    )
+                except Exception:
+                    self._risk_failure("exchange_cancel")
+                    raise
                 response = {
                     "run_id": result.run_id,
                     "status": "complete",
@@ -723,15 +837,25 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 message_payload = payload.get("payload")
                 if message_payload is None:
                     message_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
-                result = execute_run(
-                    seed=seed,
-                    run_id=run_id,
-                    module="chat",
-                    action="message_event",
-                    payload=message_payload,
-                    caller_wallet_address=account.wallet_address,
-                    caller_account_id=session.account_id,
+                self._risk_guard(
+                    "chat_message",
+                    account_id=session.account_id,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=None,
                 )
+                try:
+                    result = execute_run(
+                        seed=seed,
+                        run_id=run_id,
+                        module="chat",
+                        action="message_event",
+                        payload=message_payload,
+                        caller_wallet_address=account.wallet_address,
+                        caller_account_id=session.account_id,
+                    )
+                except Exception:
+                    self._risk_failure("chat_message")
+                    raise
                 response = {
                     "run_id": result.run_id,
                     "status": "complete",
@@ -751,13 +875,26 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 faucet_payload = payload.get("payload")
                 if faucet_payload is None:
                     faucet_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
-                result, balances, fee_record = execute_wallet_faucet(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=faucet_payload,
+                faucet_amount = None
+                if isinstance(faucet_payload, dict):
+                    faucet_amount = self._parse_int(faucet_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_faucet",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=faucet_amount,
                 )
+                try:
+                    result, balances, fee_record = execute_wallet_faucet(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=faucet_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_faucet")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -783,13 +920,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     claim_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if not isinstance(claim_payload, dict):
                     raise GatewayError("payload must be object")
-                result, balance, fee_record, claim = gateway.execute_airdrop_claim_v1(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=claim_payload,
+                claim_amount = self._parse_int(claim_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_airdrop",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=claim_amount,
                 )
+                try:
+                    result, balance, fee_record, claim = gateway.execute_airdrop_claim_v1(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=claim_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_airdrop")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -824,13 +972,24 @@ class GatewayHandler(BaseHTTPRequestHandler):
                         "from_address must match authenticated wallet_address",
                         http_status=403,
                     )
-                result, balances, fee_record = execute_wallet_transfer(
-                    seed=seed,
-                    run_id=run_id,
-                    payload=transfer_payload,
+                transfer_amount = self._parse_int(transfer_payload.get("amount"))
+                self._risk_guard(
+                    "wallet_transfer",
                     account_id=session.account_id,
-                    wallet_address=account.wallet_address,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=transfer_amount,
                 )
+                try:
+                    result, balances, fee_record = execute_wallet_transfer(
+                        seed=seed,
+                        run_id=run_id,
+                        payload=transfer_payload,
+                        account_id=session.account_id,
+                        wallet_address=account.wallet_address,
+                    )
+                except Exception:
+                    self._risk_failure("wallet_transfer")
+                    raise
                 self._send_json(
                     {
                         "run_id": result.run_id,
@@ -894,15 +1053,34 @@ class GatewayHandler(BaseHTTPRequestHandler):
                     purchase_payload = {k: v for k, v in payload.items() if k not in {"seed", "run_id"}}
                 if isinstance(purchase_payload, dict) and "buyer_id" not in purchase_payload:
                     purchase_payload["buyer_id"] = account.wallet_address
-                result = execute_run(
-                    seed=seed,
-                    run_id=run_id,
-                    module="marketplace",
-                    action="purchase_listing",
-                    payload=purchase_payload,
-                    caller_wallet_address=account.wallet_address,
-                    caller_account_id=session.account_id,
+                notional = None
+                if isinstance(purchase_payload, dict):
+                    qty_val = self._parse_int(purchase_payload.get("qty"))
+                    price_val = self._parse_int(purchase_payload.get("price"))
+                    amount_val = self._parse_int(purchase_payload.get("amount"))
+                    if qty_val is not None and price_val is not None:
+                        notional = qty_val * price_val
+                    elif amount_val is not None:
+                        notional = amount_val
+                self._risk_guard(
+                    "marketplace_purchase",
+                    account_id=session.account_id,
+                    client_ip=self.client_address[0] if self.client_address else None,
+                    amount=notional,
                 )
+                try:
+                    result = execute_run(
+                        seed=seed,
+                        run_id=run_id,
+                        module="marketplace",
+                        action="purchase_listing",
+                        payload=purchase_payload,
+                        caller_wallet_address=account.wallet_address,
+                        caller_account_id=session.account_id,
+                    )
+                except Exception:
+                    self._risk_failure("marketplace_purchase")
+                    raise
                 response = {
                     "run_id": result.run_id,
                     "status": "complete",
@@ -1914,6 +2092,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
 class GatewayServer(ThreadingHTTPServer):
     rate_limiter: RequestLimiter
     account_limiter: RequestLimiter
+    risk_engine: risk.RiskEngine
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8091) -> None:
@@ -1921,6 +2100,7 @@ def run_server(host: str = "0.0.0.0", port: int = 8091) -> None:
     server = GatewayServer((host, port), GatewayHandler)
     server.rate_limiter = RequestLimiter(_RATE_LIMIT, _RATE_WINDOW_SECONDS)
     server.account_limiter = RequestLimiter(_ACCOUNT_RATE_LIMIT, _RATE_WINDOW_SECONDS)
+    server.risk_engine = risk.RiskEngine.from_settings()
     server.serve_forever()
 
 

@@ -25,6 +25,7 @@ This document describes trust boundaries, threat assumptions, and secure default
 - **Web2 SSRF hardening**: DNS rebinding checks + redirect blocking.
 - **Wallet ≠ identity**: `account_id` and `wallet_address` are distinct; auth tokens bind to identity only.
 - **Compliance gating (optional)**: external compliance decisions occur before deterministic execution and are not part of evidence.
+- **Risk controls & circuit breakers**: shared-state mutations are subject to rate/amount limits and breaker rules (see `docs/MAINNET_RISK_CONTROLS.md`).
 
 ## 4) Key Custody Model
 
@@ -39,6 +40,7 @@ This document describes trust boundaries, threat assumptions, and secure default
 - `NYX_PORTAL_SESSION_SECRET` must be long in staging/prod.
 - API keys are optional, but if set must pass format validation.
 - `NYX_COMPLIANCE_ENABLED` + `NYX_COMPLIANCE_URL` enable compliance gating (fail-closed by default).
+- `NYX_RISK_MODE` enables risk controls and circuit breakers (`monitor`/`enforce` in prod).
 - `NYX_OTEL_ENABLED=true` enables OpenTelemetry spans (exported to stdout by default).
 
 ## 6) Logging & Redaction

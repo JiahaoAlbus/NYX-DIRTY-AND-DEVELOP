@@ -46,9 +46,9 @@
       "sha256": "a54865c6123050577e95f9f8a7e65845d3e3ca41138b779b7912f263e8b5d788"
     },
     {
-      "bytes": 1424814,
+      "bytes": 1454713,
       "path": "backend/nyx-backend.tar.gz",
-      "sha256": "6d80b5ac4c03a4892c8302d547858b471f5fa66c51d841e988f2d98ba6f584f5"
+      "sha256": "06a1c349bf072633758c9ef9415ea5cbfeda0600efe9859626bf79c6452021fe"
     },
     {
       "bytes": 221,
@@ -251,14 +251,24 @@
       "sha256": "c84e885e9c550110e450be2658fd3433416cbbc3573c3f83d5b2a6d0a7c96b0f"
     },
     {
+      "bytes": 56370,
+      "path": "proof/nyx-proof-20260211_115911.tar.gz",
+      "sha256": "e3cac3d5645434f6a81d0c65bdd05e01ad13e46d809b23bad16b41195427606f"
+    },
+    {
       "bytes": 71616,
       "path": "proof/nyx-proof-20260211_193224.tar.gz",
       "sha256": "35448d5420f9b69b636744eb950a6f051d33b26f915830cfddeba3bba4498dfb"
     },
     {
+      "bytes": 57745,
+      "path": "proof/nyx-proof-20260211_195857.tar.gz",
+      "sha256": "0fe73cdc498bd34b0ccd7ff031c17748552961a6917c76e5d870f257f9246b5e"
+    },
+    {
       "bytes": 1988,
       "path": "sbom.json",
-      "sha256": "dc02aaa7ba7158ba4a6ea9983a7ca527f1a7040cac59eab11d0610fd63c475a9"
+      "sha256": "d6354aaf29edcb8ce973ee2a3c9c9e2f244ca52bec560d127aea54ffe0f41b56"
     },
     {
       "bytes": 377,
@@ -283,9 +293,9 @@
     {
       "bytes": 3238115,
       "path": "web/nyx-portal-dist.zip",
-      "sha256": "a6a11209cb940f5d35c4d9cf1f73dd3e6fe1142ab4b585be1b1682e6e4bcd009"
+      "sha256": "6be7397c88e62277c98ce0b95c3ba89f3d2982c26ab90966be63d20c45dc01a2"
     }
   ],
-  "generated_at": "2026-02-11T11:38:58.831657Z",
+  "generated_at": "2026-02-11T11:59:26.737247Z",
   "release_dir": "/Users/huangjiahao/Desktop/NYX/nyx/release_artifacts"
 }

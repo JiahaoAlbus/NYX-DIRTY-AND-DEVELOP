@@ -123,6 +123,10 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 - Repo truth: `docs/REPO_TRUTH.md`
 - Security model: `docs/SECURITY_MODEL.md`
 - Compliance posture: `docs/COMPLIANCE_POSTURE.md`
+- Mainnet compliance template: `docs/MAINNET_COMPLIANCE_TEMPLATE.md`
+- Mainnet audit template: `docs/MAINNET_AUDIT_TEMPLATE.md`
+- Legal templates: `docs/LEGAL_TEMPLATES_MAINNET.md`
+- Mainnet risk controls: `docs/MAINNET_RISK_CONTROLS.md`
 - Operational readiness: `docs/OPERATIONAL_READINESS.md`
 - Product runbook: `docs/PRODUCT_RUNBOOK.md`
 - Testnet functionality matrix: `docs/FUNCTIONALITY_MATRIX_TESTNET_V1.md`
@@ -130,6 +134,8 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 - Production go-live checklist: `docs/PROD_GO_LIVE.md`
 - Evidence model: `docs/EVIDENCE_MODEL.md`
 - Full command list (Chinese): `docs/ALL_COMMANDS_CN.md`
+- Financing readiness: `docs/funding/FINANCING_READINESS.md`
+- Data room index: `docs/funding/DATA_ROOM_INDEX.md`
 
 ## Governance / Safety
 Some paths are frozen. Break-glass only:

@@ -57,6 +57,12 @@ Evidence backend (nyx-backend):
 - Negative balances or abnormal transfer spikes
 - Web2 guard errors > threshold
 
+## 4.1) Risk Controls & Circuit Breakers
+
+- 风控入口：`docs/MAINNET_RISK_CONTROLS.md`
+- 建议生产默认 `NYX_RISK_MODE=enforce`
+- 熔断触发应联动告警（错误爆发/异常金额）
+
 ## 5) Incident Response
 
 - **P1**: gateway down, evidence replay failure, or integrity failure

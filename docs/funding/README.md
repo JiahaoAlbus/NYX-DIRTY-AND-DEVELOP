@@ -11,6 +11,8 @@ This directory contains materials related to funding, grants, and strategic part
 -   **[Pitch Deck](./PITCH_DECK.md)**: Slide-format overview of the vision and roadmap.
 -   **[FAQ](./FAQ.md)**: Answers to tough questions about the model and technology.
 -   **[Grants Strategy](./GRANTS_STRATEGY.md)**: Specific grant applications and milestones.
+-   **[Financing Readiness](./FINANCING_READINESS.md)**: Engineering + compliance readiness summary.
+-   **[Data Room Index](./DATA_ROOM_INDEX.md)**: One-stop index of technical, security, and ops materials.
 
 ## Status
 -   **Stage**: Pre-Seed / Grant-Funded
