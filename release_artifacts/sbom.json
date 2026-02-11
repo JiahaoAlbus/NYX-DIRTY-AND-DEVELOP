@@ -1,0 +1,101 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "name": "nyx-world",
+      "scope": "application",
+      "type": "application",
+      "version": "0.0.0"
+    },
+    {
+      "name": "@noble/hashes",
+      "scope": "runtime",
+      "type": "library",
+      "version": "^1.3.3"
+    },
+    {
+      "name": "lucide-react",
+      "scope": "runtime",
+      "type": "library",
+      "version": "^0.563.0"
+    },
+    {
+      "name": "material-symbols",
+      "scope": "runtime",
+      "type": "library",
+      "version": "^0.17.0"
+    },
+    {
+      "name": "react",
+      "scope": "runtime",
+      "type": "library",
+      "version": "^19.2.3"
+    },
+    {
+      "name": "react-dom",
+      "scope": "runtime",
+      "type": "library",
+      "version": "^19.2.3"
+    },
+    {
+      "name": "@types/node",
+      "scope": "development",
+      "type": "library",
+      "version": "^22.14.0"
+    },
+    {
+      "name": "@vitejs/plugin-react",
+      "scope": "development",
+      "type": "library",
+      "version": "^5.0.0"
+    },
+    {
+      "name": "autoprefixer",
+      "scope": "development",
+      "type": "library",
+      "version": "^10.4.19"
+    },
+    {
+      "name": "postcss",
+      "scope": "development",
+      "type": "library",
+      "version": "^8.4.38"
+    },
+    {
+      "name": "tailwindcss",
+      "scope": "development",
+      "type": "library",
+      "version": "^3.4.10"
+    },
+    {
+      "name": "typescript",
+      "scope": "development",
+      "type": "library",
+      "version": "~5.8.2"
+    },
+    {
+      "name": "vite",
+      "scope": "development",
+      "type": "library",
+      "version": "^6.2.0"
+    },
+    {
+      "name": "python",
+      "scope": "runtime",
+      "type": "runtime",
+      "version": "3.10.14"
+    }
+  ],
+  "metadata": {
+    "timestamp": "2026-02-11T11:38:58.631841Z",
+    "tools": [
+      {
+        "name": "generate_sbom.py",
+        "vendor": "nyx",
+        "version": "1.0"
+      }
+    ]
+  },
+  "specVersion": "1.4",
+  "version": 1
+}

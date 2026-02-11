@@ -1,4 +1,5 @@
 # NYX iOS Installation
+Status: simulator build skipped.
 1. Use Xcode to run on simulator or device.
 2. For an installable iPhone IPA, set a Team ID and run: 'bash scripts/build_ios_ipa.sh'.
 3. Example:

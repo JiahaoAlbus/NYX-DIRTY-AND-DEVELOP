@@ -1,0 +1,291 @@
+{
+  "artifacts": [
+    {
+      "bytes": 9892,
+      "path": "EXTREME_GAP_REPORT.md",
+      "sha256": "b241497a27ec06ead61b0eae579bbadfc30711a385f83b7cd35ba43d4d88611a"
+    },
+    {
+      "bytes": 7331,
+      "path": "FUNCTIONALITY_MATRIX_TESTNET_V1.md",
+      "sha256": "404e76c4ba9bd3fcab95be960bbff2c2bd6d02959a814f0b99194147f7bef562"
+    },
+    {
+      "bytes": 2522,
+      "path": "MAINNET_PARITY.md",
+      "sha256": "840f4973506a31430bd1d020793fd7b116e9f7ae06751da0bf5c0ea5aa9ac44f"
+    },
+    {
+      "bytes": 3640,
+      "path": "PRODUCT_RUNBOOK.md",
+      "sha256": "f4e936054752addfb798b2ef7b5b11826f43f2dc2544d081d7af248aa599d14e"
+    },
+    {
+      "bytes": 4078,
+      "path": "PROD_GO_LIVE.md",
+      "sha256": "7e9906455da510c031b16907a8f327aa8d29351422f2efde68638fe0161b30c4"
+    },
+    {
+      "bytes": 5004,
+      "path": "PROTOCOL_INVARIANTS.md",
+      "sha256": "db6f17e11e50a95f982a7c3cf3f08f4df124892312be80362def2b4966303d61"
+    },
+    {
+      "bytes": 2707,
+      "path": "PUBLIC_KEYS_AND_REPLACEMENTS.md",
+      "sha256": "285f20b3404f5a06c1b892580340fde7005faede9bce7d94509a083405f2f462"
+    },
+    {
+      "bytes": 329,
+      "path": "RELEASE_NOTES_TESTNET_PORTAL_V1.md",
+      "sha256": "a4587151edeb719cbcfb91ceeadb874de21b682b36f0e15c71bd3475c2c55098"
+    },
+    {
+      "bytes": 195,
+      "path": "backend/INSTALL_BACKEND.md",
+      "sha256": "a54865c6123050577e95f9f8a7e65845d3e3ca41138b779b7912f263e8b5d788"
+    },
+    {
+      "bytes": 1424814,
+      "path": "backend/nyx-backend.tar.gz",
+      "sha256": "6d80b5ac4c03a4892c8302d547858b471f5fa66c51d841e988f2d98ba6f584f5"
+    },
+    {
+      "bytes": 221,
+      "path": "extension/INSTALL_EXTENSION.md",
+      "sha256": "a82ac789d061b8db567d4b9512af3adb90c60701aa00a49d8563fd81fa59ce95"
+    },
+    {
+      "bytes": 5417,
+      "path": "extension/nyx-extension.zip",
+      "sha256": "5dcbaaf9573b9c6af3c46374cbb5f756b476389b7e0893d3b4d84d69d6db7d8d"
+    },
+    {
+      "bytes": 524,
+      "path": "ios/INSTALL_IOS.md",
+      "sha256": "80c458a2bda664e6dfc1105e59224e72067e02ea94148b1450b143e534d9fb2d"
+    },
+    {
+      "bytes": 27467,
+      "path": "proof/nyx-proof-20260204_012757.tar.gz",
+      "sha256": "ad8b9e61422a50bfa2e31b1f5558890f4e26eb01f0df92e9c9290594f2e1bb59"
+    },
+    {
+      "bytes": 33208,
+      "path": "proof/nyx-proof-20260204_014038.tar.gz",
+      "sha256": "6dd941d6e7cfd19b9852ca353281f3dbc83349c04f384d2d9b6bf5bbf2f76535"
+    },
+    {
+      "bytes": 33444,
+      "path": "proof/nyx-proof-20260204_014234.tar.gz",
+      "sha256": "08ce9b603604de65993c565542abed75be030b2abb6cfdfc69ef6218732d2ef0"
+    },
+    {
+      "bytes": 32957,
+      "path": "proof/nyx-proof-20260204_014402.tar.gz",
+      "sha256": "c411b11066e30ee0530ce0e8d87a8718c4c01f771d68f902bda6991d85d863d4"
+    },
+    {
+      "bytes": 34417,
+      "path": "proof/nyx-proof-20260204_015919.tar.gz",
+      "sha256": "01bb2cdc1a9755897509d12c2b9861449553402b29e7f053796a5c0ddcd75b38"
+    },
+    {
+      "bytes": 33605,
+      "path": "proof/nyx-proof-20260204_015957.tar.gz",
+      "sha256": "c2514708cca778e300a7508501469a7aa86c757bd26f41afc671fe5f8609ae5d"
+    },
+    {
+      "bytes": 34096,
+      "path": "proof/nyx-proof-20260204_020658.tar.gz",
+      "sha256": "0948f0955108acdab949a211452460a2447378b42f581c939a586f3e9cfa12c5"
+    },
+    {
+      "bytes": 34233,
+      "path": "proof/nyx-proof-20260204_020801.tar.gz",
+      "sha256": "4b12da8e001a14970c284a56af250c9fe8c6e945968d5fae90eabeebfc2c4ea0"
+    },
+    {
+      "bytes": 34287,
+      "path": "proof/nyx-proof-20260204_020902.tar.gz",
+      "sha256": "4b8956b20e727df217ffa32b5a17e51c37821dab0ce8622ecd61634d2ce2fea9"
+    },
+    {
+      "bytes": 34210,
+      "path": "proof/nyx-proof-20260204_020954.tar.gz",
+      "sha256": "9cb7ccc8244c7a9046251f637b66f2b471255b28fb736d9f682a29d1cd2f40bc"
+    },
+    {
+      "bytes": 35784,
+      "path": "proof/nyx-proof-20260204_142314.tar.gz",
+      "sha256": "0cd9f21beda3528882a9aa4d756a8ab719e6a799760b4a615a07dcbc92ee9d76"
+    },
+    {
+      "bytes": 51066,
+      "path": "proof/nyx-proof-20260205_001544.tar.gz",
+      "sha256": "635211592f628382dea7b1041ec6fa44ed8c777752428f22217290d2603a4233"
+    },
+    {
+      "bytes": 50109,
+      "path": "proof/nyx-proof-20260205_001620.tar.gz",
+      "sha256": "0c0f0f43e923239d36d56cfd694dbf5f4c4973fac7057752abb674eb669b628b"
+    },
+    {
+      "bytes": 53358,
+      "path": "proof/nyx-proof-20260205_140215.tar.gz",
+      "sha256": "decd0138ca03d13a3f89e645d7f9590aa9b54157a4a497f71d10a0e5cb2dafd0"
+    },
+    {
+      "bytes": 53151,
+      "path": "proof/nyx-proof-20260205_140241.tar.gz",
+      "sha256": "d2577b1058cc862fe2a32c7630d422d09b54676b99ac9430d0de7d0dd848d45b"
+    },
+    {
+      "bytes": 56198,
+      "path": "proof/nyx-proof-20260205_142108.tar.gz",
+      "sha256": "9eb33bf016462d7d0e849791644366141fcf52edbb79965ef00c60014f9ef085"
+    },
+    {
+      "bytes": 56028,
+      "path": "proof/nyx-proof-20260205_142122.tar.gz",
+      "sha256": "0ef8e254cfcd4b5d1c62b7473463d4b7e7fabec0c933b9f3ff05eee0e74f68fe"
+    },
+    {
+      "bytes": 73768,
+      "path": "proof/nyx-proof-20260205_213610.tar.gz",
+      "sha256": "8b433a2daf8d140813a963d5a4156f4b667e03b35bdca1e76c81c17335ae8e21"
+    },
+    {
+      "bytes": 72361,
+      "path": "proof/nyx-proof-20260205_213634.tar.gz",
+      "sha256": "6ff8196a9b63a782e00161a3fb2eef2f1eca3b47d9c5b25ae228630c3f10972f"
+    },
+    {
+      "bytes": 73286,
+      "path": "proof/nyx-proof-20260205_214557.tar.gz",
+      "sha256": "efe6caad88b15de6969453416c90b01cb7ac7c18723e689c242af2cfc2174522"
+    },
+    {
+      "bytes": 73330,
+      "path": "proof/nyx-proof-20260205_224228.tar.gz",
+      "sha256": "5648c5502126e16150a55a0020aad055c46f65965e40e7edb2eed75883c87e30"
+    },
+    {
+      "bytes": 73560,
+      "path": "proof/nyx-proof-20260205_225629.tar.gz",
+      "sha256": "ad8eb91b9959ac555b24613c61cff0ccee8dea59108922d1655971ef8ce1714b"
+    },
+    {
+      "bytes": 73270,
+      "path": "proof/nyx-proof-20260208_184505.tar.gz",
+      "sha256": "3bbee2947d8d4ef04bc5b2699390292b1992e10b53457cb866d430dd57448ee8"
+    },
+    {
+      "bytes": 72178,
+      "path": "proof/nyx-proof-20260208_185059.tar.gz",
+      "sha256": "ce58b2f6a2a797ffbbf5fdf88264d20153569db17b0fac1a8a157656f03df2c6"
+    },
+    {
+      "bytes": 73408,
+      "path": "proof/nyx-proof-20260208_190600.tar.gz",
+      "sha256": "182dce110047c4498b2e1a393b499ab95050f752cb6ea07cde8103a551a10748"
+    },
+    {
+      "bytes": 73639,
+      "path": "proof/nyx-proof-20260208_191431.tar.gz",
+      "sha256": "b15870541e4e880e8d1aec43fb3edad3b95c7c45ecf3a67a033abf4fcc2a9f6d"
+    },
+    {
+      "bytes": 73722,
+      "path": "proof/nyx-proof-20260208_191909.tar.gz",
+      "sha256": "1a5be9f6233fb719e85e73650fe4f8f5cfc5c4946368ff153c6b7c06c66e714e"
+    },
+    {
+      "bytes": 73107,
+      "path": "proof/nyx-proof-20260208_192523.tar.gz",
+      "sha256": "aebdb4d28adf4a605eaf16faa371a910cb5eae782b85073511c05cc9a8a03d3c"
+    },
+    {
+      "bytes": 60682,
+      "path": "proof/nyx-proof-20260209_195343.tar.gz",
+      "sha256": "4584c9bbbb187ee731aa44b65d5f4673a6a3f21ebdbb07805578954f52981ddf"
+    },
+    {
+      "bytes": 75880,
+      "path": "proof/nyx-proof-20260211_025427.tar.gz",
+      "sha256": "f2b6342e7e6f211d93f1e2087671e37f45b132ae875ebb478f39b7dc90b145ba"
+    },
+    {
+      "bytes": 70818,
+      "path": "proof/nyx-proof-20260211_113243.tar.gz",
+      "sha256": "836c0e5320075c98e4a14a5c3ecc53d05ad59522a48e2b863442b656de63f975"
+    },
+    {
+      "bytes": 70909,
+      "path": "proof/nyx-proof-20260211_113332.tar.gz",
+      "sha256": "3cbeb53f2ef5e1f82c07dc1678c01925d4257d62fe2d653a73db7b7dbced57bd"
+    },
+    {
+      "bytes": 70996,
+      "path": "proof/nyx-proof-20260211_113415.tar.gz",
+      "sha256": "4c28ee8061646d2ebbf1bb69c544793247c1474811c0401c05fbf752158090c4"
+    },
+    {
+      "bytes": 71236,
+      "path": "proof/nyx-proof-20260211_113500.tar.gz",
+      "sha256": "aadaab48aea34fff2d98ecd37d27f36cc2cf3aaffa949a7bcecb544db90b8a8e"
+    },
+    {
+      "bytes": 71064,
+      "path": "proof/nyx-proof-20260211_113700.tar.gz",
+      "sha256": "41f6f757e3729b10106f9da6b94b9a6cf133a266f839b9fa845d5d60857447a6"
+    },
+    {
+      "bytes": 70791,
+      "path": "proof/nyx-proof-20260211_113754.tar.gz",
+      "sha256": "4f4d979b3d5b4094d1ae15c9bfba0a4b9063ca990e8cb8811e5950cab1d88903"
+    },
+    {
+      "bytes": 71321,
+      "path": "proof/nyx-proof-20260211_113845.tar.gz",
+      "sha256": "c84e885e9c550110e450be2658fd3433416cbbc3573c3f83d5b2a6d0a7c96b0f"
+    },
+    {
+      "bytes": 71616,
+      "path": "proof/nyx-proof-20260211_193224.tar.gz",
+      "sha256": "35448d5420f9b69b636744eb950a6f051d33b26f915830cfddeba3bba4498dfb"
+    },
+    {
+      "bytes": 1988,
+      "path": "sbom.json",
+      "sha256": "dc02aaa7ba7158ba4a6ea9983a7ca527f1a7040cac59eab11d0610fd63c475a9"
+    },
+    {
+      "bytes": 377,
+      "path": "verify_logs/chat_res.json",
+      "sha256": "3d65ddd4e2eadd05d353dfc20c75ef4429c0107406c481b6fe7456ee9f265b37"
+    },
+    {
+      "bytes": 428,
+      "path": "verify_logs/faucet_res.json",
+      "sha256": "9a2b76c505795245fda766ceeb74744e3e2a7a1387ae2a77c9ab1cfe7b9c3013"
+    },
+    {
+      "bytes": 549,
+      "path": "verify_logs/order_res.json",
+      "sha256": "6e5042f2fe69b5fcf6ec01df25f8e006467dd1111cd9db89dbb37ccac193fb41"
+    },
+    {
+      "bytes": 186,
+      "path": "web/INSTALL_WEB.md",
+      "sha256": "254b7b099f231179411f9306368a38bc1336db77f1d696cd838f907ac3b0dee6"
+    },
+    {
+      "bytes": 3238115,
+      "path": "web/nyx-portal-dist.zip",
+      "sha256": "a6a11209cb940f5d35c4d9cf1f73dd3e6fe1142ab4b585be1b1682e6e4bcd009"
+    }
+  ],
+  "generated_at": "2026-02-11T11:38:58.831657Z",
+  "release_dir": "/Users/huangjiahao/Desktop/NYX/nyx/release_artifacts"
+}

@@ -9,6 +9,21 @@ RUN_ID="smoke-${TIMESTAMP}"
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}"
 export TZ=UTC
 
+touch_epoch() {
+  local epoch="$1"
+  shift
+  local test_file
+  test_file="$(mktemp)"
+  if touch -d "@${epoch}" "${test_file}" 2>/dev/null; then
+    find "$@" -type f -exec touch -d "@${epoch}" {} +
+  else
+    local ts
+    ts="$(date -u -r "${epoch}" +"%Y%m%d%H%M.%S")"
+    find "$@" -type f -exec touch -t "${ts}" {} +
+  fi
+  rm -f "${test_file}"
+}
+
 mkdir -p "${RELEASE_DIR}/web" "${RELEASE_DIR}/backend" "${RELEASE_DIR}/extension" "${RELEASE_DIR}/ios" "${RELEASE_DIR}/proof"
 
 echo "--- Phase 1: Verification ---"
@@ -21,7 +36,7 @@ npm install
 npm run build
 cd ..
 rm -f "${RELEASE_DIR}/web/nyx-portal-dist.zip"
-find nyx-world/dist -type f -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
+touch_epoch "${SOURCE_DATE_EPOCH}" nyx-world/dist
 (
   cd nyx-world
   find dist -type f | LC_ALL=C sort | zip -X -@ "../${RELEASE_DIR}/web/nyx-portal-dist.zip"
@@ -48,18 +63,32 @@ cat <<EOF > ${RELEASE_DIR}/extension/INSTALL_EXTENSION.md
 EOF
 
 echo "--- Phase 4: iOS Build (Simulator) ---"
-DERIVED_DATA="$(pwd)/build_ios/DerivedData-${TIMESTAMP}"
-rm -rf "$DERIVED_DATA"
-xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj -scheme NYXPortal -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DERIVED_DATA" build
-APP_PATH="$(find "$DERIVED_DATA" -name "NYXPortal.app" -type d | head -n 1 || true)"
-if [[ -z "${APP_PATH:-}" ]]; then
-  echo "WARN: NYXPortal.app not found under $DERIVED_DATA" >&2
+IOS_BUILD_STATUS="skipped"
+if command -v xcodebuild >/dev/null 2>&1; then
+  if xcodebuild -license check >/dev/null 2>&1; then
+    DERIVED_DATA="$(pwd)/build_ios/DerivedData-${TIMESTAMP}"
+    rm -rf "$DERIVED_DATA"
+    xcodebuild -project apps/nyx-ios/NYXPortal.xcodeproj -scheme NYXPortal -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DERIVED_DATA" build
+    APP_PATH="$(find "$DERIVED_DATA" -name "NYXPortal.app" -type d | head -n 1 || true)"
+    if [[ -z "${APP_PATH:-}" ]]; then
+      echo "WARN: NYXPortal.app not found under $DERIVED_DATA" >&2
+    else
+      rm -rf "${RELEASE_DIR}/ios/NYXPortal.app"
+      cp -R "$APP_PATH" "${RELEASE_DIR}/ios/NYXPortal.app"
+      IOS_BUILD_STATUS="built"
+    fi
+  else
+    echo "WARN: Xcode license not accepted. Skipping iOS simulator build." >&2
+  fi
 else
+  echo "WARN: xcodebuild not found. Skipping iOS simulator build." >&2
+fi
+if [[ "${IOS_BUILD_STATUS}" != "built" ]]; then
   rm -rf "${RELEASE_DIR}/ios/NYXPortal.app"
-  cp -R "$APP_PATH" "${RELEASE_DIR}/ios/NYXPortal.app"
 fi
 cat <<EOF > ${RELEASE_DIR}/ios/INSTALL_IOS.md
 # NYX iOS Installation
+Status: simulator build ${IOS_BUILD_STATUS}.
 1. Use Xcode to run on simulator or device.
 2. For an installable iPhone IPA, set a Team ID and run: 'bash scripts/build_ios_ipa.sh'.
 3. Example:
@@ -71,9 +100,30 @@ cat <<EOF > ${RELEASE_DIR}/ios/INSTALL_IOS.md
 EOF
 
 echo "--- Phase 5: Backend Packaging ---"
-tar --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner -czf \
-  "${RELEASE_DIR}/backend/nyx-backend.tar.gz" \
-  apps/nyx-backend apps/nyx-backend-gateway packages
+TAR_BIN="tar"
+if command -v gtar >/dev/null 2>&1; then
+  if gtar --help 2>/dev/null | grep -q -- "--sort"; then
+    TAR_BIN="gtar"
+  fi
+fi
+touch_epoch "${SOURCE_DATE_EPOCH}" apps/nyx-backend apps/nyx-backend-gateway packages
+if "${TAR_BIN}" --help 2>/dev/null | grep -q -- "--sort"; then
+  "${TAR_BIN}" --sort=name --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner -czf \
+    "${RELEASE_DIR}/backend/nyx-backend.tar.gz" \
+    apps/nyx-backend apps/nyx-backend-gateway packages
+else
+  echo "WARN: ${TAR_BIN} lacks --sort support; using sorted file list for deterministic ordering." >&2
+  TAR_LIST="$(mktemp)"
+  find apps/nyx-backend apps/nyx-backend-gateway packages -type f | LC_ALL=C sort > "${TAR_LIST}"
+  if "${TAR_BIN}" --help 2>/dev/null | grep -q -- "--mtime"; then
+    "${TAR_BIN}" --mtime="@${SOURCE_DATE_EPOCH}" --owner=0 --group=0 --numeric-owner -czf \
+      "${RELEASE_DIR}/backend/nyx-backend.tar.gz" -T "${TAR_LIST}"
+  else
+    "${TAR_BIN}" --owner=0 --group=0 --numeric-owner -czf \
+      "${RELEASE_DIR}/backend/nyx-backend.tar.gz" -T "${TAR_LIST}"
+  fi
+  rm -f "${TAR_LIST}"
+fi
 cat <<EOF > ${RELEASE_DIR}/backend/INSTALL_BACKEND.md
 # NYX Backend Installation
 1. Extract nyx-backend.tar.gz
