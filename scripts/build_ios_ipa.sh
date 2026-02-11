@@ -18,25 +18,46 @@ ALLOW_PROVISIONING_UPDATES="${NYX_IOS_ALLOW_PROVISIONING_UPDATES:-1}"
 
 mkdir -p "$BUILD_DIR" "build_ios"
 
+is_team_id() {
+  local candidate="$1"
+  if [[ "${candidate}" =~ ^[A-Z0-9]{10}$ ]]; then
+    return 0
+  fi
+  return 1
+}
+
 detect_team_id() {
   local candidate=""
-  if command -v security >/dev/null 2>&1; then
-    candidate="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'[()]' '/Apple Development|iPhone Developer|Apple Distribution/ {print $2; exit}')"
-  fi
-  if [[ -z "$candidate" ]] && command -v xcodebuild >/dev/null 2>&1; then
+  if command -v xcodebuild >/dev/null 2>&1; then
     candidate="$(xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | awk -F' = ' '/DEVELOPMENT_TEAM/ {print $2; exit}')"
+    if is_team_id "${candidate}"; then
+      echo "${candidate}"
+      return 0
+    fi
   fi
-  echo "$candidate"
+  echo ""
 }
 
 if [[ -z "$TEAM_ID" ]]; then
   TEAM_ID="$(detect_team_id)"
 fi
 
+if ! is_team_id "${TEAM_ID:-}"; then
+  TEAM_ID=""
+fi
+
+if command -v xcodebuild >/dev/null 2>&1; then
+  if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos"; then
+    echo "❌ iOS platform not installed in Xcode."
+    echo "   Fix: Xcode → Settings → Components → install the iOS platform."
+    exit 1
+  fi
+fi
+
 if [[ -z "$TEAM_ID" && -z "${NYX_IOS_EXPORT_OPTIONS_PLIST:-}" ]]; then
   echo "❌ No Team ID detected for real-device signing."
   echo "   Fix: sign in to Xcode (Settings → Accounts) and re-run."
-  echo "   Or export NYX_IOS_TEAM_ID=ABCDE12345"
+  echo "   Or export NYX_IOS_TEAM_ID=ABCDE12345 (Team ID)"
   echo "   Optional: NYX_IOS_EXPORT_METHOD=development|ad-hoc|app-store|enterprise"
   exit 1
 fi
