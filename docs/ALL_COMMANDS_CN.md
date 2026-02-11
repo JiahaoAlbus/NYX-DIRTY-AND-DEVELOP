@@ -9,7 +9,7 @@
 
 | 命令 | 作用 |
 |---|---|
-| `gh repo clone JiahaoAlbus/attic/NYX-DIRTY-AND-DEVELOP` | 克隆主仓库。 |
+| `gh repo clone JiahaoAlbus/NYX-DIRTY-AND-DEVELOP` | 克隆主仓库。 |
 | `git status -sb` | 查看当前修改与分支状态。 |
 | `git log --oneline -5` | 查看最近 5 条提交。 |
 
@@ -139,6 +139,19 @@
 | `NYX_JUPITER_API_KEY` | Jupiter Quote 集成。 |
 | `NYX_MAGIC_EDEN_API_KEY` | Magic Eden 可选 key（上游接口可公开访问，但 key 可提速）。 |
 | `NYX_PAYEVM_API_KEY` | PayEVM（当前未接入，等待官方端点/回调规范）。 |
+
+---
+
+## 14) 版本发布 / Tag / 校验
+
+| 命令 | 作用 |
+|---|---|
+| `git tag -a testnet-1.0.1 -m "testnet release"` | 打版本 tag（示例）。 |
+| `git push target testnet-1.0.1` | 推送 tag 到主仓库。 |
+| `bash scripts/build_release_artifacts.sh` | 生成可发布产物（含校验与清单）。 |
+| `python scripts/generate_manifest.py` | 生成 release manifest.json（如需单独执行）。 |
+| `python scripts/generate_sbom.py` | 生成 SBOM。 |
+| `sha256sum -c release_artifacts/SHA256SUMS.txt` | 校验产物完整性。 |
 
 ---
 

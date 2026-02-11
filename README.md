@@ -99,17 +99,24 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 ## Tests & Validation Commands (What Each Does)
 | Command | Purpose |
 |---|---|
+| `bash scripts/nyx_conformance.sh` | Required conformance suite (determinism, fees, Web2 guard, replay). |
 | `bash scripts/nyx_verify_all.sh --seed 123 --run-id extreme-testnet` | Full end-to-end validation (wallet → trade → chat → store → evidence replay). |
 | `bash scripts/nyx_pack_proof_artifacts.sh` | Export verifiable proof bundle. |
 | `python scripts/nyx_run_all_unittests.py` | Run backend/unit test suite. |
 | `python scripts/nyx_smoke_all_modules.py` | Quick smoke check for core modules. |
 | `node scripts/nyx_e2ee_dm_roundtrip.mjs` | E2EE chat roundtrip validation. |
 | `python scripts/verify_e2ee_storage.py` | Verify ciphertext-only storage (no plaintext leakage). |
+| `bash scripts/check_no_fake_ui.sh` | Enforce NO‑FAKE‑UI policy for web portal. |
+| `python scripts/no_fake_code_check.py` | Static NO‑FAKE‑UI code checks. |
+| `python scripts/no_fake_gate_web.py` | Capabilities gate enforcement for web. |
+| `python scripts/nyx_ios_no_fake_gate.py` | Capabilities gate enforcement for iOS. |
+| `python scripts/nyx_secret_scan.py` | Local secret scan (fails on leaked keys). |
 | `python scripts/nyx_monitor_local.py` | Threshold-based alerts (API/DB/Evidence). |
 | `python scripts/nyx_metrics_exporter.py` | Metrics endpoint for Prometheus/Grafana. |
 | `bash scripts/nyx_backup_encrypted.sh` | Strong encrypted backup (AES-256-GCM + PBKDF2). |
 | `bash scripts/nyx_restore_encrypted.sh <enc> <out>` | Restore encrypted backup. |
 | `python scripts/nyx_economic_simulation.py --out-dir docs/economics` | Simulate fee economics for trade/airdrop flows and write charts/tables. |
+| `bash scripts/build_release_artifacts.sh` | Build reproducible release artifacts and checksums. |
 
 ## Documentation (Recommended)
 - Architecture map: `docs/ARCHITECTURE_MAP.md`
@@ -122,6 +129,7 @@ Docs: `docs/OPS_RUNBOOK_FREE_TIER.md` and `docs/DEPLOYMENT_FREE_TIER.md`.
 - Mainnet parity rules: `docs/MAINNET_PARITY.md`
 - Production go-live checklist: `docs/PROD_GO_LIVE.md`
 - Evidence model: `docs/EVIDENCE_MODEL.md`
+- Full command list (Chinese): `docs/ALL_COMMANDS_CN.md`
 
 ## Governance / Safety
 Some paths are frozen. Break-glass only:
